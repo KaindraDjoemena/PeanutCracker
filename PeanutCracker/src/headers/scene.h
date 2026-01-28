@@ -521,7 +521,8 @@ public:
 		// Camera Frustum Culling
 		bool isVisible = true;
 		if (node->sphereColliderComponent && node != worldNode.get()) {
-			if (!cameraObject.isInFrustum(*(node->sphereColliderComponent))) {
+			BoundingSphere boundingSphere = { node->sphereColliderComponent->worldCenter, node->sphereColliderComponent->worldRadius };
+			if (!cameraObject.frustum.isInFrustum(boundingSphere)) {
 				//std::cout << "culled " << node->name << std::endl;
 				isVisible = false;
 			}

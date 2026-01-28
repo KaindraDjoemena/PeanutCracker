@@ -33,7 +33,7 @@ add_executable(PeanutCracker
     "PeanutCracker/src/headers/assetManager.h"
     "PeanutCracker/src/headers/ray.h"
     "PeanutCracker/src/ImGuizmo.cpp"
- "PeanutCracker/src/headers/shadowCasterComponent.h" "PeanutCracker/src/headers/sphereColliderComponent.h")
+ "PeanutCracker/src/headers/shadowCasterComponent.h" "PeanutCracker/src/headers/sphereColliderComponent.h" "PeanutCracker/src/headers/frustum.h" "PeanutCracker/src/frustum.cpp")
 
 target_include_directories(PeanutCracker PRIVATE
     "PeanutCracker/src"

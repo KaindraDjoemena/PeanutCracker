@@ -2,27 +2,15 @@
 #define CAMERA_H
 
 #include "ray.h"
+#include "frustum.h"
 #include "sphereColliderComponent.h"
 
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <array>
 
-struct Frustum_Plane {
-	glm::vec3 normal;
-	float	  distance;
-};
-
-// CAMERA FRUSTUM
-struct Camera_Frustum {
-	Frustum_Plane left;
-	Frustum_Plane right;
-	Frustum_Plane bottom;
-	Frustum_Plane top;
-	Frustum_Plane near;
-	Frustum_Plane far;
-};
 
 // CAMERA MOVEMENT ENUM
 enum Camera_Movement {
@@ -69,7 +57,7 @@ public:
 	float farPlane;
 	float aspect;
 
-	Camera_Frustum frustum;
+	Frustum frustum;
 
 	// CONSTRUCTOR WITH VECTORS
 	Camera(const glm::vec3& positionIn = glm::vec3(0.0f, 0.0f, 0.0f),
@@ -90,7 +78,7 @@ public:
 		lookSpeed = i_lookSpeed;
 		position = positionIn;
 		worldUp = worldUpIn;
-		createCameraFrustum(aspect);
+		frustum.constructFrustum(aspect, getPerspectiveProjectionMatrix(aspect), getViewMatrix());
 		updateCameraVectors();
 	}
 
@@ -105,8 +93,21 @@ public:
 		, zoom(ZOOM) {
 		position = glm::vec3(posX, posY, posZ);
 		worldUp = glm::vec3(upX, upY, upZ);
-		createCameraFrustum(aspect);
+		frustum.constructFrustum(aspect, getPerspectiveProjectionMatrix(aspect), getViewMatrix());
 		updateCameraVectors();
+	}
+
+	void setPitchYaw(float pitch, float yaw) {
+		this->yaw = yaw;
+		this->pitch = pitch;
+		if (this->pitch > 89.0) { this->pitch = 89.0; }
+		if (this->pitch < -89.0) { this->pitch = -89.0; }
+
+		updateCameraVectors();
+	}
+
+	std::array<float, 2> getPitchYaw() const {
+		return { pitch, yaw };
 	}
 
 	glm::mat4 getViewMatrix() const {
@@ -141,27 +142,6 @@ public:
 		return mouseRay;
 	}
 
-	bool isInFrustum(const SphereColliderComponent& sphere) const {
-		if (isOutsidePlane(sphere, frustum.left)   || isOutsidePlane(sphere, frustum.right) ||
-			isOutsidePlane(sphere, frustum.bottom) || isOutsidePlane(sphere, frustum.top)	||
-			isOutsidePlane(sphere, frustum.near)   || isOutsidePlane(sphere, frustum.far)
-		) {
-			std::cout << "NOT IN frustum" << '\n';
-			return false;
-		}
-
-		std::cout << "IN frustum" << '\n';
-		return true;
-
-	}
-
-	bool isOutsidePlane(const SphereColliderComponent& sphere, Frustum_Plane plane) const {
-		float distance = glm::dot(plane.normal, sphere.worldCenter) + plane.distance;
-		//std::cout << "Dist: " << distance << " | -Radius: " << -sphere.worldRadius << std::endl;
-		if (distance < -sphere.localRadius) { return true; }
-		return false;
-	}
-
 	void processInput(Camera_Movement type, float deltaTime) {
 		float moveVelocity = movementSpeed * deltaTime;
 		if (type == FORWARD)	position += front * moveVelocity;
@@ -188,55 +168,13 @@ public:
 		yaw	  += xOffset;
 		pitch += yOffset;
 
-		// Clamping the pitch values
-		if (constrainPitch) {
-			if (pitch > 89.0) { pitch = 89.0; }
-			if (pitch < -89.0) { pitch = -89.0; }
-		}
-
-		updateCameraVectors();
+		setPitchYaw(pitch, yaw);
 	}
 
 	void processMouseScroll(double yOffset) {
 		zoom -= (double)yOffset;
 		if (zoom < 1.0) { zoom = 1.0; }
 		if (zoom > 45.0) { zoom = 45.0; }
-	}
-
-	void createCameraFrustum(float aspect) {
-		glm::mat4 viewProjMat = getPerspectiveProjectionMatrix(aspect) * getViewMatrix();
-
-		for (int i = 0; i < 3; i++) {
-			float posA = viewProjMat[3][0] + viewProjMat[i][0];
-			float posB = viewProjMat[3][1] + viewProjMat[i][1];
-			float posC = viewProjMat[3][2] + viewProjMat[i][2];
-			float posD = viewProjMat[3][3] + viewProjMat[i][3];
-			glm::vec3 posN = glm::normalize(glm::vec3(posA, posB, posC));
-
-			float negA = viewProjMat[3][0] - viewProjMat[i][0];
-			float negB = viewProjMat[3][1] - viewProjMat[i][1];
-			float negC = viewProjMat[3][2] - viewProjMat[i][2];
-			float negD = viewProjMat[3][3] - viewProjMat[i][3];
-			glm::vec3 negN = glm::normalize(glm::vec3(negA, negB, negC));
-
-
-			switch (i) {
-			case 0:
-				frustum.left	= { posN, posD };
-				frustum.right	= { negN, negD };
-				break;
-			case 1:
-				frustum.bottom	= { posN, posD };
-				frustum.top		= { negN, negD };
-				break;
-			case 2:
-				frustum.near	= { posN, posD };
-				frustum.far		= { negN, negD };
-				break;
-			default:
-				break;
-			}
-		}
 	}
 
 private:
@@ -255,4 +193,4 @@ private:
 	}
 };
 
-#endif CAMERA_H
+#endif
