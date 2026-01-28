@@ -305,13 +305,10 @@ int main() {
 		glClearColor(WINDOW_BACKGROUND_COLOR.r, WINDOW_BACKGROUND_COLOR.g, WINDOW_BACKGROUND_COLOR.b, WINDOW_BACKGROUND_COLOR.a);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
-		// MASTER TRANSFORMATIONS
-		glm::mat4 projectionMat = cameraObject.getPerspectiveProjectionMatrix(aspect);
-		glm::mat4 viewMat		= cameraObject.getViewMatrix();
 
 		// SCENE RENDERING
-		cameraObject.frustum.constructFrustum(aspect, projectionMat, viewMat);
-		scene.draw(cameraObject, vSize.x, vSize.y, projectionMat, viewMat, cameraObject.position);
+		/*cameraObject.frustum.constructFrustum(aspect, projectionMat, viewMat);*/
+		scene.draw(cameraObject, vSize.x, vSize.y);
 
 		// UNBIND FRAME BUFFER
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);

@@ -426,9 +426,37 @@ public:
 	}
 
 	// RENDERING
-	void draw(const Camera& cameraObject, float vWidth, float vHeight, const glm::mat4& projection, const glm::mat4& view, const glm::vec3& cameraPos) {
+	void draw(Camera& camera, float vWidth, float vHeight) {
 		GLint previousFBO;
 		glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previousFBO);
+
+		// --Updating Camera vectors
+		camera.updateCameraVectors();
+
+		for (auto& dirLight : directionalLights) {
+			if (dirLight->shadowCasterComponent) {
+				//std::cout << "Light direction: "
+				//	<< dirLight->direction.x << ", "
+				//	<< dirLight->direction.y << ", "
+				//	<< dirLight->direction.z << std::endl;
+
+				// Check if direction is valid before calc
+				if (glm::length(dirLight->direction) < 0.001f) {
+					std::cerr << "ERROR: Direction is zero or near-zero!" << std::endl;
+				}
+				if (glm::any(glm::isnan(dirLight->direction))) {
+					std::cerr << "ERROR: Direction contains NaN!" << std::endl;
+				}
+
+				dirLight->shadowCasterComponent->calcLightSpaceMat(dirLight->direction);
+
+				// Check result immediately
+				glm::mat4 test = dirLight->shadowCasterComponent->getLightSpaceMatrix();
+				if (glm::any(glm::isnan(test[0]))) {
+					std::cerr << "Matrix became NaN inside calcLightSpaceMat!" << std::endl;
+				}
+			}
+		}
 
 		// --Updating Light Space Matrices
 		for (auto& dirLight : directionalLights) {
@@ -438,13 +466,20 @@ public:
 		}
 
 		// --Updating UBOs
-		updateCameraUBO(projection, view, cameraPos);
+		updateCameraUBO(camera.getProjMat(vWidth / vHeight), camera.getViewMat(), camera.position);
 		updateLightingUBO();
 		updateShadowUBO();
 
 
-		// DEPTH PASS
-		if (!directionalLights.empty() && directionalLights[0]->shadowCasterComponent) {
+		// SHADOW PASS
+		bool hasAnyShadowCaster = false;
+		for (auto& light : directionalLights) {
+			if (light->shadowCasterComponent) {
+				hasAnyShadowCaster = true;
+				break;
+			}
+		}
+		if (hasAnyShadowCaster) {
 			const glm::vec2 res = directionalLights[0]->shadowCasterComponent->getShadowMapRes();
 			glViewport(0, 0, res.x, res.y);
 
@@ -452,9 +487,10 @@ public:
 			
 			glEnable(GL_DEPTH_TEST);
 			glEnable(GL_CULL_FACE);
-			glCullFace(GL_FRONT);   // IMPORTANT
+			glCullFace(GL_FRONT);		// Sampilng on the far face
 
-			// --Rendering each object for each light from the lights pov
+			// --Rendering each object for each light from the lights pov,
+			// and storing the depth value to an FBO
 			for (auto& dirLight : directionalLights) {
 				if (!dirLight->shadowCasterComponent) continue;
 
@@ -474,9 +510,9 @@ public:
 			//glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		}
 
-		glBindFramebuffer(GL_FRAMEBUFFER, previousFBO);
 
-		// RENDER PASS
+		// LIGHT PASS
+		glBindFramebuffer(GL_FRAMEBUFFER, previousFBO);
 		glViewport(0, 0, vWidth, vHeight);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -499,15 +535,15 @@ public:
 		setNodeShadowMapUniforms(worldNode.get());
 
 		if (renderMode == Render_Mode::WIREFRAME) { glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); }
-		renderRecursive(cameraObject, worldNode.get());
+		renderRecursive(camera, worldNode.get());
 		if (renderMode == Render_Mode::WIREFRAME) { glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); }
 
 
 
 
-		glDisable(GL_CULL_FACE);
-		glDisable(GL_DEPTH_TEST);
-		drawDirectionalLightFrustums(view, projection);
+		//glDisable(GL_CULL_FACE);
+		//glDisable(GL_DEPTH_TEST);
+		drawDirectionalLightFrustums(camera.getProjMat(vWidth / vHeight), camera.getViewMat());
 
 		// Drawing selected objects
 		drawSelectionStencil();
@@ -517,13 +553,13 @@ public:
 
 	// RENDERING
 	// --For objects
-	void renderRecursive(const Camera& cameraObject, SceneNode* node) const {
+	void renderRecursive(const Camera& camera, SceneNode* node) const {
 		// Camera Frustum Culling
 		bool isVisible = true;
 		if (node->sphereColliderComponent && node != worldNode.get()) {
 			BoundingSphere boundingSphere = { node->sphereColliderComponent->worldCenter, node->sphereColliderComponent->worldRadius };
-			if (!cameraObject.frustum.isInFrustum(boundingSphere)) {
-				//std::cout << "culled " << node->name << std::endl;
+			if (!camera.frustum.isInFrustum(boundingSphere)) {
+				std::cout << "culled " << node->name << std::endl;
 				isVisible = false;
 			}
 		}
@@ -535,7 +571,7 @@ public:
 			}
 
 			for (auto& child : node->children) {
-				renderRecursive(cameraObject, child.get());
+				renderRecursive(camera, child.get());
 			}
 		}
 	}
@@ -639,24 +675,36 @@ private:
 			"defaultshaders/lightFrustum.frag"
 		);
 	}
-	void drawDirectionalLightFrustums(const glm::mat4& view, const glm::mat4& proj) const {
+	void drawDirectionalLightFrustums(const glm::mat4& projMat, const glm::mat4& viewMat) const {
 		if (!drawLightFrustums || !frustumVAO) return;
 
+		GLenum err;
+		while ((err = glGetError()) != GL_NO_ERROR) {
+			std::cerr << "OpenGL error: " << err << std::endl;
+		}
+
+
 		glDisable(GL_DEPTH_TEST);
+		glLineWidth(2.0f);
 
 		frustumShader->use();
-		frustumShader->setMat4("view", view);
-		frustumShader->setMat4("projection", proj);
+		frustumShader->setMat4("projection", projMat);
+		frustumShader->setMat4("view", viewMat);
 		frustumShader->setVec3("color", glm::vec3(1, 0, 1));
 
 		glBindVertexArray(frustumVAO);
 
 		for (auto& dirLight : directionalLights) {
 			if (!dirLight->shadowCasterComponent) continue;
+			
+			glm::mat4 lightVP = dirLight->shadowCasterComponent->getLightSpaceMatrix();
+			if (glm::any(glm::isnan(lightVP[0])) || glm::any(glm::isinf(lightVP[0]))) {
+				//std::cerr << "Invalid light space matrix for dir light" << std::endl;
+				continue;
+			}
 
-			glm::mat4 invLightVP =
-				glm::inverse(dirLight->shadowCasterComponent->getLightSpaceMatrix());
 
+			glm::mat4 invLightVP = glm::inverse(lightVP);
 			frustumShader->setMat4("model", invLightVP);
 			glDrawArrays(GL_LINES, 0, 24);
 		}
@@ -750,6 +798,7 @@ private:
 		glBindBuffer(GL_UNIFORM_BUFFER, 0);
 	}
 
+	// LOAD EVERY SHADOW MAP TO OBJECT SHADERS
 	void setNodeShadowMapUniforms(SceneNode* node) const {
 		if (node->object && node->object->shaderPtr) {
 			node->object->shaderPtr->use();

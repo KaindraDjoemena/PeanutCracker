@@ -17,6 +17,8 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/quaternion.hpp> 
 
+#include <array>
+
 
 template<typename T>
 void widgetStretch(T&& func) {
@@ -257,33 +259,78 @@ public:
 			for (auto& dirLight : scene.directionalLights) {
 
 				ImGui::Indent();
-				ImGui::Text("Direction");
-				glm::vec3 posDisplay = dirLight->direction;
-				glm::vec3 tempScale = posDisplay;
+				ImGui::Text("Direction (World Space)");
+				ImGui::SameLine();
+				ImGui::TextDisabled("(?)");
+				if (ImGui::IsItemHovered())
+					ImGui::SetTooltip("Direction the light points toward");
+
+				glm::vec3 tempDir = dirLight->direction;
 				widgetStretch([&]() {
-					if (ImGui::DragFloat3("##Direction", glm::value_ptr(tempScale), 0.05f)) {
-						dirLight->direction = tempScale;
+					if (ImGui::DragFloat3("##Direction", glm::value_ptr(tempDir), 0.05f)) {
+						dirLight->direction = glm::normalize(tempDir);
 					}
 				});
 
-				ImGui::Text("Frustum (Light Space)");
-				Light_Frustum frustum = dirLight->shadowCasterComponent->getFrustum();
-				glm::vec2 tempLeftRight = frustum.leftRight;
-				glm::vec2 tempBotTop	= frustum.bottomTop;
-				glm::vec2 tempNearfar	= frustum.nearFar;
-				if (ImGui::DragFloat2("L/R", glm::value_ptr(tempLeftRight), 0.05f)) {
-					dirLight->shadowCasterComponent->setFrustum(tempLeftRight, tempBotTop, tempNearfar);
-				}
-				if (ImGui::DragFloat2("B/T", glm::value_ptr(tempBotTop), 0.05f)) {
-					dirLight->shadowCasterComponent->setFrustum(tempLeftRight, tempBotTop, tempNearfar);
-				}
-				if (ImGui::DragFloat2("N/F", glm::value_ptr(tempNearfar), 0.05f)) {
-					dirLight->shadowCasterComponent->setFrustum(tempLeftRight, tempBotTop, tempNearfar);
-				}
-				ImGui::Unindent();
+				//ImGui::Spacing();
+				ImGui::Separator();
+				//ImGui::Spacing();
 
+				ImGui::Text("Frustum (Light Space)");
+
+				std::array<float, 6> planes = dirLight->shadowCasterComponent->getPlanes();
+				bool changed = false;
+
+				if (ImGui::BeginTable("FrustumPlanes", 2, ImGuiTableFlags_SizingStretchProp)) {
+					ImGui::TableNextColumn();
+					ImGui::Text("L/R");
+					ImGui::TableNextColumn();
+					changed |= ImGui::DragFloat2("##LR", &planes[0], 0.1f);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("B/T");
+					ImGui::TableNextColumn();
+					changed |= ImGui::DragFloat2("##BT", &planes[2], 0.1f);
+
+					ImGui::TableNextColumn();
+					ImGui::Text("N/F");
+					ImGui::TableNextColumn();
+					changed |= ImGui::DragFloat2("##NF", &planes[4], 0.1f);
+
+					ImGui::EndTable();
+				}
+
+				if (changed) {
+					// Validation prevents NaN matrices
+					if (planes[0] < planes[1] && planes[2] < planes[3] && planes[4] < planes[5]) {
+						dirLight->shadowCasterComponent->setFrustumPlanes(
+							planes[0], planes[1], planes[2], planes[3], planes[4], planes[5]
+						);
+					}
+					else {
+						ImGui::TextColored(ImVec4(1, 0, 0, 1), "Invalid: Min must be < Max!");
+					}
+				}
+
+				// Presets
+				ImGui::Spacing();
+				if (ImGui::Button("Small (10m)")) {
+					dirLight->shadowCasterComponent->setFrustumPlanes(-5, 5, -5, 5, 0.1f, 20);
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Medium (50m)")) {
+					dirLight->shadowCasterComponent->setFrustumPlanes(-25, 25, -25, 25, 0.1f, 50);
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Large (100m)")) {
+					dirLight->shadowCasterComponent->setFrustumPlanes(-50, 50, -50, 50, 0.1f, 100);
+				}
+
+
+				ImGui::Unindent();
 			}
 		}
+
 		ImGui::End();
 
 
@@ -308,9 +355,9 @@ public:
 		}
 
 		// CAMERA MATRICES
-		glm::mat4 view = camera.getViewMatrix();
+		glm::mat4 view = camera.getViewMat();
 		float aspect = viewportSize.x / viewportSize.y;
-		glm::mat4 proj = camera.getPerspectiveProjectionMatrix(aspect);
+		glm::mat4 proj = camera.getProjMat(aspect);
 
 		//glEnable(GL_DEPTH_TEST);
 		//ImGuizmo::DrawGrid(
@@ -502,7 +549,8 @@ private:
 		ImGui::SetNextWindowPos(ImVec2(0, height - statusbarHeight));
 		ImGui::SetNextWindowSize(ImVec2(width, statusbarHeight));
 		ImGui::Begin("##StatusBar", NULL, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoInputs);
-		ImGui::Text("v0.2 | FPS: %.1f | Zoom: %.1f | (%.1f, %.1f, %.1f)", ImGui::GetIO().Framerate, camera.zoom, camera.position.x, camera.position.y, camera.position.z);
+		ImGui::Text("v0.2 | FPS: %.1f | Zoom: %.1f | P(%.1f, %.1f, %.1f) D(%.1f, %.1f, %.1f)",
+			ImGui::GetIO().Framerate, camera.zoom, camera.position.x, camera.position.y, camera.position.z, camera.front.x, camera.front.y, camera.front.z);
 		
 		//ImGui::SameLine();
 		//ImGui::Text("cam(x/y/z): ");

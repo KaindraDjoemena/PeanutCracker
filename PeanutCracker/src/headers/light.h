@@ -81,7 +81,7 @@ public:
 
 class DirectionalLight : public BaseLight {
 public:
-	glm::vec3 direction;
+	glm::vec3 direction;	// O(0, 0, 0) - direction
 	Light	  light;
 
 	std::unique_ptr<ShadowCasterComponent> shadowCasterComponent;

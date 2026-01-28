@@ -52,7 +52,7 @@ struct SpotLightStruct {
 };
 
 uniform Material material;
-uniform sampler2D DirectionalShadowMap[MAX_LIGHTS];
+uniform sampler2DShadow DirectionalShadowMap[MAX_LIGHTS];
 
 layout (std140) uniform CameraMatricesUBOData {
     mat4 projection;
@@ -78,16 +78,15 @@ struct ShadowMatricesUBOData {					    // 1536 Bytes
 
 
 // FUNCTION PROTOTYPES (Standardized to use 'light' as parameter name)
+vec3 calcAmbient(vec3 ambientColor);
+vec3 calcDiffuse(vec3 lightDir, vec3 normal, vec3 diffuseColor);
+vec3 calcSpecular(vec3 lightDir, vec3 normal, vec3 viewDir, vec3 specularColor);
+float calcShadow(int lightIndex, vec4 fragPosLightSpace, vec3 normal, vec3 lightDir);
+
 vec3 calcDirectionalLight(DirectionalLightStruct light, vec3 normal, vec3 viewDir, int lightIndex);
 vec3 calcPointLight(PointLightStruct light, vec3 normal, vec3 viewDir);
 vec3 calcSpotLight(SpotLightStruct light, vec3 normal, vec3 viewDir);
 
-vec3 calcDirectionalLight(DirectionalLightStruct light, vec3 normal, vec3 viewDir);
-
-vec3 calcAmbient(vec3 ambientColor);
-vec3 calcDiffuse(vec3 lightDir, vec3 normal, vec3 diffuseColor);
-vec3 calcSpecular(vec3 lightDir, vec3 normal, vec3 viewDir, vec3 specularColor);
-float calcDirShadow(vec3 lightDir, vec3 normal, int lightIndex);
 
 /* ======================================================== MAIN === */
 void main() {
@@ -118,9 +117,9 @@ vec3 calcDirectionalLight(DirectionalLightStruct light, vec3 normal, vec3 viewDi
     vec3 diffuse  = calcDiffuse(lightDir, normal, light.diffuse.xyz);
     vec3 specular = calcSpecular(lightDir, normal, viewDir, light.specular.xyz);
 
-    float shadow = calcDirShadow(lightDir, normal, lightIndex);
+    float shadow = calcShadow(lightIndex, DirectionalLightSpacePos[lightIndex], normal, lightDir);
 
-    return ambient + (diffuse + specular) * shadow;
+    return (ambient + (diffuse + specular) * (1.0f - shadow));
 }
 vec3 calcPointLight(PointLightStruct light, vec3 normal, vec3 viewDir) {
     vec3 lightDir = normalize(light.position.xyz - FragPos);
@@ -169,24 +168,24 @@ vec3 calcSpecular(vec3 lightDir, vec3 normal, vec3 viewDir, vec3 specularColor) 
     return specularColor * spec * vec3(texture(material.texture_specular1, TexCoord));
 }
 
-/* ===================== SHADOW MAPPING ===================== */
-float calcDirShadow(vec3 lightDir, vec3 normal, int lightIndex) {
-    vec3 projCoords = DirectionalLightSpacePos[lightIndex].xyz / DirectionalLightSpacePos[lightIndex].w;
 
-    // NDC [-1, +1] → [0,1]
+float calcShadow(int lightIndex, vec4 fragPosLightSpace, vec3 normal, vec3 lightDir) {
+    // Projected coords from scene to lights near plane [-1, +1]
+    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+    
+    // [-1, +1] -> [0, +1]
     projCoords = projCoords * 0.5f + 0.5f;
-
-    // Outside shadow map = fully lit
-    if (projCoords.x < 0.0f || projCoords.x > 1.0f ||
-        projCoords.y < 0.0f || projCoords.y > 1.0f ||
-        projCoords.z > 1.0f) {
-        return 1.0f;
+    
+    // No shadow outside the lights frustum
+    if(projCoords.z > 1.0f || projCoords.x < 0.0f ||
+       projCoords.x > 1.0f || projCoords.y < 0.0f || projCoords.y > 1.0f) {
+        return 0.0;
     }
-
-    float closestDepth = texture(DirectionalShadowMap[lightIndex], projCoords.xy).r;
-    float currentDepth = projCoords.z;
-
-    float bias = max(0.05f * (1.0f - dot(normal, lightDir)), 0.005f);
-
-    return (currentDepth - bias > closestDepth) ? 0.0f : 1.0f;
+    
+    // Bias
+    float bias = max(0.05f * (1.0f - dot(normal, -lightDir)), 0.005f);
+   
+    float shadow = texture(DirectionalShadowMap[lightIndex], vec3(projCoords.xy, projCoords.z - bias));
+    
+    return 1.0 - shadow; // Return shadow factor (0 = lit, 1 = shadow)
 }

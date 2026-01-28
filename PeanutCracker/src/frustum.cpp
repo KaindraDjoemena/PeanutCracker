@@ -22,7 +22,6 @@ void Frustum::constructFrustum(float aspect, const glm::mat4& projectionMat, con
 	}
 }
 
-
 bool Frustum::isInFrustum(const BoundingSphere& sphere) const {
 	// Iterate over planes
 	for (int i = 0; i < 6; i++) {
