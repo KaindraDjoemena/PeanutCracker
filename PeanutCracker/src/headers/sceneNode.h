@@ -6,6 +6,7 @@
 
 #include "transform.h"
 #include "object.h"
+#include "sphereColliderComponent.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -18,23 +19,26 @@
 
 class SceneNode {
 public:
-	std::string		name;
-	Transform		localTransform;
-	glm::mat4		worldMatrix;
-	bool			isDirty	= true;
-	bool			isSelected = false;
-
-	SceneNode*		parent = nullptr;
+	std::string	name;
+	Transform	localTransform;
+	glm::mat4	worldMatrix;
+	bool		isDirty	= true;
+	bool		isSelected = false;
+	SceneNode*								parent = nullptr;
 	std::vector<std::unique_ptr<SceneNode>>	children;
+	std::unique_ptr<Object>	object = nullptr;
 
-	std::unique_ptr<Object> object = nullptr;
+	std::unique_ptr<SphereColliderComponent> sphereColliderComponent;
 
-	SceneNode(std::string i_name) : name(i_name) {}
+	SceneNode(std::string i_name) : name(i_name) {
+		sphereColliderComponent = std::make_unique<SphereColliderComponent>(localTransform.position, 1.0f);
+	}
 
 	glm::vec3 getPosition() const { return localTransform.position; }
 	glm::vec3 getScale() const { return localTransform.scale; }
 	glm::vec3 getEulerRotation() const { return glm::degrees(glm::eulerAngles(localTransform.quatRotation)); }
 
+	// --Setters
 	void setPosition(const glm::vec3& pos) {
 		localTransform.position = pos;
 		isDirty = true;
@@ -51,6 +55,20 @@ public:
 		isDirty = true;
 	}
 
+
+	void setSphereComponentRadius() {
+		if (object && object->modelPtr) {
+			glm::vec3 maxAABB = object->modelPtr->aabb.max;
+			glm::vec3 minAABB = object->modelPtr->aabb.min;
+
+			float maxExtent = std::max(std::fabs(maxAABB.x), std::fabs(minAABB.x));
+			maxExtent = std::max(maxExtent, std::max(std::fabs(maxAABB.y), std::fabs(minAABB.y)));
+			maxExtent = std::max(maxExtent, std::max(std::fabs(maxAABB.z), std::fabs(minAABB.z)));
+
+			sphereColliderComponent->localRadius = maxExtent;
+		}
+
+	}
 
 	void updateFromMatrix(const glm::mat4& newLocalMatrix) {
 		glm::vec3 skew;
@@ -73,8 +91,24 @@ public:
 
 		if (shouldUpdate) {
 			worldMatrix = parentWorldMatrix * localTransform.getModelMatrix();
+			//sphereColliderComponent->localCenter = localTransform.position;
+			sphereColliderComponent->worldCenter = worldMatrix * glm::vec4(sphereColliderComponent->localCenter, 1.0f);
+			//updateSphereComponentRadius();
+			float scaleX = glm::length(glm::vec3(worldMatrix[0]));
+			float scaleY = glm::length(glm::vec3(worldMatrix[1]));
+			float scaleZ = glm::length(glm::vec3(worldMatrix[2]));
+
+			float maxScale = glm::max(scaleX, glm::max(scaleY, scaleZ));
+
+			sphereColliderComponent->worldRadius = sphereColliderComponent->localRadius * maxScale;
+
 			isDirty = false;
 		}
+
+
+		// sphereColliderComponent->localCenter == localTransform.position (TRUE)
+
+		//std::cout << name << ": " << sphereColliderComponent->localRadius << std::endl;
 
 		// Propagate update to children nodes
 		for (auto& child : children) {
@@ -83,13 +117,10 @@ public:
 	}
 
 	void addChild(std::unique_ptr<SceneNode> child) {
-		// 1. Set the backlink so the child knows who its parent is
 		child->parent = this;
 
-		// 2. Mark the child as dirty so it inherits this node's world transform
 		child->isDirty = true;
 
-		// 3. Move ownership into our vector
 		children.push_back(std::move(child));
 	}
 

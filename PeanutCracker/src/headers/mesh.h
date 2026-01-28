@@ -47,7 +47,7 @@ public:
 		setupMesh();
 	}
 
-	void draw(Shader* shader) {
+	void draw(Shader* shader, bool isShadowPass = false) {
 		// Texture Binding
 		unsigned int diffuseNr  = 1;
 		unsigned int specularNr = 1;
@@ -79,6 +79,7 @@ public:
 
 		// setting the default texture back
 		glActiveTexture(GL_TEXTURE0);
+
 	}
 
 private:

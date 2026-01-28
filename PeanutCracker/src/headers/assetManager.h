@@ -75,8 +75,8 @@ public:
 	}
 
 private:
-	std::unordered_map<std::string, std::shared_ptr<Model>>		modelCache;
-	std::unordered_map<std::string, std::shared_ptr<Shader>>	shaderCache;
+	std::unordered_map<std::string, std::shared_ptr<Model>>	 modelCache;
+	std::unordered_map<std::string, std::shared_ptr<Shader>> shaderCache;
 };
 
 #endif

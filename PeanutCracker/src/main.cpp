@@ -112,19 +112,20 @@ int scr_width  = SCR_WIDTH;
 int scr_height = SCR_HEIGHT;
 const glm::vec4 WINDOW_BACKGROUND_COLOR(0.6f, 0.6f, 0.6f, 1.0f);
 
-// CAMERA SETUP
-glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
-glm::vec3 cameraWorldUp = glm::vec3(0.0f, 1.0f, 0.0f);
-float cameraYaw = -90.0f;
-float cameraPitch = 0.0f;
-float nearPlane = 0.1f;
-float farPlane = 100.0f;
-Camera cameraObject(cameraPos, cameraWorldUp, nearPlane, farPlane, cameraYaw, cameraPitch);
-
 // MOUSE
 float lastX = SCR_WIDTH / 2.0;
 float lastY = SCR_HEIGHT / 2.0;
 bool firstMouse = true;
+
+// CAMERA SETUP
+glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
+glm::vec3 cameraWorldUp = glm::vec3(0.0f, 1.0f, 0.0f);
+float cameraYaw = 0.0f;
+float cameraPitch = 0.0f;
+float nearPlane = 0.01f;
+float farPlane = 100.0f;
+float aspect = (float)scr_width / (float)scr_height;
+Camera cameraObject(cameraPos, cameraWorldUp, nearPlane, farPlane, aspect, cameraYaw, cameraPitch);
 
 // DELTA TIME
 float deltaTime = 0.0f;
@@ -193,20 +194,9 @@ int main() {
 	glEnable(GL_MULTISAMPLE);
 
 
-	// === SKYBOX ==============================================
-
-	//Faces faces(
-	//	std::filesystem::path("assets/textures/skybox/right.jpg"),
-	//	std::filesystem::path("assets/textures/skybox/left.jpg"),
-	//	std::filesystem::path("assets/textures/skybox/top.jpg"),
-	//	std::filesystem::path("assets/textures/skybox/bottom.jpg"),
-	//	std::filesystem::path("assets/textures/skybox/front.jpg"),
-	//	std::filesystem::path("assets/textures/skybox/back.jpg")
-	//);
-	//scene.createAndAddSkybox(faces, std::filesystem::path("defaultshaders/skybox.vert"), std::filesystem::path("defaultshaders/skybox.frag"));
-
 	// === LIGHT STUFF =========================================
 	// -- Vertex position data
+	/*
 	float vertices[] = {
 		-0.5f, -0.5f, -0.5f,
 		 0.5f, -0.5f, -0.5f,
@@ -250,6 +240,7 @@ int main() {
 		-0.5f,  0.5f,  0.5f,
 		-0.5f,  0.5f, -0.5f
 	};
+	*/
 	// -- Light buffer objects
 	//VAO pointlightVAO;
 	//pointlightVAO.bind();
@@ -257,17 +248,24 @@ int main() {
 	//pointlightVAO.linkAttrib(pointlightVBO, 0, 3, GL_FLOAT, 3 * sizeof(float), (void*)0);
 	//pointlightVAO.unbind();
 
+	// POINT LIGHTS
+	/*
 	auto pointLight1 = std::make_unique<PointLight>(glm::vec3(0.0f, 0.0f, 5.0f),
 													Light(glm::vec3(0.05f), glm::vec3(1.0f), glm::vec3(0.5f)),
 													Attenuation(1.0f, 0.022f, 0.0019f));
-	//scene.addPointLight(std::move(pointLight1));
 	scene.createAndAddPointLight(std::move(pointLight1));
 
 	auto pointLight2 = std::make_unique<PointLight>(glm::vec3(0.0f, 0.0f, -5.0f),
 													Light(glm::vec3(0.05f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.5f)),
 													Attenuation(1.0f, 0.022f, 0.0019f));
-	//scene.addPointLight(std::move(pointLight2));
 	scene.createAndAddPointLight(std::move(pointLight2));
+	*/
+
+
+	auto directionalLight = std::make_unique<DirectionalLight>(
+		glm::vec3(0.0f, 0.0f, -1.0f),
+		Light(glm::vec3(0.1f), glm::vec3(0.8f), glm::vec3(1.0f)));
+	scene.createAndAddDirectionalLight(std::move(directionalLight));
 
 
 	// STBI IMAGE FLIPPING FOR TEXTURES
@@ -303,10 +301,6 @@ int main() {
 		glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO.fbo);
 		glViewport(0, 0, (int)vSize.x, (int)vSize.y);
 
-		// 1. FORCED STATE RESET (Safety for Portfolio-grade code)
-		glEnable(GL_STENCIL_TEST);
-		glStencilMask(0xFF); // MUST be 0xFF for glClear to work!
-
 		// BUFFER STUFF
 		glClearColor(WINDOW_BACKGROUND_COLOR.r, WINDOW_BACKGROUND_COLOR.g, WINDOW_BACKGROUND_COLOR.b, WINDOW_BACKGROUND_COLOR.a);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
@@ -316,7 +310,8 @@ int main() {
 		glm::mat4 view		 = cameraObject.getViewMatrix();
 
 		// SCENE RENDERING
-		scene.draw(projection, view, cameraObject.position);
+		cameraObject.createCameraFrustum(aspect);
+		scene.draw(cameraObject, vSize.x, vSize.y, projection, view, cameraObject.position);
 
 		// UNBIND FRAME BUFFER
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -332,16 +327,12 @@ int main() {
 		scene.processLoadQueue();
 	}
 
-	//pointlightVBO.unbind();
-	//pointlightVAO.unbind();
-
 	glfwDestroyWindow(window);
 	glfwTerminate();
 	return 0;
 }
 
 // === CALLBACK FUNCTIONS ===============================================================
-
 void frameBufferSizeCallback(GLFWwindow* window, int width, int height) {
 	glViewport(0, 0, width, height);
 }
@@ -349,11 +340,8 @@ void frameBufferSizeCallback(GLFWwindow* window, int width, int height) {
 void mouseCallback(GLFWwindow* window, double xPos, double yPos) {
 	WindowContext* ctx = static_cast<WindowContext*>(glfwGetWindowUserPointer(window));
 	if (!ctx || !ctx->gui) return;
-
 	if (ImGui::GetIO().WantCaptureMouse && !ctx->gui->isViewportHovered) return;
-
 	if (ctx->gui && ImGui::GetIO().WantCaptureMouse && !ctx->gui->isViewportHovered) return;
-
 	if (ImGuizmo::IsOver() || ImGuizmo::IsUsing()) return;
 
 
@@ -380,28 +368,23 @@ void mouseCallback(GLFWwindow* window, double xPos, double yPos) {
 void keyPressCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
 	WindowContext* ctx = static_cast<WindowContext*>(glfwGetWindowUserPointer(window));
 	if (!ctx || !ctx->gui) return;
-
 	ImGuiIO& io = ImGui::GetIO();
 	if (ImGui::GetIO().WantCaptureMouse && !ctx->gui->isViewportHovered) return;
-
 	if (action != GLFW_PRESS) return;
 
 
 	// --Window Close
 	if (key == GLFW_KEY_Q && (mods & GLFW_MOD_CONTROL)) {
-		std::cout << "CLOSING WINDOW" << std::endl;
 		glfwSetWindowShouldClose(window, true);
 	}
 
 	// --Entitiy Deletion
 	if (key == GLFW_KEY_DELETE) {
-		//std::cout << "DELETE ENTITIES" << std::endl;
 		ctx->scene->deleteSelectedEntities();
 	}
 
 	// -- Entitiy Duplication
 	if (key == GLFW_KEY_D && (mods & GLFW_MOD_CONTROL)) {
-		//std::cout << "DUPLICATE ENTITIES" << std::endl;
 		ctx->scene->duplicateSelectedEntities();
 	}
 }
@@ -410,9 +393,7 @@ void keyPressCallback(GLFWwindow* window, int key, int scancode, int action, int
 void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
 	WindowContext* ctx = static_cast<WindowContext*>(glfwGetWindowUserPointer(window));
 	if (!ctx || !ctx->gui || !ctx->scene) return;
-
 	if (ImGui::GetIO().WantCaptureMouse && !ctx->gui->isViewportHovered) return;
-
 	if (ImGuizmo::IsOver() || ImGuizmo::IsUsing()) return;
 
 
@@ -448,6 +429,7 @@ void scrollCallback(GLFWwindow* window, double xOffset, double yOffset) {
 	WindowContext* ctx = static_cast<WindowContext*>(glfwGetWindowUserPointer(window));
 	if (ImGui::GetIO().WantCaptureMouse && !ctx->gui->isViewportHovered) return;
 
+
 	cameraObject.processMouseScroll(yOffset);
 }
 
@@ -455,8 +437,8 @@ void scrollCallback(GLFWwindow* window, double xOffset, double yOffset) {
 void processInput(GLFWwindow* window) {
 	WindowContext* ctx = static_cast<WindowContext*>(glfwGetWindowUserPointer(window));
 	if (!ctx || !ctx->gui || !ctx->scene) return;
-
 	if (ImGui::GetIO().WantCaptureMouse && !ctx->gui->isViewportHovered) return;
+
 
 	bool isHoldingCTRL = (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS ||
 		glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS);

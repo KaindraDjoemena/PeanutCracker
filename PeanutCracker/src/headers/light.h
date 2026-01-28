@@ -3,6 +3,7 @@
 
 #include <glm/glm.hpp>
 #include "shader.h"
+#include "shadowCasterComponent.h"
 
 
 struct Light {
@@ -83,10 +84,13 @@ public:
 	glm::vec3 direction;
 	Light	  light;
 
+	std::unique_ptr<ShadowCasterComponent> shadowCasterComponent;
+
 	DirectionalLight(const glm::vec3& i_direction,	// Direction
 		const Light& i_light						// Light
 	) : direction(i_direction),
 		light(i_light) {
+		shadowCasterComponent = std::make_unique<ShadowCasterComponent>(glm::vec2(2048, 2048), Shadow_Map_Projection::ORTHOGRAPHIC);
 	}
 
 	std::string getUniformPrefix() const override { return "directionalLight";}
@@ -103,12 +107,16 @@ public:
 	Light		light;
 	Attenuation attenuation;
 
+	std::unique_ptr<ShadowCasterComponent> shadowCasterComponent;
+
 	PointLight(const glm::vec3& i_position, // Position
 		const Light& i_light,				// Light
 		const Attenuation& i_attenuation	// Attenuation
 	) : position(i_position),
 		light(i_light),
-		attenuation(i_attenuation) {}
+		attenuation(i_attenuation) {
+		shadowCasterComponent = std::make_unique<ShadowCasterComponent>(glm::vec2(2048, 2048), Shadow_Map_Projection::PERSPECTIVE);
+	}
 
 	std::string getUniformPrefix() const override { return "pointLight"; }
 
@@ -128,6 +136,8 @@ public:
 	float		innerCutoff;
 	float		outerCutoff;
 
+	std::unique_ptr<ShadowCasterComponent> shadowCasterComponent;
+
 	SpotLight(const glm::vec3& i_position,	// Position
 		const glm::vec3& i_direction,		// Direction
 		const Light& i_light,				// Light
@@ -139,7 +149,9 @@ public:
 		light(i_light),
 		attenuation(i_attenuation),
 		innerCutoff(i_innerCutoff),
-		outerCutoff(i_outerCutoff) {}
+		outerCutoff(i_outerCutoff) {
+		shadowCasterComponent = std::make_unique<ShadowCasterComponent>(glm::vec2(2048, 2048), Shadow_Map_Projection::PERSPECTIVE);
+	}
 
 	std::string getUniformPrefix() const override { return "spotLight"; }
 

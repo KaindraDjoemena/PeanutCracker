@@ -116,13 +116,26 @@ public:
 		shaderPtr->setFloat("material.shininess", 32.0f);
 	}
 
-	void draw(const glm::mat4 worldMatrix) const {
+	void draw(const glm::mat4& worldMatrix) const {
 		shaderPtr->use();
 		shaderPtr->setMat4("model", worldMatrix);
 		glm::mat4 normalMatrix = glm::transpose(glm::inverse(worldMatrix));
 		shaderPtr->setMat4("normalMatrix", normalMatrix);
 		shaderPtr->setFloat("material.shininess", 32.0f);
 		modelPtr->draw(shaderPtr);
+	}
+
+	void drawShadow(const glm::mat4& modelMatrix, Shader* depthShader) const {
+		if (depthShader) {
+			depthShader->use();
+
+			depthShader->setMat4("model", modelMatrix);
+
+			modelPtr->draw(depthShader);
+		}
+		else {
+			draw(modelMatrix);
+		}
 	}
 };
 

@@ -2,11 +2,27 @@
 #define CAMERA_H
 
 #include "ray.h"
+#include "sphereColliderComponent.h"
 
 #include <glad/glad.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+
+struct Frustum_Plane {
+	glm::vec3 normal;
+	float	  distance;
+};
+
+// CAMERA FRUSTUM
+struct Camera_Frustum {
+	Frustum_Plane left;
+	Frustum_Plane right;
+	Frustum_Plane bottom;
+	Frustum_Plane top;
+	Frustum_Plane near;
+	Frustum_Plane far;
+};
 
 // CAMERA MOVEMENT ENUM
 enum Camera_Movement {
@@ -23,9 +39,9 @@ enum Camera_Movement {
 };
 
 // DEFAULT CAMERA VALUES
-const double YAW = -90.0;
-const double PITCH = 0.0;
-const float FOV = 45.0f;
+const double YAW = 0.0f;
+const double PITCH = 0.0f;
+const float FOV = 45.0;
 const float SPEED = 5.0f;
 const float SENSITIVITY = 0.3f;
 const float ZOOM = FOV;
@@ -51,37 +67,45 @@ public:
 
 	float nearPlane;
 	float farPlane;
+	float aspect;
+
+	Camera_Frustum frustum;
 
 	// CONSTRUCTOR WITH VECTORS
 	Camera(const glm::vec3& positionIn = glm::vec3(0.0f, 0.0f, 0.0f),
-		   const glm::vec3& worldUpIn = glm::vec3(0.0f, 1.0f, 0.0f),
-		   float i_nearPlane = 0.1f,
-		   float i_farPlane = 100.0f,
-		   double yawIn = YAW,
-		   double pitchIn = PITCH,
-		   float i_lookSpeed = LOOK_SPEED)
+		const glm::vec3& worldUpIn = glm::vec3(0.0f, 1.0f, 0.0f),
+		float i_nearPlane = 0.1f,
+		float i_farPlane = 100.0f,
+		double yawIn = YAW,
+		double pitchIn = PITCH,
+		float i_aspect = (16.0f/9.0f),
+		float i_lookSpeed = LOOK_SPEED)
 		: front(glm::vec3(0.0f, 0.0f, -1.0f))
 		, movementSpeed(SPEED)
 		, mouseSensitivity(SENSITIVITY)
 		, nearPlane(i_nearPlane)
 		, farPlane(i_farPlane)
+		, aspect(i_aspect)
 		, zoom(ZOOM) {
 		lookSpeed = i_lookSpeed;
 		position = positionIn;
 		worldUp = worldUpIn;
+		createCameraFrustum(aspect);
 		updateCameraVectors();
 	}
 
 	// CONSTRUCTOR WITH SCALARS
-	Camera(float posX, float posY, float posZ, float upX, float upY, float upZ, float i_nearPlane, float i_farPlane, double yawIn, double pitchIn)
+	Camera(float posX, float posY, float posZ, float upX, float upY, float upZ, float i_nearPlane, float i_farPlane, float i_aspect, double yawIn, double pitchIn)
 		: front(glm::vec3(0.0f, 0.0f, -1.0f))
 		, movementSpeed(SPEED)
 		, mouseSensitivity(SENSITIVITY)
 		, nearPlane(i_nearPlane)
 		, farPlane(i_farPlane)
+		, aspect(i_aspect)
 		, zoom(ZOOM) {
 		position = glm::vec3(posX, posY, posZ);
 		worldUp = glm::vec3(upX, upY, upZ);
+		createCameraFrustum(aspect);
 		updateCameraVectors();
 	}
 
@@ -100,7 +124,7 @@ public:
 		glm::mat4 proj = getPerspectiveProjectionMatrix(aspect);
 		glm::mat4 view = getViewMatrix();
 		glm::mat4 projView = proj * view;
-		
+
 		float winX = mouseX;
 		float winY = (float)viewportHeight - mouseY;
 
@@ -115,6 +139,27 @@ public:
 		mouseRay.dist = -1.0f;
 
 		return mouseRay;
+	}
+
+	bool isInFrustum(const SphereColliderComponent& sphere) const {
+		if (isOutsidePlane(sphere, frustum.left)   || isOutsidePlane(sphere, frustum.right) ||
+			isOutsidePlane(sphere, frustum.bottom) || isOutsidePlane(sphere, frustum.top)	||
+			isOutsidePlane(sphere, frustum.near)   || isOutsidePlane(sphere, frustum.far)
+		) {
+			std::cout << "NOT IN frustum" << '\n';
+			return false;
+		}
+
+		std::cout << "IN frustum" << '\n';
+		return true;
+
+	}
+
+	bool isOutsidePlane(const SphereColliderComponent& sphere, Frustum_Plane plane) const {
+		float distance = glm::dot(plane.normal, sphere.worldCenter) + plane.distance;
+		//std::cout << "Dist: " << distance << " | -Radius: " << -sphere.worldRadius << std::endl;
+		if (distance < -sphere.localRadius) { return true; }
+		return false;
 	}
 
 	void processInput(Camera_Movement type, float deltaTime) {
@@ -156,6 +201,42 @@ public:
 		zoom -= (double)yOffset;
 		if (zoom < 1.0) { zoom = 1.0; }
 		if (zoom > 45.0) { zoom = 45.0; }
+	}
+
+	void createCameraFrustum(float aspect) {
+		glm::mat4 viewProjMat = getPerspectiveProjectionMatrix(aspect) * getViewMatrix();
+
+		for (int i = 0; i < 3; i++) {
+			float posA = viewProjMat[3][0] + viewProjMat[i][0];
+			float posB = viewProjMat[3][1] + viewProjMat[i][1];
+			float posC = viewProjMat[3][2] + viewProjMat[i][2];
+			float posD = viewProjMat[3][3] + viewProjMat[i][3];
+			glm::vec3 posN = glm::normalize(glm::vec3(posA, posB, posC));
+
+			float negA = viewProjMat[3][0] - viewProjMat[i][0];
+			float negB = viewProjMat[3][1] - viewProjMat[i][1];
+			float negC = viewProjMat[3][2] - viewProjMat[i][2];
+			float negD = viewProjMat[3][3] - viewProjMat[i][3];
+			glm::vec3 negN = glm::normalize(glm::vec3(negA, negB, negC));
+
+
+			switch (i) {
+			case 0:
+				frustum.left	= { posN, posD };
+				frustum.right	= { negN, negD };
+				break;
+			case 1:
+				frustum.bottom	= { posN, posD };
+				frustum.top		= { negN, negD };
+				break;
+			case 2:
+				frustum.near	= { posN, posD };
+				frustum.far		= { negN, negD };
+				break;
+			default:
+				break;
+			}
+		}
 	}
 
 private:

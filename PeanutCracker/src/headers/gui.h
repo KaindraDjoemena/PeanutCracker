@@ -57,7 +57,7 @@ public:
 		float screenWidth				= ImGui::GetIO().DisplaySize.x;
 		float screenHeight				= ImGui::GetIO().DisplaySize.y;
 		float statusBarHeight			= 25.0f;
-		float toolbarHeight				= 45.0f;
+		float toolbarHeight				= 0.0f;		// change this when adding toolbar
 		float viewportHeight			= screenHeight - statusBarHeight - toolbarHeight;
 		float rightPanelHeight			= viewportHeight;
 		float inspectorHeight			= rightPanelHeight * 0.65f;
@@ -254,10 +254,35 @@ public:
 			//ImGui::Dummy(ImVec2(0.0f, 10.0f));
 			ImGui::Spacing();
 			ImGui::SeparatorText("DIRECTIONAL LIGHT");
-			ImGui::Indent();
-			ImGui::Unindent();
+			for (auto& dirLight : scene.directionalLights) {
 
+				ImGui::Indent();
+				ImGui::Text("Direction");
+				glm::vec3 posDisplay = dirLight->direction;
+				glm::vec3 tempScale = posDisplay;
+				widgetStretch([&]() {
+					if (ImGui::DragFloat3("##Direction", glm::value_ptr(tempScale), 0.05f)) {
+						dirLight->direction = tempScale;
+					}
+				});
 
+				ImGui::Text("Frustum (Light Space)");
+				Light_Frustum frustum = dirLight->shadowCasterComponent->getFrustum();
+				glm::vec2 tempLeftRight = frustum.leftRight;
+				glm::vec2 tempBotTop	= frustum.bottomTop;
+				glm::vec2 tempNearfar	= frustum.nearFar;
+				if (ImGui::DragFloat2("L/R", glm::value_ptr(tempLeftRight), 0.05f)) {
+					dirLight->shadowCasterComponent->setFrustum(tempLeftRight, tempBotTop, tempNearfar);
+				}
+				if (ImGui::DragFloat2("B/T", glm::value_ptr(tempBotTop), 0.05f)) {
+					dirLight->shadowCasterComponent->setFrustum(tempLeftRight, tempBotTop, tempNearfar);
+				}
+				if (ImGui::DragFloat2("N/F", glm::value_ptr(tempNearfar), 0.05f)) {
+					dirLight->shadowCasterComponent->setFrustum(tempLeftRight, tempBotTop, tempNearfar);
+				}
+				ImGui::Unindent();
+
+			}
 		}
 		ImGui::End();
 
@@ -271,7 +296,6 @@ public:
 										 ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
 										 ImGuiWindowFlags_NoScrollbar;
 
-		//ImVec2 viewportSize(0, 0);
 		// Capture current state
 		ImGui::Begin("Viewport", NULL, viewportFlags);
 		this->isViewportHovered = ImGui::IsWindowHovered();
@@ -283,15 +307,24 @@ public:
 			ImGui::Image((void*)(intptr_t)textureID, this->viewportSize, ImVec2(0, 1), ImVec2(1, 0));
 		}
 
-		// --- NEW GIZMO LOGIC ---
+		// CAMERA MATRICES
+		glm::mat4 view = camera.getViewMatrix();
+		float aspect = viewportSize.x / viewportSize.y;
+		glm::mat4 proj = camera.getPerspectiveProjectionMatrix(aspect);
+
+		//glEnable(GL_DEPTH_TEST);
+		//ImGuizmo::DrawGrid(
+		//	glm::value_ptr(view),
+		//	glm::value_ptr(proj),
+		//	glm::value_ptr(glm::mat4(1.0f)), // Identity matrix for world origin
+		//	100.0f // Grid size
+		//);
+		//glDisable(GL_DEPTH_TEST);
+
+		// === GIZMO ======================================================================
 		if (!scene.selectedEntities.empty()) {
 			ImGuizmo::SetDrawlist();
 			ImGuizmo::SetRect(viewportBoundsMin.x, viewportBoundsMin.y, viewportSize.x, viewportSize.y);
-
-			// Get camera matrices
-			glm::mat4 view = camera.getViewMatrix();
-			float aspect = viewportSize.x / viewportSize.y;
-			glm::mat4 proj = camera.getPerspectiveProjectionMatrix(aspect);
 
 			// Select the first object in the selection
 			auto selectedNode = scene.selectedEntities[0];
@@ -320,6 +353,62 @@ public:
 			}
 		}
 
+
+		// === VIEW ===========================================================================
+		ImGuizmo::SetDrawlist();
+		float viewManipulateRight = ImGui::GetWindowPos().x + ImGui::GetWindowWidth();
+		float viewManipulateTop = ImGui::GetWindowPos().y;
+
+		// After ViewManipulate call
+		ImVec2 gizmoPos(viewManipulateRight - 96, viewManipulateTop);
+
+		ImGuizmo::ViewManipulate(glm::value_ptr(view), 10.0f, ImVec2(viewManipulateRight - 96, viewManipulateTop), ImVec2(96, 96), 0x10101010);
+
+		// Now draw axis labels
+		ImDrawList* drawList = ImGui::GetWindowDrawList();
+		ImVec2 center = ImVec2(gizmoPos.x + 48, gizmoPos.y + 48); // Center of gizmo
+
+		// Extract rotation from view matrix
+		glm::mat3 rotation = glm::mat3(view);
+
+		// Define axis directions in world space
+		glm::vec3 axes[] = {
+			glm::vec3(1, 0, 0),  // +X
+			glm::vec3(-1, 0, 0), // -X
+			glm::vec3(0, 1, 0),  // +Y
+			glm::vec3(0, -1, 0), // -Y
+			glm::vec3(0, 0, -1),  // -Z
+			glm::vec3(0, 0, 1) // +Z
+		};
+
+		const char* labels[] = { "+X", "-X", "+Y", "-Y", "+Z", "-Z" };
+		ImU32 colors[] = {
+			IM_COL32(255, 0, 0, 255),   // +X red
+			IM_COL32(255, 0, 0, 255),   // -X dark red
+			IM_COL32(0, 255, 0, 255),   // +Y green
+			IM_COL32(0, 255, 0, 255),   // -Y dark green
+			IM_COL32(0, 0, 255, 255),   // +Z blue
+			IM_COL32(0, 0, 255, 255)    // -Z dark blue
+		};
+
+		// Project each axis to screen space
+		for (int i = 0; i < 6; i++) {
+			// Transform axis by view rotation (invert because view matrix)
+			glm::vec3 viewAxis = glm::transpose(rotation) * axes[i];
+
+			// Skip if pointing away from camera (negative Z in view space)
+			if (viewAxis.z > 0) continue; // Facing away
+
+			// Project to 2D (simple orthographic projection)
+			float scale = 24.0f; // Distance from center
+			ImVec2 labelPos = ImVec2(
+				center.x + viewAxis.x * scale,
+				center.y - viewAxis.y * scale  // Flip Y for screen coords
+			);
+
+			// Draw label
+			drawList->AddText(labelPos, colors[i], labels[i]);
+		}
 		ImGui::End();
 		ImGui::PopStyleVar();
 
@@ -329,7 +418,7 @@ public:
 
 
 		// === TOOLBAR =====================================================================
-		showToolbar(toolbarHeight);;
+		//showToolbar(toolbarHeight);
 
 
 		return viewportSize;
@@ -404,12 +493,6 @@ private:
 		// Text (usually left white/near-white)
 		colors[ImGuiCol_Text]			= ImVec4(0.90f, 0.90f, 0.90f, 1.00f);
 		colors[ImGuiCol_TextDisabled]	= peanutYellow;
-
-		// --- Apply Style Adjustments ---
-		//style.WindowRounding = 4.0f;
-		//style.FrameRounding = 4.0f;
-		//style.PopupRounding = 4.0f;
-		//style.GrabRounding = 4.0f;
 	}
 
 	// STATUS BAR
@@ -419,38 +502,39 @@ private:
 		ImGui::SetNextWindowPos(ImVec2(0, height - statusbarHeight));
 		ImGui::SetNextWindowSize(ImVec2(width, statusbarHeight));
 		ImGui::Begin("##StatusBar", NULL, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoInputs);
-		ImGui::Text("v0.1 | FPS: %.1f | Zoom: %.1f", ImGui::GetIO().Framerate, camera.zoom);
+		ImGui::Text("v0.1 | FPS: %.1f | Zoom: %.1f | (%.1f, %.1f, %.1f)", ImGui::GetIO().Framerate, camera.zoom, camera.position.x, camera.position.y, camera.position.z);
 		ImGui::End();
 	}
 
 	// TOOLBAR
-	void showToolbar(int toolbarHeight) {
-		float screenWidth = ImGui::GetIO().DisplaySize.x;
-		ImGui::SetNextWindowPos(ImVec2(0, 0));
-		ImGui::SetNextWindowSize(ImVec2(screenWidth, toolbarHeight));
+	//void showToolbar(int toolbarHeight) {
+	//	float screenWidth = ImGui::GetIO().DisplaySize.x;
+	//	ImGui::SetNextWindowPos(ImVec2(0, 0));
+	//	ImGui::SetNextWindowSize(ImVec2(screenWidth, toolbarHeight));
 
-		ImGuiWindowFlags toolbarFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoSavedSettings;
+	//	ImGuiWindowFlags toolbarFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoSavedSettings;
 
-		ImGui::Begin("##Toolbar", NULL, toolbarFlags);
+	//	ImGui::Begin("##Toolbar", NULL, toolbarFlags);
 
-		// Helper to color the button if it's the active mode
-		auto toolbarButton = [&](const char* label, ImGuizmo::OPERATION op) {
-			bool isActive = (mCurrentGizmoOperation == op);
-			if (isActive) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_ButtonActive]);
+	//	// Helper to color the button if it's the active mode
+	//	auto toolbarButton = [&](const char* label, ImGuizmo::OPERATION op) {
+	//		bool isActive = (mCurrentGizmoOperation == op);
+	//		if (isActive) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_ButtonActive]);
 
-			if (ImGui::Button(label, ImVec2(70, toolbarHeight - 20))) {
-				mCurrentGizmoOperation = op;
-			}
+	//		if (ImGui::Button(label, ImVec2(70, toolbarHeight - 20))) {
+	//			mCurrentGizmoOperation = op;
+	//		}
 
-			if (isActive) ImGui::PopStyleColor();
-			};
+	//		if (isActive) ImGui::PopStyleColor();
+	//		};
 
-		toolbarButton("Translate", ImGuizmo::TRANSLATE); ImGui::SameLine();
-		toolbarButton("Rotate", ImGuizmo::ROTATE);    ImGui::SameLine();
-		toolbarButton("Scale", ImGuizmo::SCALE);
+	//	toolbarButton("Translate", ImGuizmo::TRANSLATE); ImGui::SameLine();
+	//	toolbarButton("Rotate", ImGuizmo::ROTATE);    ImGui::SameLine();
+	//	toolbarButton("Scale", ImGuizmo::SCALE);
 
-		ImGui::End();
-	}
+	//	ImGui::End();
+	//}
+
 };
 
 #endif

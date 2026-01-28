@@ -105,10 +105,10 @@ private:
 				vector.z = mesh->mVertices[j].z;
 				vertex.position = vector;
 
+				// Keep track of max and min AABB
 				aabb.min.x = std::min(aabb.min.x, vertex.position.x);
 				aabb.min.y = std::min(aabb.min.y, vertex.position.y);
 				aabb.min.z = std::min(aabb.min.z, vertex.position.z);
-
 				aabb.max.x = std::max(aabb.max.x, vertex.position.x);
 				aabb.max.y = std::max(aabb.max.y, vertex.position.y);
 				aabb.max.z = std::max(aabb.max.z, vertex.position.z);

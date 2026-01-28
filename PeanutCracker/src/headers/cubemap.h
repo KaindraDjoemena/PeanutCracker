@@ -20,12 +20,12 @@
 struct Faces {
 	std::array<std::filesystem::path, 6> cubeFaces;
 
-	Faces(const std::filesystem::path& i_right_dir,  // +X
-		  const std::filesystem::path& i_left_dir,     // -X
-		  const std::filesystem::path& i_top_dir,      // +Y
-		  const std::filesystem::path& i_bottom_dir,   // -Y
-		  const std::filesystem::path& i_front_dir,    // +Z
-		  const std::filesystem::path& i_back_dir      // -Z
+	Faces(const std::filesystem::path& i_right_dir,		// +X
+		  const std::filesystem::path& i_left_dir,		// -X
+		  const std::filesystem::path& i_top_dir,		// +Y
+		  const std::filesystem::path& i_bottom_dir,	// -Y
+		  const std::filesystem::path& i_front_dir,		// +Z
+		  const std::filesystem::path& i_back_dir		// -Z
 	) : cubeFaces{ i_right_dir, i_left_dir, i_top_dir, i_bottom_dir, i_front_dir, i_back_dir } {}
 
 };

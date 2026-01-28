@@ -17,9 +17,9 @@ struct Transform {
 
 		// M = T x R x S
 		glm::mat4 modelMat = glm::mat4(1.0f);
-		modelMat = glm::translate(modelMat, position);
-		modelMat = modelMat * glm::mat4_cast(quatRotation);
 		modelMat = glm::scale(modelMat, scale);
+		modelMat = modelMat * glm::mat4_cast(quatRotation);
+		modelMat = glm::translate(modelMat, position);
 
 		return modelMat;
 	}

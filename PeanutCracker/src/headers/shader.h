@@ -25,6 +25,16 @@ public:
 		std::string vertexCode = readFile(vertexPath);
 		std::string fragmentCode = readFile(fragmentPath);
 
+
+
+		//std::cout << "=== VERTEX SHADER SOURCE ===\n";
+		//std::cout << vertexCode << "\n";
+
+		//std::cout << "=== FRAGMENT SHADER SOURCE ===\n";
+		//std::cout << fragmentCode << "\n";
+
+
+
 		if (vertexCode.empty() || fragmentCode.empty()) {
 			std::cerr << "ERROR::SHADER::SOURCE_EMPTY" << std::endl;
 			return;
