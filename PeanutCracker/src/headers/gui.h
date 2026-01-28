@@ -253,7 +253,6 @@ public:
 			ImGui::Unindent();
 
 			// --Directional light
-			//ImGui::Dummy(ImVec2(0.0f, 10.0f));
 			ImGui::Spacing();
 			ImGui::SeparatorText("DIRECTIONAL LIGHT");
 			for (auto& dirLight : scene.directionalLights) {
@@ -314,15 +313,15 @@ public:
 
 				// Presets
 				ImGui::Spacing();
-				if (ImGui::Button("Small (10m)")) {
+				if (ImGui::Button("10m^3")) {
 					dirLight->shadowCasterComponent->setFrustumPlanes(-5, 5, -5, 5, 0.1f, 20);
 				}
 				ImGui::SameLine();
-				if (ImGui::Button("Medium (50m)")) {
+				if (ImGui::Button("50m^3")) {
 					dirLight->shadowCasterComponent->setFrustumPlanes(-25, 25, -25, 25, 0.1f, 50);
 				}
 				ImGui::SameLine();
-				if (ImGui::Button("Large (100m)")) {
+				if (ImGui::Button("100m^2")) {
 					dirLight->shadowCasterComponent->setFrustumPlanes(-50, 50, -50, 50, 0.1f, 100);
 				}
 
@@ -358,15 +357,6 @@ public:
 		glm::mat4 view = camera.getViewMat();
 		float aspect = viewportSize.x / viewportSize.y;
 		glm::mat4 proj = camera.getProjMat(aspect);
-
-		//glEnable(GL_DEPTH_TEST);
-		//ImGuizmo::DrawGrid(
-		//	glm::value_ptr(view),
-		//	glm::value_ptr(proj),
-		//	glm::value_ptr(glm::mat4(1.0f)), // Identity matrix for world origin
-		//	100.0f // Grid size
-		//);
-		//glDisable(GL_DEPTH_TEST);
 
 		// === GIZMO ======================================================================
 		if (!scene.selectedEntities.empty()) {

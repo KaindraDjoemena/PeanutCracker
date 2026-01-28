@@ -185,6 +185,7 @@ private:
 				}
 			}
 			if (!skip) {
+				std::cout << "creating texture..." << std::endl;
 				Texture texture;
 				texture.id = TextureFromFile(str.C_Str(), this->directory);
 				texture.type = typeName;
@@ -210,7 +211,7 @@ unsigned int TextureFromFile(const char* path, const std::string& directory, boo
 	unsigned char* data = stbi_load(filename.c_str(), &width, &height, &nrComponents, 0);
 	if (data)
 	{
-		GLenum format;
+		GLenum format = GL_RED;
 		if (nrComponents == 1)
 			format = GL_RED;
 		else if (nrComponents == 3)

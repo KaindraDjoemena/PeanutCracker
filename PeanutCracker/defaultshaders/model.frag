@@ -183,7 +183,7 @@ float calcShadow(int lightIndex, vec4 fragPosLightSpace, vec3 normal, vec3 light
     }
     
     // Bias
-    float bias = max(0.05f * (1.0f - dot(normal, -lightDir)), 0.005f);
+    float bias = max(0.05f * (1.0f - dot(normal, lightDir)), 0.005f);
    
     float shadow = texture(DirectionalShadowMap[lightIndex], vec3(projCoords.xy, projCoords.z - bias));
     
