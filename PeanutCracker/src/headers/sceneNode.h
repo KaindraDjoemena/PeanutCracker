@@ -41,17 +41,26 @@ public:
 	// --Setters
 	void setPosition(const glm::vec3& pos) {
 		localTransform.position = pos;
+
+
+		// *** FLAGS ***
 		isDirty = true;
 	}
 	void setScale(const glm::vec3& scl) {
 		localTransform.scale.x = scl.x < epsilon ? epsilon : scl.x;
 		localTransform.scale.y = scl.y < epsilon ? epsilon : scl.y;
 		localTransform.scale.z = scl.z < epsilon ? epsilon : scl.z;
+		
+		
+		// *** FLAGS ***
 		isDirty = true;
 	}
 	void setEulerRotation(const glm::vec3& eulerRotDegrees) {
 		glm::vec3 radians = glm::radians(eulerRotDegrees);
 		localTransform.quatRotation = glm::quat(radians);
+		
+		
+		// *** FLAGS ***
 		isDirty = true;
 	}
 
@@ -83,6 +92,8 @@ public:
 			perspective
 		);
 
+
+		// *** FLAGS ***
 		this->isDirty = true;
 	}
 
@@ -91,9 +102,6 @@ public:
 
 		if (shouldUpdate) {
 			worldMatrix = parentWorldMatrix * localTransform.getModelMatrix();
-			//sphereColliderComponent->localCenter = localTransform.position;
-			sphereColliderComponent->worldCenter = worldMatrix * glm::vec4(sphereColliderComponent->localCenter, 1.0f);
-			//updateSphereComponentRadius();
 			float scaleX = glm::length(glm::vec3(worldMatrix[0]));
 			float scaleY = glm::length(glm::vec3(worldMatrix[1]));
 			float scaleZ = glm::length(glm::vec3(worldMatrix[2]));
@@ -101,14 +109,16 @@ public:
 			float maxScale = glm::max(scaleX, glm::max(scaleY, scaleZ));
 
 			sphereColliderComponent->worldRadius = sphereColliderComponent->localRadius * maxScale;
+			sphereColliderComponent->worldCenter = worldMatrix * glm::vec4(sphereColliderComponent->localCenter, 1.0f);
 
 			isDirty = false;
 		}
 
-
-		// sphereColliderComponent->localCenter == localTransform.position (TRUE)
-
-		//std::cout << name << ": " << sphereColliderComponent->localRadius << std::endl;
+		if (object) {
+			object->setScale(localTransform.scale);
+			object->setPosition(localTransform.position);
+			object->setQuatRotation(localTransform.quatRotation);
+		}
 
 		// Propagate update to children nodes
 		for (auto& child : children) {

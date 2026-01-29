@@ -178,10 +178,10 @@ public:
 
 
 	void debugPrintSceneGraph(SceneNode* node, int depth = 0) {
-		std::string indent(depth * 2, ' ');
-		std::cout << indent << "- " << node->name
-			<< (node->isSelected ? " [SELECTED]" : "")
-			<< std::endl;
+		//std::string indent(depth * 2, ' ');
+		//std::cout << indent << "- " << node->name
+		//	<< (node->isSelected ? " [SELECTED]" : "")
+		//	<< std::endl;
 		for (auto& child : node->children) {
 			debugPrintSceneGraph(child.get(), depth + 1);
 		}
@@ -559,7 +559,7 @@ public:
 		if (node->sphereColliderComponent && node != worldNode.get()) {
 			BoundingSphere boundingSphere = { node->sphereColliderComponent->worldCenter, node->sphereColliderComponent->worldRadius };
 			if (!camera.frustum.isInFrustum(boundingSphere)) {
-				std::cout << "culled " << node->name << std::endl;
+				//std::cout << "culled " << node->name << std::endl;
 				isVisible = false;
 			}
 		}
