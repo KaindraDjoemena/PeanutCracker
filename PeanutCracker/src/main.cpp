@@ -54,7 +54,7 @@ struct Framebuffer {
 	void rescale(int w, int h) {
 		if (w <= 0 || h <= 0) return;
 		if (w == width && h == height) return;
-		//std::cout << "RESCALING FBO TO: " << w << "x" << h << std::endl;
+		//std::cout << "RESCALING FBO TO: " << w << "x" << h << '\n';
 		width = w;
 		height = h;
 
@@ -76,7 +76,7 @@ struct Framebuffer {
 		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
 
 		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-			std::cerr << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
+			std::cerr << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << '\n';
 
 		glDisable(GL_FRAMEBUFFER_SRGB);
 
@@ -136,8 +136,8 @@ const int MSAA_SAMPLES = 4;
 
 
 int main() {
-	std::cout << "C++ version: " << __cplusplus << std::endl;
-	std::cout << std::filesystem::current_path() << std::endl;
+	std::cout << "[MAIN] C++ version: " << __cplusplus << '\n';
+	std::cout << "[MAIN] current path: " << std::filesystem::current_path() << '\n';
 
 	// === SETTINGS AND INITS ================================
 	// WINDOWING API INITIALIZATION
@@ -154,7 +154,7 @@ int main() {
 	// INITALIZING AND ASSIGNING A WINDOW
 	GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Peanut Cracker", NULL, NULL);
 	if (window == NULL) {
-		std::cout << "Failed to create GLFW window" << '\n';
+		std::cout << "[MAIN] Failed to create GLFW window" << '\n';
 		glfwTerminate();
 		return -1;
 	}
@@ -173,7 +173,7 @@ int main() {
 
 	// INITALIZING GLAD
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-		std::cout << "Failed to initialize GLAD" << '\n';
+		std::cout << "[MAIN] Failed to initialize GLAD" << '\n';
 		return -1;
 	}
 
@@ -267,6 +267,14 @@ int main() {
 		Light(glm::vec3(0.1f), glm::vec3(0.8f), glm::vec3(1.0f)));
 	scene.createAndAddDirectionalLight(std::move(directionalLight));
 
+	auto spotLight = std::make_unique<SpotLight>(
+		glm::vec3(0.0f, 0.0f, -10.0f),
+		glm::vec3(0.0f, 0.0f, 1.0f),
+		Light(glm::vec3(0.1f), glm::vec3(0.8f), glm::vec3(1.0f)),
+		Attenuation(),
+		cosf(glm::radians(10.0f)),
+		cosf(glm::radians(20.0f)));
+	scene.createAndAddSpotLight(std::move(spotLight));
 
 	// STBI IMAGE FLIPPING FOR TEXTURES
 	stbi_set_flip_vertically_on_load(true);
@@ -400,7 +408,7 @@ void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
 
 		float relX = (float)xPos - ctx->gui->viewportBoundsMin.x;
 		float relY = (float)yPos - ctx->gui->viewportBoundsMin.y;
-		//std::cout << "viewportsize.x: " << ctx->gui->viewportSize.x << std::endl;
+		//std::cout << "viewportsize.x: " << ctx->gui->viewportSize.x << '\n';
 
 		if (!ctx->gui->isViewportHovered) return;
 		if (ctx->gui->viewportSize.x <= 0 || ctx->gui->viewportSize.y <= 0) return;

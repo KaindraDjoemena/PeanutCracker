@@ -195,8 +195,6 @@ public:
 			right = glm::normalize(glm::cross(front, worldUp));
 			up = glm::normalize(glm::cross(right, front));
 
-			//std::cout << "Recalculating vectors" << std::endl;
-
 			// Reconstruct frustum
 			frustum.constructFrustum(aspect, getProjMat(aspect), getViewMat());
 		}

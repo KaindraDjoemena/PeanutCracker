@@ -15,28 +15,24 @@ enum class Shadow_Map_Projection {
 	PERSPECTIVE
 };
 
-//struct Light_Frustum {
-//	glm::vec2 leftRight;
-//	glm::vec2 bottomTop;
-//	glm::vec2 nearFar;
-//
-//	Light_Frustum() = default;
-//
-//	Light_Frustum(const glm::vec2& i_leftRight,
-//			const glm::vec2& i_bottomTop,
-//			const glm::vec2& i_nearFar)
-//		: leftRight(i_leftRight)
-//		, bottomTop(i_bottomTop)
-//		, nearFar(i_nearFar) {}
-//};
-
 class ShadowCasterComponent {
 public:
 	Frustum frustum;
 
-	ShadowCasterComponent(const glm::vec2 i_shadowMapRes, Shadow_Map_Projection i_projectionType)
+	ShadowCasterComponent(const glm::vec2 i_shadowMapRes, Shadow_Map_Projection i_projectionType, float i_width, float i_height)
 		: m_shadowMapResolution(i_shadowMapRes)
 		, m_projectionType(i_projectionType)
+		, m_planeWidth(i_width)
+		, m_planeHeight(i_height)
+	{
+		generateShadowMap();
+	}
+	ShadowCasterComponent(const glm::vec2 i_shadowMapRes, Shadow_Map_Projection i_projectionType, float i_outCosCutoff, float i_width, float i_height)
+		: m_shadowMapResolution(i_shadowMapRes)
+		, m_projectionType(i_projectionType)
+		, m_fov(glm::degrees(acos(glm::clamp(i_outCosCutoff, -1.0f, 1.0f)) * 2.0f + glm::radians(2.0f)))
+		, m_planeWidth(i_width)
+		, m_planeHeight(i_height)
 	{
 		generateShadowMap();
 	}
@@ -59,7 +55,7 @@ public:
 
 	void setFrustumPlanes(float i_left, float i_right, float i_bottom, float i_top, float i_near, float i_far) {
 		if (i_left >= i_right || i_bottom >= i_top || i_near >= i_far) {
-			std::cerr << "Invalid frustum planes: left >= right or bottom >= top or near >= far" << std::endl;
+			std::cerr << "Invalid frustum planes: left >= right or bottom >= top or near >= far" << '\n';
 			return;
 		}
 		
@@ -70,14 +66,9 @@ public:
 		m_nearPlane = i_near;
 		m_farPlane = i_far;
 
-
-
+		// *** FLAGS ***
 		_isDirty = true;
 		updateFrustum();
-
-
-		// *** FLAGS ***
-
 	}
 
 	glm::mat4 calcProjMat() const {
@@ -87,40 +78,42 @@ public:
 							  m_bottomPlane, m_topPlane,
 							  m_nearPlane, m_farPlane);
 		case Shadow_Map_Projection::PERSPECTIVE:
-			// TODO: ADD THIS
-			return glm::mat4(1.0f);
+			return glm::perspective(glm::radians(m_fov), (m_planeWidth / m_planeHeight), m_nearPlane, m_farPlane);
 		default: break;
 		}
 	}
 
-	glm::mat4 calcViewMat(const glm::vec3& lightDirection) const {
+	glm::mat4 calcViewMat(const glm::vec3& lightDirection, const glm::vec3& position = glm::vec3(0.0f, 0.0f, 0.0f)) const {
 		if (glm::length(lightDirection) < 0.001f) {
 			return glm::mat4(1.0f);
 		}
 
-		float depth		= 50.0f;														// How many units to move back the light + near plane
-		glm::vec3 sceneOrigin = glm::vec3(0.0f);										// Where the camera is looking
-		glm::vec3 lightPos	  = sceneOrigin - glm::normalize(lightDirection) * depth;   // Moving the camera depth units back
-		glm::vec3 targetPos   = sceneOrigin;
-
+		glm::vec3 normDir = glm::normalize(lightDirection);
 		glm::vec3 upVec = glm::vec3(0.0f, 1.0f, 0.0f);
 		if (std::abs(glm::dot(glm::normalize(lightDirection), upVec)) > 0.99f) {
 			upVec = glm::vec3(1.0f, 0.0f, 0.0f);
 		}
 
-		return glm::lookAt(lightPos, targetPos, upVec);
+		float depth = 50.0f;
+		switch (m_projectionType) {
+		case Shadow_Map_Projection::ORTHOGRAPHIC:
+			glm::vec3 lightPos = position - normDir * depth;
+			return glm::lookAt(lightPos, position, upVec);
+		case Shadow_Map_Projection::PERSPECTIVE:
+			return glm::lookAt(position, position + normDir, upVec);
+		default:
+			return glm::mat4(1.0f);
+		}
 	}
 
-	// Matrix to light space
-	void calcLightSpaceMat(const glm::vec3 lightDirection) {
+	void calcLightSpaceMat(const glm::vec3& lightDirection, const glm::vec3& position = glm::vec3(0.0f, 0.0f, 0.0f)) {
 		if (glm::length(lightDirection) < 0.001f) {
-			//std::cerr << "ShadowCaster: Invalid light direction (zero length)" << std::endl;
 			m_lightSpaceMatrix = glm::mat4(1.0f);
 			return;
 		}
 
 		m_lightProjMat = calcProjMat();
-		m_lightViewMat = calcViewMat(lightDirection);
+		m_lightViewMat = calcViewMat(lightDirection, position);
 		m_lightSpaceMatrix = m_lightProjMat * m_lightViewMat;
 	}
 
@@ -138,20 +131,22 @@ private:
 	float m_rightPlane	= 50.0f;
 	float m_bottomPlane	= -50.0f;
 	float m_topPlane	= 50.0f;
-	float m_nearPlane	= 0.1f;
+	float m_nearPlane	= 0.01f;
 	float m_farPlane	= 50.0f;
 
 	float m_planeWidth  = 50.0f;
 	float m_planeHeight = 50.0f;
+	float m_fov = 45.0f;;
 
 	float m_projectionDist = 50.0f;
+
 
 	bool _isDirty = true;
 
 
 	void generateShadowMap() {
 		glGenFramebuffers(1, &m_fboID);
-		std::cout << "Generating Shadow Map for: " << m_fboID << std::endl;
+		std::cout << "[SHADOW CASTER] Generating Shadow Map for: " << m_fboID << '\n';
 
 		// --Creating the depth texture
 		glGenTextures(1, &m_depthMapTextureID);
@@ -177,7 +172,7 @@ private:
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-			std::cerr << "ERROR: Shadow framebuffer not complete!" << std::endl;
+			std::cerr << "ERROR: Shadow framebuffer not complete!" << '\n';
 		}
 
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);

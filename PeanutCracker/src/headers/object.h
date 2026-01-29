@@ -49,7 +49,7 @@ public:
 		, shaderPtr(i_shaderPtr)
 		, transform() {}
 
-	void setPosition(const glm::vec3& pos) { 
+	void setPosition(const glm::vec3& pos) {
 		transform.position = pos;
 	}
 	void setScale(const glm::vec3& scl) {

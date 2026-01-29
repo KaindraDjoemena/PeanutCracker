@@ -40,8 +40,8 @@ struct SpotLightStruct {
 	float constant;
 	float linear;
 	float quadratic;
-	float innerCutoff;
-	float outerCutoff;
+	float inCosCutoff;
+	float outCosCutoff;
 	float _padding0;
 	float _padding1;
 	float _padding2;

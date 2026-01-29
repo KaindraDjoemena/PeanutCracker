@@ -12,54 +12,88 @@
 #include <memory>
 #include <functional>
 #include <unordered_map>
-
+#include <chrono>
 
 class AssetManager {
 public:
 	AssetManager() = default;
 
-	//std::shared_ptr<Cubemap> loadCubeMap(const Faces& faces, std::shared_ptr<Shader> shaderObjectPtr) {
-	//	// 1. Create a robust composite key string by concatenating all six paths IN ORDER
-	//	std::string compositeKey =
-	//		faces.cubeFaces[0].string() + "|" + // +X
-	//		faces.cubeFaces[1].string() + "|" + // -X
-	//		faces.cubeFaces[2].string() + "|" + // +Y
-	//		faces.cubeFaces[3].string() + "|" + // -Y
-	//		faces.cubeFaces[4].string() + "|" + // +Z
-	//		faces.cubeFaces[5].string();        // -Z
-
-	//	// 2. Calculate the hash value (the actual map key)
-	//	size_t hashKey = std::hash<std::string>{}(compositeKey);
-
-	//	// 3. Check the cache
-	//	auto it = cubemapCache.find(hashKey);
-	//	if (it != cubemapCache.end()) {
-	//		return it->second; // Return cached shared_ptr
-	//	}
-
-	//	// 4. If not found, create the new Cubemap object.
-	//	// Assuming your Cubemap constructor takes the Faces struct directly, as shown in your Scene code.
-	//	auto newCubeMap = std::make_shared<Cubemap>(faces, shaderObjectPtr.get());
-
-	//	// 5. Store and return
-	//	cubemapCache[hashKey] = newCubeMap;
-	//	return newCubeMap;
-	//}
+	// Shader cache struct
+	struct CachedShader {
+		std::shared_ptr<Shader> shader;
+		std::filesystem::file_time_type vertLastModified;
+		std::filesystem::file_time_type fragLastModified;
+	};
 
 	std::shared_ptr<Shader> loadShaderObject(const std::filesystem::path& vertPath, const std::filesystem::path& fragPath) {
-		std::string strVertPath  = vertPath.string();
-		std::string strFragPath  = fragPath.string();
-		std::string compositeKey = strVertPath + "|" + strFragPath;		// the "|" delimiter is not that good. Hash functions are better i think(?)
+		std::string compositeKey = vertPath.string() + "|" + fragPath.string();
 
-		auto shaderPath = shaderCache.find(compositeKey);
-		if (shaderPath != shaderCache.end()) {
-			return shaderPath->second;
+		auto cacheIt = shaderCache.find(compositeKey);
+		if (cacheIt != shaderCache.end()) {
+			auto currentVertTime = std::filesystem::last_write_time(vertPath);
+			auto currentFragTime = std::filesystem::last_write_time(fragPath);
+
+			if (currentVertTime == cacheIt->second.vertLastModified &&
+				currentFragTime == cacheIt->second.fragLastModified) {
+				return cacheIt->second.shader;
+			}
+
+			std::cout << "[AssetManager] Reloading modified shader: " << compositeKey << '\n';
+			shaderCache.erase(cacheIt);
 		}
 
-		auto newShaderObject = std::make_shared<Shader>(vertPath, fragPath);
+		// Load new or modified shader
+		try {
+			auto newShaderObject = std::make_shared<Shader>(vertPath, fragPath);
 
-		shaderCache[compositeKey] = newShaderObject;
-		return newShaderObject;
+			CachedShader cached;
+			cached.shader = newShaderObject;
+			cached.vertLastModified = std::filesystem::last_write_time(vertPath);
+			cached.fragLastModified = std::filesystem::last_write_time(fragPath);
+
+			shaderCache[compositeKey] = cached;
+			return newShaderObject;
+		}
+		catch (const std::exception& e) {
+			std::cerr << "[AssetManager] Failed to load shader: " << e.what() << '\n';
+
+			if (cacheIt != shaderCache.end()) {
+				std::cout << "[AssetManager] Keeping old cached version due to compile error" << '\n';
+				return cacheIt->second.shader;
+			}
+			return nullptr;
+		}
+	}
+
+	// Force reload shader object
+	void reloadShader(const std::filesystem::path& vertPath, const std::filesystem::path& fragPath) {
+		std::string compositeKey = vertPath.string() + "|" + fragPath.string();
+
+		auto cacheIt = shaderCache.find(compositeKey);
+
+		try {
+			auto newShader = std::make_shared<Shader>(vertPath, fragPath);
+
+			if (cacheIt != shaderCache.end()) {
+				std::cout << "[AssetManager] Hot-reloaded shader: " << compositeKey << '\n';
+			}
+
+			CachedShader cached;
+			cached.shader = newShader;
+			cached.vertLastModified = std::filesystem::last_write_time(vertPath);
+			cached.fragLastModified = std::filesystem::last_write_time(fragPath);
+			shaderCache[compositeKey] = cached;
+
+		}
+		catch (const std::exception& e) {
+			std::cerr << "[AssetManager] Hot-reload failed: " << e.what() << '\n';
+		}
+	}
+
+	// Clear shader cache
+	void clearShaderCache() {
+		shaderCache.clear();
+		std::cout << "[AssetManager] Shader cache cleared" << '\n';
 	}
 
 	std::shared_ptr<Model> loadModel(const std::string& path) {
@@ -68,15 +102,14 @@ public:
 			return modelPath->second;
 		}
 
-		auto newModel = std::make_shared<Model>(path);	// Load model
-
+		auto newModel = std::make_shared<Model>(path);
 		modelCache[path] = newModel;
 		return newModel;
 	}
 
 private:
-	std::unordered_map<std::string, std::shared_ptr<Model>>	 modelCache;
-	std::unordered_map<std::string, std::shared_ptr<Shader>> shaderCache;
+	std::unordered_map<std::string, std::shared_ptr<Model>> modelCache;
+	std::unordered_map<std::string, CachedShader> shaderCache;
 };
 
 #endif

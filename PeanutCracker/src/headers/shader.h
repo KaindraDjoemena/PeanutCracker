@@ -19,8 +19,8 @@ public:
 	unsigned int ID;
 
 	Shader(const std::filesystem::path& vertexPath, const std::filesystem::path& fragmentPath) {
-		std::cout << "opening shader file at: " << vertexPath << std::endl;
-		std::cout << "opening shader file at: " << fragmentPath << std::endl;
+		std::cout << "[SHADER] opening shader file at: " << vertexPath << '\n';
+		std::cout << "[SHADER] opening shader file at: " << fragmentPath << '\n';
 
 		std::string vertexCode = readFile(vertexPath);
 		std::string fragmentCode = readFile(fragmentPath);
@@ -36,7 +36,7 @@ public:
 
 
 		if (vertexCode.empty() || fragmentCode.empty()) {
-			std::cerr << "ERROR::SHADER::SOURCE_EMPTY" << std::endl;
+			std::cerr << "ERROR::SHADER::SOURCE_EMPTY" << '\n';
 			return;
 		}
 
@@ -88,7 +88,7 @@ private:
 
 	std::string readFile(const std::filesystem::path& path) {
 		if (!std::filesystem::exists(path)) {
-			std::cerr << "ERROR::SHADER::FILE_NOT_FOUND: " << path << std::endl;
+			std::cerr << "ERROR::SHADER::FILE_NOT_FOUND: " << path << '\n';
 			return "";
 		}
 
@@ -103,7 +103,7 @@ private:
 			code = stream.str();
 		}
 		catch (const std::ifstream::failure& e) {
-			std::cerr << "ERROR::SHADER::FILE_NOT_READ: " << path << " (" << e.what() << ")" << std::endl;
+			std::cerr << "ERROR::SHADER::FILE_NOT_READ: " << path << " (" << e.what() << ")" << '\n';
 		}
 		return code;
 	}
@@ -150,7 +150,7 @@ private:
 			glGetShaderiv(shaderOrProgram, GL_COMPILE_STATUS, &success);
 			if (!success) {
 				glGetShaderInfoLog(shaderOrProgram, 1024, NULL, infoLog);
-				std::cout << "ERROR::SHADER_COMPILATION_ERROR of type: " << type << "\n" << infoLog << "\n -- --------------------------------------------------- -- " << std::endl;
+				std::cout << "ERROR::SHADER_COMPILATION_ERROR of type: " << type << "\n" << infoLog << "\n -- --------------------------------------------------- -- " << '\n';
 			}
 		}
 		else {
@@ -158,7 +158,7 @@ private:
 			glGetProgramiv(shaderOrProgram, GL_LINK_STATUS, &success);
 			if (!success) {
 				glGetProgramInfoLog(shaderOrProgram, 1024, NULL, infoLog);
-				std::cout << "ERROR::PROGRAM_LINKING_ERROR of type: " << type << "\n" << infoLog << "\n -- --------------------------------------------------- -- " << std::endl;
+				std::cout << "ERROR::PROGRAM_LINKING_ERROR of type: " << type << "\n" << infoLog << "\n -- --------------------------------------------------- -- " << '\n';
 			}
 		}
 	}

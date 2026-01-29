@@ -66,8 +66,8 @@ struct SpotLightStruct {
 	float constant;			// 4
 	float linear;			// 4
 	float quadratic;		// 4
-	float innerCutoff;		// 4
-	float outerCutoff;		// 4
+	float inCosCutoff;		// 4
+	float outCosCutoff;		// 4
 	float _padding0;		// 4
 	float _padding1;		// 4
 	float _padding2;		// 4
@@ -181,7 +181,7 @@ public:
 		//std::string indent(depth * 2, ' ');
 		//std::cout << indent << "- " << node->name
 		//	<< (node->isSelected ? " [SELECTED]" : "")
-		//	<< std::endl;
+		//	<< '\n';
 		for (auto& child : node->children) {
 			debugPrintSceneGraph(child.get(), depth + 1);
 		}
@@ -189,16 +189,16 @@ public:
 
 	void deleteSelectedEntities() {
 		if (selectedEntities.empty()) return;
-		std::cout << "Deleting " << selectedEntities.size() << " entities..." << std::endl;
+		std::cout << "[SCENE] Deleting " << selectedEntities.size() << " entities..." << '\n';
 
 		for (SceneNode* node : selectedEntities) {
 			if (node == worldNode.get()) {
-				std::cout << "  WARNING: Cannot delete root node!" << std::endl;
+				std::cout << "  WARNING: Cannot delete root node!" << '\n';
 				continue;
 			}
 
 			if (!node->parent) {
-				std::cout << "  WARNING: Node has no parent, cannot delete: " << node->name << std::endl;
+				std::cout << "  WARNING: Node has no parent, cannot delete: " << node->name << '\n';
 				continue;
 			}
 
@@ -218,21 +218,21 @@ public:
 
 		worldNode->update(glm::mat4(1.0f), false);
 
-		std::cout << "SUCCESS: Deleted selected entities." << std::endl;
+		std::cout << "[SCENE] Deleted selected entities." << '\n';
 	}
 
 
 	void duplicateSelectedEntities() {
 		if (selectedEntities.empty()) return;
-		std::cout << "Duplicating " << selectedEntities.size() << " selected entities..." << std::endl;
+		std::cout << "[SCENE] Duplicating " << selectedEntities.size() << " selected entities..." << '\n';
 
 		std::vector<SceneNode*> newSelection;
 
 		for (SceneNode* source : selectedEntities) {
-			std::cout << "  Processing: " << source->name << std::endl;
+			std::cout << "  Processing: " << source->name << '\n';
 
 			if (!source->parent) {
-				std::cout << "    ERROR: No parent pointer! Skipping." << std::endl;
+				std::cout << "    ERROR: No parent pointer! Skipping." << '\n';
 				continue;
 			}
 
@@ -240,7 +240,7 @@ public:
 			std::unique_ptr<SceneNode> clonedNodePtr = source->clone();
 
 			if (!clonedNodePtr) {
-				std::cout << "    ERROR: Clone failed!" << std::endl;
+				std::cout << "    ERROR: Clone failed!" << '\n';
 				continue;
 			}
 
@@ -262,7 +262,7 @@ public:
 		// CRITICAL: Recalculate world matrices
 		worldNode->update(glm::mat4(1.0f), false);
 
-		std::cout << "SUCCESS: Duplicated " << newSelection.size() << " entities." << std::endl;
+		std::cout << "[SCENE] Duplicated " << newSelection.size() << " entities." << '\n';
 	}
 
 	// OBJECT LOADING QUEUE
@@ -340,7 +340,7 @@ public:
 			}
 
 			if (!found) {
-				std::cerr << "[Skybox Error] Missing face: " << faceNames[i] << " in directory " << directory << std::endl;
+				std::cerr << "[Skybox Error] Missing face: " << faceNames[i] << " in directory " << directory << '\n';
 				return; // Exit early if any face is missing to prevent OpenGL errors
 			}
 		}
@@ -356,7 +356,7 @@ public:
 			"defaultshaders/skybox.frag"
 		);
 
-		std::cout << "[Skybox] Successfully loaded environment from: " << directory << std::endl;
+		std::cout << "[SKYBOX] Successfully loaded environment from: " << directory << '\n';
 	}
 
 	void setSkybox(std::unique_ptr<Cubemap> sb) {
@@ -433,35 +433,43 @@ public:
 		// --Updating Camera vectors
 		camera.updateCameraVectors();
 
+		// -- Updating light space matrices
 		for (auto& dirLight : directionalLights) {
 			if (dirLight->shadowCasterComponent) {
-				//std::cout << "Light direction: "
-				//	<< dirLight->direction.x << ", "
-				//	<< dirLight->direction.y << ", "
-				//	<< dirLight->direction.z << std::endl;
-
 				// Check if direction is valid before calc
 				if (glm::length(dirLight->direction) < 0.001f) {
-					std::cerr << "ERROR: Direction is zero or near-zero!" << std::endl;
+					std::cerr << "ERROR: Direction is zero or near-zero!" << '\n';
 				}
 				if (glm::any(glm::isnan(dirLight->direction))) {
-					std::cerr << "ERROR: Direction contains NaN!" << std::endl;
+					std::cerr << "ERROR: Direction contains NaN!" << '\n';
 				}
 
-				dirLight->shadowCasterComponent->calcLightSpaceMat(dirLight->direction);
+				dirLight->shadowCasterComponent->calcLightSpaceMat(dirLight->direction, glm::vec3(0.0f, 0.0f, 0.0f));
 
 				// Check result immediately
 				glm::mat4 test = dirLight->shadowCasterComponent->getLightSpaceMatrix();
 				if (glm::any(glm::isnan(test[0]))) {
-					std::cerr << "Matrix became NaN inside calcLightSpaceMat!" << std::endl;
+					std::cerr << "Matrix became NaN inside calcLightSpaceMat!" << '\n';
 				}
 			}
 		}
+		for (auto& spotLight : spotLights) {
+			if (spotLight->shadowCasterComponent) {
+				// Check if direction is valid before calc
+				if (glm::length(spotLight->direction) < 0.001f) {
+					std::cerr << "ERROR: Direction is zero or near-zero!" << '\n';
+				}
+				if (glm::any(glm::isnan(spotLight->direction))) {
+					std::cerr << "ERROR: Direction contains NaN!" << '\n';
+				}
 
-		// --Updating Light Space Matrices
-		for (auto& dirLight : directionalLights) {
-			if (dirLight->shadowCasterComponent) {
-				dirLight->shadowCasterComponent->calcLightSpaceMat(dirLight->direction);
+				spotLight->shadowCasterComponent->calcLightSpaceMat(spotLight->direction, spotLight->position);
+
+				// Check result immediately
+				glm::mat4 test = spotLight->shadowCasterComponent->getLightSpaceMatrix();
+				if (glm::any(glm::isnan(test[0]))) {
+					std::cerr << "SPOTLIGHT: Matrix became NaN inside calcLightSpaceMat!" << '\n';
+				}
 			}
 		}
 
@@ -491,10 +499,37 @@ public:
 
 			// --Rendering each object for each light from the lights pov,
 			// and storing the depth value to an FBO
+			// -- Directional lights
 			for (auto& dirLight : directionalLights) {
 				if (!dirLight->shadowCasterComponent) continue;
 
 				ShadowCasterComponent* shadowComponent = dirLight->shadowCasterComponent.get();
+
+				glBindFramebuffer(GL_FRAMEBUFFER, shadowComponent->getFboID());
+				glClear(GL_DEPTH_BUFFER_BIT);
+
+				depthShaderObject->setMat4("lightSpaceMatrix", shadowComponent->getLightSpaceMatrix());
+
+				renderShadowRecursive(worldNode.get());
+			}
+			// -- Point lights
+			for (auto& pointLight : pointLights) {
+				if (!pointLight->shadowCasterComponent) continue;
+
+				ShadowCasterComponent* shadowComponent = pointLight->shadowCasterComponent.get();
+
+				glBindFramebuffer(GL_FRAMEBUFFER, shadowComponent->getFboID());
+				glClear(GL_DEPTH_BUFFER_BIT);
+
+				depthShaderObject->setMat4("lightSpaceMatrix", shadowComponent->getLightSpaceMatrix());
+
+				renderShadowRecursive(worldNode.get());
+			}
+			// -- Spot lights
+			for (auto& spotLight : spotLights) {
+				if (!spotLight->shadowCasterComponent) continue;
+
+				ShadowCasterComponent* shadowComponent = spotLight->shadowCasterComponent.get();
 
 				glBindFramebuffer(GL_FRAMEBUFFER, shadowComponent->getFboID());
 				glClear(GL_DEPTH_BUFFER_BIT);
@@ -517,10 +552,25 @@ public:
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		// --Binding the depth maps
+		// --Directinoal lights
 		for (size_t i = 0; i < directionalLights.size() && i < MAX_LIGHTS; ++i) {
 			if (directionalLights[i]->shadowCasterComponent) {
 				glActiveTexture(GL_TEXTURE0 + 10 + i);
 				glBindTexture(GL_TEXTURE_2D, directionalLights[i]->shadowCasterComponent->getDepthMapTexID());
+			}
+		}
+		// --Point lights
+		for (size_t i = 0; i < pointLights.size() && i < MAX_LIGHTS; ++i) {
+			if (pointLights[i]->shadowCasterComponent) {
+				glActiveTexture(GL_TEXTURE0 + 20 + i);
+				glBindTexture(GL_TEXTURE_2D, pointLights[i]->shadowCasterComponent->getDepthMapTexID());
+			}
+		}
+		// --Spot lights
+		for (size_t i = 0; i < spotLights.size() && i < MAX_LIGHTS; ++i) {
+			if (spotLights[i]->shadowCasterComponent) {
+				glActiveTexture(GL_TEXTURE0 + 30 + i);
+				glBindTexture(GL_TEXTURE_2D, spotLights[i]->shadowCasterComponent->getDepthMapTexID());
 			}
 		}
 
@@ -532,7 +582,7 @@ public:
 
 		worldNode->update(glm::mat4(1.0f), true);
 
-		setNodeShadowMapUniforms(worldNode.get());
+		setNodeShadowMapUniforms(worldNode.get());		// Set fragment shader shadow map uniformms
 
 		if (renderMode == Render_Mode::WIREFRAME) { glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); }
 		renderRecursive(camera, worldNode.get());
@@ -540,14 +590,15 @@ public:
 
 
 
-
+		// Drawing selected objects
+		drawSelectionStencil();
+		
+		// --Debug drawing
 		//glDisable(GL_CULL_FACE);
 		//glDisable(GL_DEPTH_TEST);
 		drawDirectionalLightFrustums(camera.getProjMat(vWidth / vHeight), camera.getViewMat());
-
-		// Drawing selected objects
-		drawSelectionStencil();
-
+		//drawPointLightFrustums(camera.getProjMat(vWidth / vHeight), camera.getViewMat());
+		drawSpotLightFrustums(camera.getProjMat(vWidth / vHeight), camera.getViewMat());
 		drawDebugAABBs();
 	}
 
@@ -559,14 +610,14 @@ public:
 		if (node->sphereColliderComponent && node != worldNode.get()) {
 			BoundingSphere boundingSphere = { node->sphereColliderComponent->worldCenter, node->sphereColliderComponent->worldRadius };
 			if (!camera.frustum.isInFrustum(boundingSphere)) {
-				//std::cout << "culled " << node->name << std::endl;
+				//std::cout << "culled " << node->name << '\n';
 				isVisible = false;
 			}
 		}
 
 		if (isVisible) {
 			if (node->object) {
-				//std::cout << "rendering " << node->name << std::endl;
+				//std::cout << "rendering " << node->name << '\n';
 				node->object->draw(node->worldMatrix);
 			}
 
@@ -676,15 +727,15 @@ private:
 		);
 	}
 	void drawDirectionalLightFrustums(const glm::mat4& projMat, const glm::mat4& viewMat) const {
-		if (!drawLightFrustums || !frustumVAO) return;
+		if (!drawLightFrustums || !frustumVAO || !frustumShader) return;
 
 		GLenum err;
 		while ((err = glGetError()) != GL_NO_ERROR) {
-			std::cerr << "OpenGL error: " << err << std::endl;
+			std::cerr << "[DRAW DIRLIGHT FRUST] OpenGL error: " << err << '\n';
 		}
 
 
-		glDisable(GL_DEPTH_TEST);
+		//glDisable(GL_DEPTH_TEST);
 		glLineWidth(2.0f);
 
 		frustumShader->use();
@@ -699,7 +750,6 @@ private:
 			
 			glm::mat4 lightVP = dirLight->shadowCasterComponent->getLightSpaceMatrix();
 			if (glm::any(glm::isnan(lightVP[0])) || glm::any(glm::isinf(lightVP[0]))) {
-				//std::cerr << "Invalid light space matrix for dir light" << std::endl;
 				continue;
 			}
 
@@ -709,7 +759,42 @@ private:
 			glDrawArrays(GL_LINES, 0, 24);
 		}
 
-		glEnable(GL_DEPTH_TEST);
+		//glEnable(GL_DEPTH_TEST);
+	}
+	//void drawPointLightFrustums();
+	void drawSpotLightFrustums(const glm::mat4& projMat, const glm::mat4& viewMat) const {
+		if (!drawLightFrustums || !frustumVAO || !frustumShader) return;
+
+		GLenum err;
+		while ((err = glGetError()) != GL_NO_ERROR) {
+			std::cerr << "[DRAW SPOTLIGHT FRUST] OpenGL error: " << err << '\n';
+		}
+
+		//glDisable(GL_DEPTH_TEST);
+		glLineWidth(2.0f);
+
+		frustumShader->use();
+		frustumShader->setMat4("projection", projMat);
+		frustumShader->setMat4("view", viewMat);
+		frustumShader->setVec3("color", glm::vec3(0, 1, 1)); // Cyan for spot lights (magenta is directional)
+
+		glBindVertexArray(frustumVAO);
+
+		for (auto& spotLight : spotLights) {
+			if (!spotLight->shadowCasterComponent) continue;
+
+			glm::mat4 lightVP = spotLight->shadowCasterComponent->getLightSpaceMatrix();
+			if (glm::any(glm::isnan(lightVP[0])) || glm::any(glm::isinf(lightVP[0]))) {
+				continue;
+			}
+
+			// Transform unit cube [-1,1] by inverse perspective matrix to get pyramid frustum corners
+			glm::mat4 invLightVP = glm::inverse(lightVP);
+			frustumShader->setMat4("model", invLightVP);
+			glDrawArrays(GL_LINES, 0, 24);
+		}
+
+		//glEnable(GL_DEPTH_TEST);
 	}
 
 
@@ -763,8 +848,8 @@ private:
 			dst.constant = src->attenuation.constant;
 			dst.linear = src->attenuation.linear;
 			dst.quadratic = src->attenuation.quadratic;
-			dst.innerCutoff = glm::cos(glm::radians(src->innerCutoff));
-			dst.outerCutoff = glm::cos(glm::radians(src->outerCutoff));
+			dst.inCosCutoff  = src->inCosCutoff;
+			dst.outCosCutoff = src->outCosCutoff;
 		}
 
 		glBindBuffer(GL_UNIFORM_BUFFER, lightingUBO);
@@ -777,6 +862,7 @@ private:
 	void updateShadowUBO() const {
 		ShadowMatricesUBOData data = {};
 
+		// --Directional lights
 		for (size_t i = 0; i < directionalLights.size() && i < MAX_LIGHTS; ++i) {
 			if (directionalLights[i]->shadowCasterComponent) {
 				data.directionalLightSpaceMatrices[i] = directionalLights[i]->shadowCasterComponent->getLightSpaceMatrix();
@@ -785,10 +871,17 @@ private:
 				data.directionalLightSpaceMatrices[i] = glm::mat4(1.0f);
 			}
 		}
-
-		for (size_t i = 0; i < MAX_LIGHTS; ++i) {
-			data.pointLightSpaceMatrices[i] = glm::mat4(1.0f);
-			data.spotLightSpaceMatrices[i] = glm::mat4(1.0f);
+		// --Point lights
+		for (size_t i = 0; i < pointLights.size(); ++i) {
+			if (pointLights[i]->shadowCasterComponent) {
+				data.pointLightSpaceMatrices[i] = pointLights[i]->shadowCasterComponent->getLightSpaceMatrix();
+			}
+		}
+		// --Spot lights
+		for (size_t i = 0; i < spotLights.size(); ++i) {
+			if (spotLights[i]->shadowCasterComponent) {
+				data.spotLightSpaceMatrices[i] = spotLights[i]->shadowCasterComponent->getLightSpaceMatrix();
+			}
 		}
 
 		glBindBuffer(GL_UNIFORM_BUFFER, shadowUBO);
@@ -802,9 +895,17 @@ private:
 	void setNodeShadowMapUniforms(SceneNode* node) const {
 		if (node->object && node->object->shaderPtr) {
 			node->object->shaderPtr->use();
-			for (size_t i = 0; i < directionalLights.size() && i < MAX_LIGHTS; ++i) {
+			for (size_t i = 0; i < directionalLights.size(); ++i) {
 				std::string uniformName = "DirectionalShadowMap[" + std::to_string(i) + "]";
 				node->object->shaderPtr->setInt(uniformName, 10 + i);
+			}
+			for (size_t i = 0; i < pointLights.size(); ++i) {
+				std::string uniformName = "PointShadowMap[" + std::to_string(i) + "]";
+				node->object->shaderPtr->setInt(uniformName, 20 + i);
+			}
+			for (size_t i = 0; i < spotLights.size(); ++i) {
+				std::string uniformName = "SpotShadowMap[" + std::to_string(i) + "]";
+				node->object->shaderPtr->setInt(uniformName, 30 + i);
 			}
 		}
 

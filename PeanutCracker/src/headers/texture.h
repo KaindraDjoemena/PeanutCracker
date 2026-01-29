@@ -30,7 +30,7 @@ private:
     unsigned int m_unit;
 
     void loadTexture(char const* path) {
-        std::cout << "loading texture: " << path << std::endl;
+        std::cout << "[TEXTURE] loading texture: " << path << '\n';
 
         glGenTextures(1, &m_ID);
 
@@ -52,7 +52,7 @@ private:
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         }
         else {
-            std::cout << "Failed to load texture: " << path << std::endl;
+            std::cout << "[TETURE] Failed to load texture: " << path << '\n';
         }
         stbi_image_free(data);
     }

@@ -1,5 +1,5 @@
 #ifndef SCENE_NODE_H
-#define SCENE_NODE_h
+#define SCENE_NODE_H
 
 
 #define GLM_ENABLE_EXPERIMENTAL 

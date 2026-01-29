@@ -84,7 +84,7 @@ private:
 				glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
 			}
 			else {
-				std::cout << "Cubemap texture failed to load at path: " << faces.cubeFaces[i] << std::endl;
+				std::cout << "[CUBEMAP] texture failed to load at path: " << faces.cubeFaces[i] << '\n';
 			}
 
 			stbi_image_free(data);

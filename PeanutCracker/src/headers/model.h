@@ -45,7 +45,7 @@ public:
 
 	Model(std::string const& path, bool gamma = false)
 		: gammaCorrection(gamma), path(path) {
-		std::cout << "Loading model: " << path << std::endl;
+		std::cout << "[MODEL] Loading model: " << path << '\n';
 		loadModel(path);
 	}
 
@@ -56,13 +56,13 @@ public:
 
 	int loadModel(std::string const& path) {
 		Assimp::Importer importer;
-		// aiProcess_JoinIdenticalVertices is crucial for performance here
+
 		const aiScene* scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_GenSmoothNormals |
 			aiProcess_FlipUVs | aiProcess_CalcTangentSpace |
 			aiProcess_JoinIdenticalVertices);
 
 		if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
-			std::cout << "ERROR::ASSIMP:: " << importer.GetErrorString() << std::endl;
+			std::cout << "ERROR::ASSIMP:: " << importer.GetErrorString() << '\n';
 			return -1;
 		}
 
@@ -185,7 +185,7 @@ private:
 				}
 			}
 			if (!skip) {
-				std::cout << "creating texture..." << std::endl;
+				std::cout << "[MODEL] creating texture..." << '\n';
 				Texture texture;
 				texture.id = TextureFromFile(str.C_Str(), this->directory);
 				texture.type = typeName;
@@ -202,7 +202,7 @@ private:
 unsigned int TextureFromFile(const char* path, const std::string& directory, bool gamma) {
 	std::string filename = (std::filesystem::path(directory) / std::filesystem::path(path)).string();
 
-	std::cout << "loading texture from " << filename << "..." << std::endl;
+	std::cout << "[MODEL] loading texture from " << filename << "..." << '\n';
 
 	unsigned int textureID;
 	glGenTextures(1, &textureID);
@@ -230,11 +230,11 @@ unsigned int TextureFromFile(const char* path, const std::string& directory, boo
 
 		stbi_image_free(data);
 
-		std::cout << "done" << std::endl;
+		std::cout << "[MODEL] done" << '\n';
 	}
 	else
 	{
-		std::cout << "texture failed to load at " << path << std::endl;
+		std::cout << "[MODEL] texture failed to load at " << path << '\n';
 		stbi_image_free(data);
 	}
 
