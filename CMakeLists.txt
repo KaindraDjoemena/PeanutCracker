@@ -26,14 +26,28 @@ file(GLOB_RECURSE IMGUI_SOURCES
 )
 
 add_executable(PeanutCracker 
-    "PeanutCracker/src/main.cpp"
     "PeanutCracker/src/stb.cpp"
     "PeanutCracker/dependencies/glad/src/glad.c"
     ${IMGUI_SOURCES}
-    "PeanutCracker/src/headers/assetManager.h"
-    "PeanutCracker/src/headers/ray.h"
     "PeanutCracker/src/ImGuizmo.cpp"
- "PeanutCracker/src/headers/shadowCasterComponent.h" "PeanutCracker/src/headers/sphereColliderComponent.h" "PeanutCracker/src/headers/frustum.h" "PeanutCracker/src/frustum.cpp")
+
+    "PeanutCracker/src/assetManager.cpp"
+    "PeanutCracker/src/camera.cpp"
+    "PeanutCracker/src/cubemap.cpp"
+    "PeanutCracker/src/frustum.cpp"
+    "PeanutCracker/src/gui.cpp"
+    "PeanutCracker/src/light.cpp"
+    "PeanutCracker/src/main.cpp"
+    "PeanutCracker/src/mesh.cpp"
+    "PeanutCracker/src/model.cpp"
+    "PeanutCracker/src/object.cpp"
+    "PeanutCracker/src/ray.cpp"
+    "PeanutCracker/src/scene.cpp"
+    "PeanutCracker/src/sceneNode.cpp"
+    "PeanutCracker/src/shader.cpp"
+    "PeanutCracker/src/shadowCasterComponent.cpp"
+    "PeanutCracker/src/sphereColliderComponent.cpp"
+)
 
 target_include_directories(PeanutCracker PRIVATE
     "PeanutCracker/src"
@@ -42,7 +56,7 @@ target_include_directories(PeanutCracker PRIVATE
     "PeanutCracker/dependencies/stb_image"
     "PeanutCracker/dependencies/imgui"
     "PeanutCracker/dependencies/imgui/backends"
-    #"PeanutCracker/dependencies/imguizmo"
+    "PeanutCracker/dependencies/imguizmo"
     "PeanutCracker/dependencies/assimp/include"
 )
 

@@ -37,19 +37,31 @@
 *.out
 *.app
 
-# debug information files
+# Debug information files
 *.dwo
 
 # Visual Studio / IDE Caches
 .vs/
+.vscode/
+.idea/
+*.vcxproj
 *.vcxproj.user
+*.sln
 *.suo
-dependencies/
+*.user
+*.cache
 
 # CMake Build Artifacts
+build/
 out/
 Debug/
 Release/
 x64/
 CMakeCache.txt
 CMakeSettings.json
+
+# ImGui
+imgui.ini
+
+# Dependencies
+dependencies/

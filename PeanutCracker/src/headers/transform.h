@@ -13,16 +13,15 @@ struct Transform {
 	glm::vec3 scale			= glm::vec3(1.0f, 1.0f, 1.0f);
 	glm::quat quatRotation	= glm::vec3(0.0f, 0.0f, 0.0f);
 
-	glm::mat4 getModelMatrix() {
-
-		// M = T x R x S
+	inline glm::mat4 getModelMatrix() {
+		// Model Space Matrix = T x R x S
 		glm::mat4 modelMat = glm::mat4(1.0f);
 		modelMat = glm::translate(modelMat, position);
-		modelMat = modelMat * glm::mat4_cast(quatRotation);
+		modelMat *= glm::mat4_cast(quatRotation);
 		modelMat = glm::scale(modelMat, scale);
 
 		return modelMat;
 	}
 };
 
-#endif 
+#endif

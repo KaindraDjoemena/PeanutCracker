@@ -1,5 +1,4 @@
-#ifndef OBJECT_H
-#define OBJECT_H
+#pragma once
 
 #define GLM_ENABLE_EXPERIMENTAL 
 
@@ -44,58 +43,18 @@ public:
 	glm::mat4	modelMatrixCache;
 	glm::mat4	normalMatrixCache;
 
-	Object(Model* i_modelPtr, Shader* i_shaderPtr)
-		: modelPtr(i_modelPtr)
-		, shaderPtr(i_shaderPtr)
-		, transform() {}
+	Object(Model* i_modelPtr, Shader* i_shaderPtr);
 
-	void setPosition(const glm::vec3& pos) {
-		transform.position = pos;
-	}
-	void setScale(const glm::vec3& scl) {
-		transform.scale.x = scl.x < epsilon ? epsilon : scl.x;
-		transform.scale.y = scl.y < epsilon ? epsilon : scl.y;
-		transform.scale.z = scl.z < epsilon ? epsilon : scl.z;
-	}
-	void setEulerRotation(const glm::vec3& eulerRotDegrees) {
-		glm::vec3 radians = glm::radians(eulerRotDegrees);
-		transform.quatRotation = glm::quat(radians);
-	}
-	void setQuatRotation(const glm::quat& quatRot) {
-		transform.quatRotation = quatRot;
-	}
+	void setPosition(const glm::vec3& pos);
+	void setScale(const glm::vec3& scl);
+	void setEulerRotation(const glm::vec3& eulerRotDegrees);
+	void setQuatRotation(const glm::quat& quatRot);
 
-	glm::vec3 getPosition() const {
-		return transform.position;
-	}
-	glm::vec3 getScale() const {
-		return transform.scale;
-	}
-	glm::vec3 getEulerRotation() const {
-		return glm::degrees(glm::eulerAngles(transform.quatRotation));
-	}
+	glm::vec3 getPosition() const;
+	glm::vec3 getScale() const;
+	glm::vec3 getEulerRotation() const;
 
-	void draw(const glm::mat4& worldMatrix) const {
-		shaderPtr->use();
-		shaderPtr->setMat4("model", worldMatrix);
-		glm::mat4 normalMatrix = glm::transpose(glm::inverse(worldMatrix));
-		shaderPtr->setMat4("normalMatrix", normalMatrix);
-		shaderPtr->setFloat("material.shininess", 32.0f);
-		modelPtr->draw(shaderPtr);
-	}
+	void draw(const glm::mat4& worldMatrix) const;
 
-	void drawShadow(const glm::mat4& modelMatrix, Shader* depthShader) const {
-		if (depthShader) {
-			depthShader->use();
-
-			depthShader->setMat4("model", modelMatrix);
-
-			modelPtr->draw(depthShader);
-		}
-		else {
-			draw(modelMatrix);
-		}
-	}
+	void drawShadow(const glm::mat4& modelMatrix, Shader* depthShader) const;
 };
-
-#endif

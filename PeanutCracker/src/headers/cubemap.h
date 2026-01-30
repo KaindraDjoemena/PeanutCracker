@@ -1,5 +1,4 @@
-#ifndef CUBEMAP_H
-#define CUBEMAP_H
+#pragma once
 
 #include "../../dependencies//stb_image/stb_image.h"
 #include "vao.h"
@@ -39,117 +38,16 @@ public:
 	unsigned int texture = 0;
 
 
-	Cubemap(const Faces& i_faces, Shader* i_shader)
-		: faces(i_faces)
-		, shaderPtr(i_shader)
-	{
-		setupMesh();
-	}
+	Cubemap(const Faces& i_faces, Shader* i_shader);
 
-	~Cubemap() {
-		if (texture != 0) glDeleteTextures(1, &texture);
-	}
+	~Cubemap();
 
-	void setShaderObject(Shader* i_shader) {
-		shaderPtr = i_shader;
-	}
+	void setShaderObject(Shader* i_shader);
 
-	void draw() const {
-		if (!shaderPtr) return;
-
-		shaderPtr->use();
-
-		glDepthFunc(GL_LEQUAL);
-
-		vao.bind();
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_CUBE_MAP, texture);
-		glDrawArrays(GL_TRIANGLES, 0, 36);
-		glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
-		vao.unbind();
-
-		glDepthFunc(GL_LESS);
-	}
+	void draw() const;
 
 private:
-	unsigned int loadCubemap() const {
-		unsigned int textureID;
-		glGenTextures(1, &textureID);
-		glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
+	unsigned int loadCubemap() const;
 
-		int width, height, nrChannels;
-		for (unsigned int i = 0; i < 6; i++) {
-			unsigned char* data = stbi_load(faces.cubeFaces[i].string().c_str(), &width, &height, &nrChannels, 0);
-			if (data) {
-				glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-			}
-			else {
-				std::cout << "[CUBEMAP] texture failed to load at path: " << faces.cubeFaces[i] << '\n';
-			}
-
-			stbi_image_free(data);
-		}
-
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-
-		return textureID;
-	}
-
-	void setupMesh() {
-		float skybox_vertices[] = {
-					-1.0f, 1.0f, -1.0f,
-		-1.0f, -1.0f, -1.0f,
-		1.0f, -1.0f, -1.0f,
-		1.0f, -1.0f, -1.0f,
-		1.0f, 1.0f, -1.0f,
-		-1.0f, 1.0f, -1.0f,
-
-		-1.0f, -1.0f, 1.0f,
-		-1.0f, -1.0f, -1.0f,
-		-1.0f, 1.0f, -1.0f,
-		-1.0f, 1.0f, -1.0f,
-		-1.0f, 1.0f, 1.0f,
-		-1.0f, -1.0f, 1.0f,
-
-		1.0f, -1.0f, -1.0f,
-		1.0f, -1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, -1.0f,
-		1.0f, -1.0f, -1.0f,
-
-		-1.0f, -1.0f, 1.0f,
-		-1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, -1.0f, 1.0f,
-		-1.0f, -1.0f, 1.0f,
-
-		-1.0f, 1.0f, -1.0f,
-		1.0f, 1.0f, -1.0f,
-		1.0f, 1.0f, 1.0f,
-		1.0f, 1.0f, 1.0f,
-		-1.0f, 1.0f, 1.0f,
-		-1.0f, 1.0f, -1.0f,
-
-		-1.0f, -1.0f, -1.0f,
-		-1.0f, -1.0f, 1.0f,
-		1.0f, -1.0f, -1.0f,
-		1.0f, -1.0f, -1.0f,
-		-1.0f, -1.0f, 1.0f,
-		1.0f, -1.0f, 1.0f
-		};
-
-		vao.bind();
-		vbo = VBO(skybox_vertices, 108 * sizeof(float));
-		vao.linkAttrib(vbo, 0, 3, GL_FLOAT, 3 * sizeof(float), (void*)0);
-		texture = loadCubemap();
-		vao.unbind();
-	}
+	void setupMesh();
 };
-
-#endif

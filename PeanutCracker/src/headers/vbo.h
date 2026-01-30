@@ -8,10 +8,10 @@ class VBO {
 public:
 	VBO() : m_ID(0) {}
 
-	VBO(GLfloat* vertices, GLsizeiptr size) {
+	VBO(GLfloat* vertices, GLsizeiptr size, GLenum drawMode) {
 		glGenBuffers(1, &m_ID);
 		glBindBuffer(GL_ARRAY_BUFFER, m_ID);
-		glBufferData(GL_ARRAY_BUFFER, size, vertices, GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, size, vertices, drawMode);
 	}
 
 	~VBO() { if (m_ID != 0) glDeleteBuffers(1, &m_ID); }
@@ -32,16 +32,14 @@ public:
 	VBO(const VBO&) = delete;
 	VBO& operator = (const VBO&) = delete;
 
+	unsigned int getID() { return m_ID; }
+
 	void bind() const {
 		glBindBuffer(GL_ARRAY_BUFFER, m_ID);
 	}
 
 	void unbind() const {
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
-	}
-
-	void deleteObject() const {
-		glDeleteBuffers(1, &m_ID);
 	}
 
 private:

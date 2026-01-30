@@ -1,5 +1,4 @@
-#ifndef LIGHT_H
-#define LIGHT_H
+#pragma once
 
 #include <glm/glm.hpp>
 #include "shader.h"
@@ -53,30 +52,15 @@ public:
 	virtual void setUniforms(const Shader& shader, const std::string& uniformName) const = 0;
 	virtual std::string getUniformPrefix() const = 0;
 
-	void setPositionUniform(const Shader& shader, const std::string& uniformName, const glm::vec3& position) const {
-		shader.setVec3(uniformName + ".position", position);
-	}
+	void setPositionUniform(const Shader& shader, const std::string& uniformName, const glm::vec3& position) const;
 
-	void setDirectionUniform(const Shader& shader, const std::string& uniformName, const glm::vec3& direction) const {
-		shader.setVec3(uniformName + ".direction", direction);
-	}
+	void setDirectionUniform(const Shader& shader, const std::string& uniformName, const glm::vec3& direction) const;
 
-	void setLightUniform(const Shader& shader, const std::string& uniformName, const Light& light) const {
-		shader.setVec3(uniformName + ".light.ambient", light.ambient);
-		shader.setVec3(uniformName + ".light.diffuse", light.diffuse);
-		shader.setVec3(uniformName + ".light.specular", light.specular);
-	}
+	void setLightUniform(const Shader& shader, const std::string& uniformName, const Light& light) const;
 
-	void setAttenuationUniform(const Shader& shader, const std::string& uniformName, const Attenuation& attenuation) const {
-		shader.setFloat(uniformName + ".attenuation.constant", attenuation.constant);
-		shader.setFloat(uniformName + ".attenuation.linear", attenuation.linear);
-		shader.setFloat(uniformName + ".attenuation.quadratic", attenuation.quadratic);
-	}
+	void setAttenuationUniform(const Shader& shader, const std::string& uniformName, const Attenuation& attenuation) const;
 
-	void setCutoffValuesUniform(const Shader& shader, const std::string& uniformName, float inCosCutoff, float outCosCutoff) const {
-		shader.setFloat(uniformName + ".inCosCutoff", inCosCutoff);
-		shader.setFloat(uniformName + ".outCosCutoff", outCosCutoff);
-	}
+	void setCutoffValuesUniform(const Shader& shader, const std::string& uniformName, float inCosCutoff, float outCosCutoff) const;
 };
 
 class DirectionalLight : public BaseLight {
@@ -86,19 +70,14 @@ public:
 
 	std::unique_ptr<ShadowCasterComponent> shadowCasterComponent;
 
-	DirectionalLight(const glm::vec3& i_direction,	// Direction
-		const Light& i_light						// Light
-	) : direction(i_direction),
-		light(i_light) {
-		shadowCasterComponent = std::make_unique<ShadowCasterComponent>(glm::vec2(2048, 2048), Shadow_Map_Projection::ORTHOGRAPHIC, 50.f, 50.f);
-	}
+	DirectionalLight(
+		const glm::vec3& i_direction,	// Direction
+		const Light& i_light			// Light
+	);
 
-	std::string getUniformPrefix() const override { return "directionalLight";}
+	std::string getUniformPrefix() const override;
 
-	void setUniforms(const Shader& shader, const std::string& uniformName) const override {
-		setDirectionUniform(shader, uniformName, direction);
-		setLightUniform(shader, uniformName, light);
-	}
+	void setUniforms(const Shader& shader, const std::string& uniformName) const override;
 };
 
 class PointLight : public BaseLight {
@@ -109,22 +88,15 @@ public:
 
 	std::unique_ptr<ShadowCasterComponent> shadowCasterComponent;
 
-	PointLight(const glm::vec3& i_position, // Position
+	PointLight(
+		const glm::vec3& i_position,		// Position
 		const Light& i_light,				// Light
 		const Attenuation& i_attenuation	// Attenuation
-	) : position(i_position),
-		light(i_light),
-		attenuation(i_attenuation) {
-		shadowCasterComponent = std::make_unique<ShadowCasterComponent>(glm::vec2(2048, 2048), Shadow_Map_Projection::PERSPECTIVE, 1.0f, 50.0f, 50.0f);
-	}
+	);
 
-	std::string getUniformPrefix() const override { return "pointLight"; }
+	std::string getUniformPrefix() const override;
 
-	void setUniforms(const Shader& shader, const std::string& uniformName) const override {
-		setPositionUniform(shader, uniformName, position);
-		setLightUniform(shader, uniformName, light);
-		setAttenuationUniform(shader, uniformName, attenuation);
-	}
+	void setUniforms(const Shader& shader, const std::string& uniformName) const override;
 };
 
 class SpotLight : public BaseLight {
@@ -138,31 +110,16 @@ public:
 
 	std::unique_ptr<ShadowCasterComponent> shadowCasterComponent;
 
-	SpotLight(const glm::vec3& i_position,	// Position
-		const glm::vec3& i_direction,		// Direction
-		const Light& i_light,				// Light
-		const Attenuation& i_attenuation,	// Attenuation
-		float					i_inCosCutoff,
-		float					i_outCosCutoff
-	) : position(i_position),
-		direction(i_direction),
-		light(i_light),
-		attenuation(i_attenuation),
-		inCosCutoff(i_inCosCutoff),
-		outCosCutoff(i_outCosCutoff) {
-		shadowCasterComponent = std::make_unique<ShadowCasterComponent>(glm::vec2(2048, 2048), Shadow_Map_Projection::PERSPECTIVE, i_outCosCutoff, 50.0f, 50.0f);
-	}
+	SpotLight(
+		const glm::vec3& i_position,		// Position
+		const glm::vec3&	i_direction,	// Direction
+		const Light&		i_light,		// Light
+		const Attenuation&	i_attenuation,	// Attenuation
+		float				i_inCosCutoff,
+		float				i_outCosCutoff
+	);
 
-	std::string getUniformPrefix() const override { return "spotLight"; }
+	std::string getUniformPrefix() const override;
 
-	void setUniforms(const Shader& shader, const std::string& uniformName) const override {
-		setPositionUniform(shader, uniformName, position);
-		setDirectionUniform(shader, uniformName, direction);
-		setLightUniform(shader, uniformName, light);
-		setAttenuationUniform(shader, uniformName, attenuation);
-		setCutoffValuesUniform(shader, uniformName, inCosCutoff, outCosCutoff);
-	}
+	void setUniforms(const Shader& shader, const std::string& uniformName) const override;
 };
-
-
-#endif

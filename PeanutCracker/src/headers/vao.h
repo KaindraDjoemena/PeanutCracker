@@ -23,6 +23,8 @@ public:
 	VAO(const VAO&) = delete;
 	VAO& operator = (const VAO&) = delete;
 
+	unsigned int getID() const { return m_ID; }
+
 	void linkAttrib(VBO& VBO, GLuint layout, GLuint numComponents, GLenum type, GLsizeiptr stride, void* offset) {
 		VBO.bind();
 		glVertexAttribPointer(layout, numComponents, type, GL_FALSE, stride, offset);
