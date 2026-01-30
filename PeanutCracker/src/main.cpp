@@ -264,16 +264,19 @@ int main() {
 
 	auto directionalLight = std::make_unique<DirectionalLight>(
 		glm::vec3(0.0f, 0.0f, -1.0f),
-		Light(glm::vec3(0.1f), glm::vec3(0.8f), glm::vec3(1.0f)));
+		Light(glm::vec3(0.1f), glm::vec3(0.8f), glm::vec3(1.0f)),
+		0.1f, 100.0f
+	);
 	scene.createAndAddDirectionalLight(std::move(directionalLight));
 
 	auto spotLight = std::make_unique<SpotLight>(
-		glm::vec3(0.0f, 0.0f, -10.0f),
-		glm::vec3(0.0f, 0.0f, 1.0f),
+		glm::vec3(0.0f, 0.0f, 10.0f),
+		glm::vec3(0.0f, 0.0f, -1.0f),
 		Light(glm::vec3(0.1f), glm::vec3(0.8f), glm::vec3(1.0f)),
 		Attenuation(),
 		cosf(glm::radians(10.0f)),
-		cosf(glm::radians(20.0f)));
+		cosf(glm::radians(20.0f)),
+		0.01f, 10.0f);
 	scene.createAndAddSpotLight(std::move(spotLight));
 
 	// STBI IMAGE FLIPPING FOR TEXTURES

@@ -71,8 +71,10 @@ public:
 	std::unique_ptr<ShadowCasterComponent> shadowCasterComponent;
 
 	DirectionalLight(
-		const glm::vec3& i_direction,	// Direction
-		const Light& i_light			// Light
+		const glm::vec3&	i_direction,	// Direction
+		const Light&		i_light,		// Light
+		float				i_nearPlane,
+		float				i_farPlane
 	);
 
 	std::string getUniformPrefix() const override;
@@ -89,9 +91,11 @@ public:
 	std::unique_ptr<ShadowCasterComponent> shadowCasterComponent;
 
 	PointLight(
-		const glm::vec3& i_position,		// Position
-		const Light& i_light,				// Light
-		const Attenuation& i_attenuation	// Attenuation
+		const glm::vec3&	i_position,		// Position
+		const Light&		i_light,		// Light
+		const Attenuation&	i_attenuation,	// Attenuation
+		float				i_nearPlane,
+		float				i_farPlane
 	);
 
 	std::string getUniformPrefix() const override;
@@ -111,12 +115,14 @@ public:
 	std::unique_ptr<ShadowCasterComponent> shadowCasterComponent;
 
 	SpotLight(
-		const glm::vec3& i_position,		// Position
+		const glm::vec3&	i_position,		// Position
 		const glm::vec3&	i_direction,	// Direction
 		const Light&		i_light,		// Light
 		const Attenuation&	i_attenuation,	// Attenuation
 		float				i_inCosCutoff,
-		float				i_outCosCutoff
+		float				i_outCosCutoff,
+		float				i_nearPlane,
+		float				i_farPlane
 	);
 
 	std::string getUniformPrefix() const override;

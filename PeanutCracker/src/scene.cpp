@@ -354,12 +354,10 @@ void Scene::draw(Camera& camera, float vWidth, float vHeight) {
 		for (auto& dirLight : directionalLights) {
 			if (!dirLight->shadowCasterComponent) continue;
 
-			ShadowCasterComponent* shadowComponent = dirLight->shadowCasterComponent.get();
-
-			glBindFramebuffer(GL_FRAMEBUFFER, shadowComponent->getFboID());
+			glBindFramebuffer(GL_FRAMEBUFFER, dirLight->shadowCasterComponent->getFboID());
 			glClear(GL_DEPTH_BUFFER_BIT);
 
-			m_depthShader->setMat4("lightSpaceMatrix", shadowComponent->getLightSpaceMatrix());
+			m_depthShader->setMat4("lightSpaceMatrix", dirLight->shadowCasterComponent->getLightSpaceMatrix());
 
 			renderShadowRecursive(worldNode.get());
 		}
@@ -367,12 +365,10 @@ void Scene::draw(Camera& camera, float vWidth, float vHeight) {
 		for (auto& pointLight : pointLights) {
 			if (!pointLight->shadowCasterComponent) continue;
 
-			ShadowCasterComponent* shadowComponent = pointLight->shadowCasterComponent.get();
-
-			glBindFramebuffer(GL_FRAMEBUFFER, shadowComponent->getFboID());
+			glBindFramebuffer(GL_FRAMEBUFFER, pointLight->shadowCasterComponent->getFboID());
 			glClear(GL_DEPTH_BUFFER_BIT);
 
-			m_depthShader->setMat4("lightSpaceMatrix", shadowComponent->getLightSpaceMatrix());
+			m_depthShader->setMat4("lightSpaceMatrix", pointLight->shadowCasterComponent->getLightSpaceMatrix());
 
 			renderShadowRecursive(worldNode.get());
 		}
@@ -380,12 +376,10 @@ void Scene::draw(Camera& camera, float vWidth, float vHeight) {
 		for (auto& spotLight : spotLights) {
 			if (!spotLight->shadowCasterComponent) continue;
 
-			ShadowCasterComponent* shadowComponent = spotLight->shadowCasterComponent.get();
-
-			glBindFramebuffer(GL_FRAMEBUFFER, shadowComponent->getFboID());
+			glBindFramebuffer(GL_FRAMEBUFFER, spotLight->shadowCasterComponent->getFboID());
 			glClear(GL_DEPTH_BUFFER_BIT);
 
-			m_depthShader->setMat4("lightSpaceMatrix", shadowComponent->getLightSpaceMatrix());
+			m_depthShader->setMat4("lightSpaceMatrix", spotLight->shadowCasterComponent->getLightSpaceMatrix());
 
 			renderShadowRecursive(worldNode.get());
 		}

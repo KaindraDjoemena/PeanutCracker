@@ -28,11 +28,14 @@ void BaseLight::setCutoffValuesUniform(const Shader& shader, const std::string& 
 
 // DIRECTIONAL LIGHT
 DirectionalLight::DirectionalLight(
-	const glm::vec3& i_direction,	// Direction
-	const Light& i_light			// Light
+	const glm::vec3&	i_direction,	// Direction
+	const Light&		i_light,			// Light
+	float				i_nearPlane,
+	float				i_farPlane
 ) : direction(i_direction),
-	light(i_light) {
-	shadowCasterComponent = std::make_unique<ShadowCasterComponent>(glm::vec2(2048, 2048), Shadow_Map_Projection::ORTHOGRAPHIC, 50.f, 50.f);
+	light(i_light)
+{
+	shadowCasterComponent = std::make_unique<ShadowCasterComponent>(glm::vec2(1024, 1024), Shadow_Map_Projection::ORTHOGRAPHIC, 50.f, 50.f, i_nearPlane, i_farPlane);
 }
 std::string DirectionalLight::getUniformPrefix() const {
 	return "directionalLight";
@@ -44,13 +47,16 @@ void DirectionalLight::setUniforms(const Shader& shader, const std::string& unif
 
 // POINT LIGHT
 PointLight::PointLight(
-	const glm::vec3& i_position,		// Position
-	const Light& i_light,				// Light
-	const Attenuation& i_attenuation	// Attenuation
+	const glm::vec3&	i_position,		// Position
+	const Light&		i_light,				// Light
+	const Attenuation&	i_attenuation,	// Attenuation
+	float				i_nearPlane,
+	float				i_farPlane
 ) : position(i_position),
 	light(i_light),
-	attenuation(i_attenuation) {
-	shadowCasterComponent = std::make_unique<ShadowCasterComponent>(glm::vec2(2048, 2048), Shadow_Map_Projection::PERSPECTIVE, 1.0f, 50.0f, 50.0f);
+	attenuation(i_attenuation)
+{
+	shadowCasterComponent = std::make_unique<ShadowCasterComponent>(glm::vec2(1024, 1024), Shadow_Map_Projection::PERSPECTIVE, 1.0f, 50.0f, 50.0f, i_nearPlane, i_farPlane);
 }
 std::string PointLight::getUniformPrefix() const {
 	return "pointLight";
@@ -68,14 +74,17 @@ SpotLight::SpotLight(
 	const Light&		i_light,		// Light
 	const Attenuation&	i_attenuation,	// Attenuation
 	float				i_inCosCutoff,
-	float				i_outCosCutoff
+	float				i_outCosCutoff,
+	float				i_nearPlane,
+	float				i_farPlane
 ) : position(i_position),
 	direction(i_direction),
 	light(i_light),
 	attenuation(i_attenuation),
 	inCosCutoff(i_inCosCutoff),
-	outCosCutoff(i_outCosCutoff) {
-	shadowCasterComponent = std::make_unique<ShadowCasterComponent>(glm::vec2(2048, 2048), Shadow_Map_Projection::PERSPECTIVE, i_outCosCutoff, 50.0f, 50.0f);
+	outCosCutoff(i_outCosCutoff)
+{
+	shadowCasterComponent = std::make_unique<ShadowCasterComponent>(glm::vec2(1024, 1024), Shadow_Map_Projection::PERSPECTIVE, i_outCosCutoff, 50.0f, 50.0f, i_nearPlane, i_farPlane);
 }
 std::string SpotLight::getUniformPrefix() const {
 	return "spotLight";

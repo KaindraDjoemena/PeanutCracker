@@ -18,8 +18,8 @@ class ShadowCasterComponent {
 public:
 	Frustum frustum;
 
-	ShadowCasterComponent(const glm::vec2 i_shadowMapRes, Shadow_Map_Projection i_projectionType, float i_width, float i_height);
-	ShadowCasterComponent(const glm::vec2 i_shadowMapRes, Shadow_Map_Projection i_projectionType, float i_outCosCutoff, float i_width, float i_height);
+	ShadowCasterComponent(const glm::vec2 i_shadowMapRes, Shadow_Map_Projection i_projectionType, float i_width, float i_height, float i_nearPlane, float i_farPlane);
+	ShadowCasterComponent(const glm::vec2 i_shadowMapRes, Shadow_Map_Projection i_projectionType, float i_outCosCutoff, float i_width, float i_height, float i_nearPlane, float i_farPlane);
 
 	~ShadowCasterComponent();
 
@@ -58,7 +58,7 @@ private:
 
 	float m_planeWidth  = 50.0f;
 	float m_planeHeight = 50.0f;
-	float m_fov = 45.0f;;
+	float m_fov			= 45.0f;
 
 	float m_projectionDist = 50.0f;
 
@@ -66,5 +66,5 @@ private:
 	bool _isDirty = true;
 
 
-	void generateShadowMap();
+	void generateShadowMap(bool linearFilter = true);
 };

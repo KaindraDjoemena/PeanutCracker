@@ -196,6 +196,15 @@ float calcShadow(bool isLocalLight, vec4 fragPosLightSpace, sampler2DShadow shad
     float bias = max(0.005f * tan(acos(cosTheta)), 0.001f); 
     bias = clamp(bias, 0.0001f, 0.01f);
 
-    float shadow = texture(shadowMap, vec3(projCoords.xy, projCoords.z - bias));
-    return 1.0 - shadow;
+    // 3x3 PCF
+    float shadow = 0.0;
+    vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+    for(int x = -1; x <= 1; ++x) {
+        for(int y = -1; y <= 1; ++y) {
+            vec3 coord = vec3(projCoords.xy + vec2(x,y) * texelSize, projCoords.z - bias);
+            shadow += texture(shadowMap, coord);
+        }
+    }
+
+    return 1.0f - (shadow / 9.0f);
 }
