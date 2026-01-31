@@ -1,0 +1,13 @@
+[submodule "PeanutCracker/dependencies/glfw"]
+	path = PeanutCracker/dependencies/glfw
+	url = https://github.com/glfw/glfw.git
+[submodule "PeanutCracker/dependencies/glm"]
+	path = PeanutCracker/dependencies/glm
+	url = https://github.com/g-truc/glm.git
+[submodule "PeanutCracker/dependencies/imgui"]
+	path = PeanutCracker/dependencies/imgui
+	url = https://github.com/ocornut/imgui.git
+	branch = docking
+[submodule "PeanutCracker/dependencies/imguizmo"]
+	path = PeanutCracker/dependencies/imguizmo
+	url = https://github.com/CedricGuillemet/ImGuizmo.git
