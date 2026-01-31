@@ -46,4 +46,4 @@ private:
 	unsigned int m_ID;
 };
 
-#endif VBO_H
+#endif

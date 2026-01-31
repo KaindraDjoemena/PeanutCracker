@@ -59,15 +59,20 @@ void ShadowCasterComponent::setFrustumPlanes(float i_left, float i_right, float 
 }
 
 glm::mat4 ShadowCasterComponent::calcProjMat() const {
+	glm::mat4 projMat = glm::mat4(1.0f);
 	switch (m_projectionType) {
 	case Shadow_Map_Projection::ORTHOGRAPHIC:
-		return glm::ortho(m_leftPlane, m_rightPlane,
+		projMat = glm::ortho(m_leftPlane, m_rightPlane,
 			m_bottomPlane, m_topPlane,
 			m_nearPlane, m_farPlane);
+		break;
 	case Shadow_Map_Projection::PERSPECTIVE:
-		return glm::perspective(glm::radians(m_fov), (m_planeWidth / m_planeHeight), m_nearPlane, m_farPlane);
+		projMat = glm::perspective(glm::radians(m_fov), (m_planeWidth / m_planeHeight), m_nearPlane, m_farPlane);
+		break;
 	default: break;
 	}
+
+	return projMat;
 }
 
 glm::mat4 ShadowCasterComponent::calcViewMat(const glm::vec3& lightDirection, const glm::vec3& position) const {
@@ -82,15 +87,20 @@ glm::mat4 ShadowCasterComponent::calcViewMat(const glm::vec3& lightDirection, co
 	}
 
 	float depth = 50.0f;
+	glm::mat4 viewMat = glm::mat4(1.0f);
+	glm::vec3 lightPos = position - normDir * depth;
 	switch (m_projectionType) {
 	case Shadow_Map_Projection::ORTHOGRAPHIC:
-		glm::vec3 lightPos = position - normDir * depth;
-		return glm::lookAt(lightPos, position, upVec);
+		viewMat = glm::lookAt(lightPos, position, upVec);
+		break;
 	case Shadow_Map_Projection::PERSPECTIVE:
-		return glm::lookAt(position, position + normDir, upVec);
+		viewMat = glm::lookAt(position, position + normDir, upVec);
+		break;
 	default:
-		return glm::mat4(1.0f);
+		break;
 	}
+
+	return viewMat;
 }
 
 void ShadowCasterComponent::calcLightSpaceMat(const glm::vec3& lightDirection, const glm::vec3& position) {
