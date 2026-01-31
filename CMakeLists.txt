@@ -21,8 +21,20 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(glfw)
 
-file(GLOB_RECURSE IMGUI_SOURCES 
+file(GLOB IMGUI_SOURCES 
     "PeanutCracker/dependencies/imgui/*.cpp"
+    "PeanutCracker/dependencies/imgui/backends/imgui_impl_glfw.cpp"
+    "PeanutCracker/dependencies/imgui/backends/imgui_impl_opengl3.cpp"
+)
+
+set(IMGUI_SOURCES 
+    "PeanutCracker/dependencies/imgui/imgui.cpp"
+    "PeanutCracker/dependencies/imgui/imgui_demo.cpp"
+    "PeanutCracker/dependencies/imgui/imgui_draw.cpp"
+    "PeanutCracker/dependencies/imgui/imgui_tables.cpp"
+    "PeanutCracker/dependencies/imgui/imgui_widgets.cpp"
+    "PeanutCracker/dependencies/imgui/backends/imgui_impl_glfw.cpp"
+    "PeanutCracker/dependencies/imgui/backends/imgui_impl_opengl3.cpp"
 )
 
 add_executable(PeanutCracker 
