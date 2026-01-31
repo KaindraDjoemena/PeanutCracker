@@ -40,8 +40,8 @@ public:
 	Transform	transform;
 	bool		isSelected = false;
 
-	glm::mat4	modelMatrixCache;
-	glm::mat4	normalMatrixCache;
+	glm::mat4	modelMatrixCache = glm::mat4(1.0f);
+	glm::mat4	normalMatrixCache = glm::mat4(1.0f);
 
 	Object(Model* i_modelPtr, Shader* i_shaderPtr);
 

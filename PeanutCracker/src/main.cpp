@@ -20,7 +20,7 @@
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 #include <imgui_internal.h>
-#include "headers/ImGuizmo.h"
+#include <ImGuizmo.h>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -136,6 +136,7 @@ const int MSAA_SAMPLES = 4;
 
 
 int main() {
+	std::cout << "BRAH" << std::endl;
 	std::cout << "[MAIN] C++ version: " << __cplusplus << '\n';
 	std::cout << "[MAIN] current path: " << std::filesystem::current_path() << '\n';
 
