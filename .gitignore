@@ -62,6 +62,3 @@ CMakeSettings.json
 
 # ImGui
 imgui.ini
-
-# Dependencies
-dependencies/
