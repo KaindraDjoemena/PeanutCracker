@@ -1,5 +1,6 @@
 #include "headers/frustum.h"
 
+
 void Frustum::constructFrustum(float aspect, const glm::mat4& projectionMat, const glm::mat4& viewMat) {
 	glm::mat4 viewProjMat = projectionMat * viewMat;
 

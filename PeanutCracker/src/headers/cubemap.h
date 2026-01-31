@@ -1,6 +1,5 @@
 #pragma once
 
-#include "../../dependencies//stb_image/stb_image.h"
 #include "vao.h"
 #include "vbo.h"
 #include "shader.h"

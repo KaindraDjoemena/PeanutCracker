@@ -181,36 +181,49 @@ void Scene::createAndAddSkyboxFromDirectory(const std::string& directory) {
 	namespace fs = std::filesystem;
 	fs::path root(directory);
 
-	std::vector<std::string> faceNames = { "right", "left", "top", "bottom", "front", "back" };
-	std::vector<std::string> extensions = { ".jpg", ".png", ".tga", ".jpeg", ".bmp" };
-	std::string finalPaths[6];
+	static const std::vector<std::array<std::string, 6>> namingSets = {
+		{ "right",  "left",   "top",    "bottom", "front", "back"  },
+		{ "px",     "nx",     "py",     "ny",     "pz",    "nz"    }
+	};
 
-	// Iterate over the faces
-	for (int i = 0; i < 6; ++i) {
-		bool found = false;
-		for (const auto& ext : extensions) {
-			fs::path fullPath = root / (faceNames[i] + ext);
-			if (fs::exists(fullPath)) {
-				finalPaths[i] = fullPath.string();
-				found = true;
-				break; // Found the file for this face, move to next face
+	static const std::vector<std::string> extensions = { ".png", ".jpg", ".jpeg" };
+
+	fs::path finalPaths[6];
+
+	for (const auto& names : namingSets) {
+		bool allFound = true;
+
+		for (int i = 0; i < 6; ++i) {
+			bool faceFound = false;
+
+			for (const auto& ext : extensions) {
+				fs::path fullPath = root / (names[i] + ext);
+				if (fs::exists(fullPath)) {
+					finalPaths[i] = fullPath;
+					faceFound = true;
+					break;
+				}
+			}
+
+			if (!faceFound) {
+				allFound = false;
+				break;
 			}
 		}
 
-		if (!found) {
-			std::cerr << "[Skybox Error] Missing face: " << faceNames[i] << " in directory " << directory << '\n';
+		if (allFound) {
+			Faces faces(
+				finalPaths[0], finalPaths[1], finalPaths[3],
+				finalPaths[2], finalPaths[4], finalPaths[5]
+			);
+			createAndAddSkybox(faces, "defaultshaders/skybox.vert", "defaultshaders/skybox.frag");
+			std::cout << "[SKYBOX] Successfully loaded environment from: " << directory << '\n';
 			return;
 		}
 	}
 
-	Faces faces(
-		finalPaths[0], finalPaths[1], finalPaths[3],
-		finalPaths[2], finalPaths[4], finalPaths[5]
-	);
-
-	createAndAddSkybox(faces, "defaultshaders/skybox.vert", "defaultshaders/skybox.frag");
-
-	std::cout << "[SKYBOX] Successfully loaded environment from: " << directory << '\n';
+	std::cerr << "[Skybox Error] No recognized naming convention found in: " << directory << '\n';
+	std::cerr << "[Skybox Error] Supported formats: right/left/top/bottom/front/back, px/nx/py/ny/pz/nz, etc.\n";
 }
 
 
@@ -331,62 +344,52 @@ void Scene::draw(Camera& camera, float vWidth, float vHeight) {
 
 
 	// SHADOW PASS
-	bool hasAnyShadowCaster = false;
-	for (auto& light : directionalLights) {
-		if (light->shadowCasterComponent) {
-			hasAnyShadowCaster = true;
-			break;
-		}
-	}
-	if (hasAnyShadowCaster) {
-		const glm::vec2 res = directionalLights[0]->shadowCasterComponent->getShadowMapRes();
+	m_depthShader->use();
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_CULL_FACE);
+	glCullFace(GL_FRONT);		// Sampilng on the far face
+
+	// --Rendering each object for each light from the lights pov,
+	// and storing the depth value to an FBO
+	// -- Directional lights
+	for (auto& dirLight : directionalLights) {
+		if (!dirLight->shadowCasterComponent) continue;
+
+		const glm::vec2 res = dirLight->shadowCasterComponent->getShadowMapRes();
+		glBindFramebuffer(GL_FRAMEBUFFER, dirLight->shadowCasterComponent->getFboID());
 		glViewport(0, 0, res.x, res.y);
+		glClear(GL_DEPTH_BUFFER_BIT);
 
-		m_depthShader->use();
-
-		glEnable(GL_DEPTH_TEST);
-		glEnable(GL_CULL_FACE);
-		glCullFace(GL_FRONT);		// Sampilng on the far face
-
-		// --Rendering each object for each light from the lights pov,
-		// and storing the depth value to an FBO
-		// -- Directional lights
-		for (auto& dirLight : directionalLights) {
-			if (!dirLight->shadowCasterComponent) continue;
-
-			glBindFramebuffer(GL_FRAMEBUFFER, dirLight->shadowCasterComponent->getFboID());
-			glClear(GL_DEPTH_BUFFER_BIT);
-
-			m_depthShader->setMat4("lightSpaceMatrix", dirLight->shadowCasterComponent->getLightSpaceMatrix());
-
-			renderShadowRecursive(worldNode.get());
-		}
-		// -- Point lights
-		for (auto& pointLight : pointLights) {
-			if (!pointLight->shadowCasterComponent) continue;
-
-			glBindFramebuffer(GL_FRAMEBUFFER, pointLight->shadowCasterComponent->getFboID());
-			glClear(GL_DEPTH_BUFFER_BIT);
-
-			m_depthShader->setMat4("lightSpaceMatrix", pointLight->shadowCasterComponent->getLightSpaceMatrix());
-
-			renderShadowRecursive(worldNode.get());
-		}
-		// -- Spot lights
-		for (auto& spotLight : spotLights) {
-			if (!spotLight->shadowCasterComponent) continue;
-
-			glBindFramebuffer(GL_FRAMEBUFFER, spotLight->shadowCasterComponent->getFboID());
-			glClear(GL_DEPTH_BUFFER_BIT);
-
-			m_depthShader->setMat4("lightSpaceMatrix", spotLight->shadowCasterComponent->getLightSpaceMatrix());
-
-			renderShadowRecursive(worldNode.get());
-		}
-
-		// --Reset opengl stuff
-		glCullFace(GL_BACK);
+		m_depthShader->setMat4("lightSpaceMatrix", dirLight->shadowCasterComponent->getLightSpaceMatrix());
+		renderShadowRecursive(worldNode.get());
 	}
+	// -- Point lights
+	for (auto& pointLight : pointLights) {
+		if (!pointLight->shadowCasterComponent) continue;
+
+		const glm::vec2 res = pointLight->shadowCasterComponent->getShadowMapRes();
+		glBindFramebuffer(GL_FRAMEBUFFER, pointLight->shadowCasterComponent->getFboID());
+		glViewport(0, 0, res.x, res.y);
+		glClear(GL_DEPTH_BUFFER_BIT);
+
+		m_depthShader->setMat4("lightSpaceMatrix", pointLight->shadowCasterComponent->getLightSpaceMatrix());
+		renderShadowRecursive(worldNode.get());
+	}
+	// -- Spot lights
+	for (auto& spotLight : spotLights) {
+		if (!spotLight->shadowCasterComponent) continue;
+
+		const glm::vec2 res = spotLight->shadowCasterComponent->getShadowMapRes();
+		glBindFramebuffer(GL_FRAMEBUFFER, spotLight->shadowCasterComponent->getFboID());
+		glViewport(0, 0, res.x, res.y);
+		glClear(GL_DEPTH_BUFFER_BIT);
+
+		m_depthShader->setMat4("lightSpaceMatrix", spotLight->shadowCasterComponent->getLightSpaceMatrix());
+		renderShadowRecursive(worldNode.get());
+	}
+
+	// --Reset opengl stuff
+	glCullFace(GL_BACK);
 
 
 	// LIGHT PASS

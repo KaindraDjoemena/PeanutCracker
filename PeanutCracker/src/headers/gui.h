@@ -32,8 +32,8 @@ public:
 	bool isViewportHovered = false;
 	bool pathErrorState = false;
 
-	ImVec2 viewportBoundsMin; // Top-left of the actual image
-	ImVec2 viewportSize;      // Width and Height of the image
+	ImVec2 viewportBoundsMin;
+	ImVec2 viewportSize;
 
 
 	GUI(GLFWwindow* window, const char* glsl_version);
@@ -48,7 +48,7 @@ public:
 private:
 	bool mUniformScale = false;
 
-	// --IMGUIZMO
+	// IMGUIZMO
 	ImGuizmo::OPERATION mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
 	ImGuizmo::MODE mCurrentGizmoMode = ImGuizmo::LOCAL;
 
