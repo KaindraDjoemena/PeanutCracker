@@ -37,69 +37,11 @@ struct WindowContext {
 	Scene* scene;
 };
 
-/*
-struct Framebuffer {
-	unsigned int fbo = 0, texture = 0, rbo = 0;
-	int width = 0, height = 0;
-
-	// Call this ONCE at the start of your program
-	void setup(int w, int h) {
-		glGenFramebuffers(1, &fbo);
-		glGenTextures(1, &texture);
-		glGenRenderbuffers(1, &rbo);
-
-		// Now allocate the initial storage
-		rescale(w, h);
-	}
-
-	void rescale(int w, int h) {
-		if (w <= 0 || h <= 0) return;
-		if (w == width && h == height) return;
-		//std::cout << "RESCALING FBO TO: " << w << "x" << h << '\n';
-		width = w;
-		height = h;
-
-		// 1. Resize Texture Storage
-		//glEnable(GL_FRAMEBUFFER_SRGB);
-		glBindTexture(GL_TEXTURE_2D, texture);
-		// Calling glTexImage2D on an existing ID simply reallocates the storage
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-		// 2. Resize Renderbuffer Storage
-		glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
-
-		// 3. Attach them to the FBO (Only strictly necessary once, but safe to repeat)
-		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
-		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
-
-		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-			std::cerr << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << '\n';
-
-		glDisable(GL_FRAMEBUFFER_SRGB);
-
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	}
-
-	void cleanUp() {
-		if (fbo) glDeleteFramebuffers(1, &fbo);
-		if (texture) glDeleteTextures(1, &texture);
-		if (rbo) glDeleteRenderbuffers(1, &rbo);
-		fbo = texture = rbo = 0;
-	}
-
-	~Framebuffer() { cleanUp(); }
-};
-*/
 
 
 struct Framebuffer {
 	unsigned int fbo = 0, texture = 0, rbo = 0;
 
-	// ADD THESE
 	unsigned int resolveFbo = 0, resolveTexture = 0;
 	int samples = 4;
 
@@ -110,7 +52,6 @@ struct Framebuffer {
 		glGenTextures(1, &texture);
 		glGenRenderbuffers(1, &rbo);
 
-		// ADD THESE
 		glGenFramebuffers(1, &resolveFbo);
 		glGenTextures(1, &resolveTexture);
 
@@ -123,25 +64,19 @@ struct Framebuffer {
 		width = w;
 		height = h;
 
-		// CHANGE: was glBindTexture(GL_TEXTURE_2D, texture)
 		glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, texture);
-		// CHANGE: was glTexImage2D
 		glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, samples, GL_RGBA16F, width, height, GL_TRUE);
-		// REMOVE: the two glTexParameteri calls — you can't set filter params on a multisample texture
 
-		// CHANGE: was glRenderbufferStorage
 		glBindRenderbuffer(GL_RENDERBUFFER, rbo);
 		glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_DEPTH24_STENCIL8, width, height);
 
 		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-		// CHANGE: GL_TEXTURE_2D -> GL_TEXTURE_2D_MULTISAMPLE
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D_MULTISAMPLE, texture, 0);
 		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
 
 		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 			std::cerr << "ERROR: Multisampled FBO incomplete\n";
 
-		// ADD: resolve FBO setup
 		glBindTexture(GL_TEXTURE_2D, resolveTexture);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -156,7 +91,6 @@ struct Framebuffer {
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}
 
-	// ADD THIS
 	void resolve() const {
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo);
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, resolveFbo);
@@ -168,7 +102,6 @@ struct Framebuffer {
 		if (fbo) glDeleteFramebuffers(1, &fbo);
 		if (texture) glDeleteTextures(1, &texture);
 		if (rbo) glDeleteRenderbuffers(1, &rbo);
-		// ADD THESE
 		if (resolveFbo) glDeleteFramebuffers(1, &resolveFbo);
 		if (resolveTexture) glDeleteTextures(1, &resolveTexture);
 		fbo = texture = rbo = resolveFbo = resolveTexture = 0;
