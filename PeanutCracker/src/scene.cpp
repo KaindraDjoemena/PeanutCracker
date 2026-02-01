@@ -295,7 +295,7 @@ void Scene::draw(Camera& camera, float vWidth, float vHeight) {
 	glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previousFBO);
 
 	// --Updating Camera vectors
-	camera.updateCameraVectors();
+	camera.updateVectors();
 
 	// -- Updating light space matrices
 	for (auto& dirLight : directionalLights) {
@@ -350,7 +350,7 @@ void Scene::draw(Camera& camera, float vWidth, float vHeight) {
 	}
 
 	// --Updating UBOs
-	updateCameraUBO(camera.getProjMat(vWidth / vHeight), camera.getViewMat(), camera.position);
+	updateCameraUBO(camera.getProjMat(vWidth / vHeight), camera.getViewMat(), camera.getPos());
 	updateLightingUBO();
 	updateShadowUBO();
 
@@ -475,16 +475,13 @@ void Scene::renderRecursive(const Camera& camera, SceneNode* node) const {
 	bool isVisible = true;
 	if (node->sphereColliderComponent && node != worldNode.get()) {
 		BoundingSphere boundingSphere = { node->sphereColliderComponent->worldCenter, node->sphereColliderComponent->worldRadius };
-		if (!camera.frustum.isInFrustum(boundingSphere)) {
-			std::cout << "culling " << node->name << '\n';
+		if (!camera.getFrustum().isInFrustum(boundingSphere)) {
 			isVisible = false;
 		}
 	}
 
 	if (isVisible) {
 		if (node->object) {
-			//std::cout << "[SCENE] rendering " << node->name << std::endl;
-			std::cout << "rendering " << node->name << '\n';
 			node->object->draw(node->worldMatrix);
 		}
 

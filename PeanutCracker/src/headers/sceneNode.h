@@ -28,6 +28,7 @@ public:
 	std::unique_ptr<SphereColliderComponent> sphereColliderComponent;
 
 	SceneNode(std::string i_name);
+
 	glm::vec3 getPosition() const;
 	glm::vec3 getScale() const;
 	glm::vec3 getEulerRotation() const;

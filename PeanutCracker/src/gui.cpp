@@ -509,8 +509,11 @@ void GUI::showStatusBar(int statusbarHeight, Camera& camera) const{
 	ImGui::SetNextWindowPos(ImVec2(0, height - statusbarHeight));
 	ImGui::SetNextWindowSize(ImVec2(width, statusbarHeight));
 	ImGui::Begin("##StatusBar", NULL, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoInputs);
+	float camZoom = camera.getZoom();
+	glm::vec3 camPos = camera.getPos();
+	glm::vec3 camDir = camera.getDir();
 	ImGui::Text("v0.2 | FPS: %.1f | Zoom: %.1f | P(%.1f, %.1f, %.1f) D(%.1f, %.1f, %.1f)",
-		ImGui::GetIO().Framerate, camera.zoom, camera.position.x, camera.position.y, camera.position.z, camera.front.x, camera.front.y, camera.front.z);
+		ImGui::GetIO().Framerate, camera.getZoom(), camPos.x, camPos.y, camPos.z, camDir.x, camDir.y, camDir.z);
 
 	//ImGui::SameLine();
 	//ImGui::Text("cam(x/y/z): ");

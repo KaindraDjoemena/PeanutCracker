@@ -285,7 +285,6 @@ int main() {
 
 
 		// SCENE RENDERING
-		/*cameraObject.frustum.constructFrustum(aspect, projectionMat, viewMat);*/
 		scene.draw(cameraObject, vSize.x, vSize.y);
 
 		sceneFBO.resolve();
@@ -419,17 +418,17 @@ void processInput(GLFWwindow* window) {
 		glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS);
 
 	if (!isHoldingCTRL) {
-		if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) cameraObject.processInput(FORWARD, deltaTime);
-		if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) cameraObject.processInput(BACKWARD, deltaTime);
-		if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) cameraObject.processInput(LEFT, deltaTime);
-		if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) cameraObject.processInput(RIGHT, deltaTime);
-		if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) cameraObject.processInput(UP, deltaTime);
-		if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) cameraObject.processInput(DOWN, deltaTime);
+		if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) cameraObject.processInput(Camera_Movement::FORWARD, deltaTime);
+		if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) cameraObject.processInput(Camera_Movement::BACKWARD, deltaTime);
+		if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) cameraObject.processInput(Camera_Movement::LEFT, deltaTime);
+		if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) cameraObject.processInput(Camera_Movement::RIGHT, deltaTime);
+		if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) cameraObject.processInput(Camera_Movement::UP, deltaTime);
+		if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) cameraObject.processInput(Camera_Movement::DOWN, deltaTime);
 	
-		if (glfwGetKey(window, GLFW_KEY_UP)		== GLFW_PRESS) cameraObject.processInput(LOOK_UP, deltaTime);
-		if (glfwGetKey(window, GLFW_KEY_DOWN)	== GLFW_PRESS) cameraObject.processInput(LOOK_DOWN , deltaTime);
-		if (glfwGetKey(window, GLFW_KEY_LEFT)	== GLFW_PRESS) cameraObject.processInput(LOOK_LEFT , deltaTime);
-		if (glfwGetKey(window, GLFW_KEY_RIGHT)	== GLFW_PRESS) cameraObject.processInput(LOOK_RIGHT , deltaTime);
+		if (glfwGetKey(window, GLFW_KEY_UP)		== GLFW_PRESS) cameraObject.processInput(Camera_Movement::LOOK_UP, deltaTime);
+		if (glfwGetKey(window, GLFW_KEY_DOWN)	== GLFW_PRESS) cameraObject.processInput(Camera_Movement::LOOK_DOWN , deltaTime);
+		if (glfwGetKey(window, GLFW_KEY_LEFT)	== GLFW_PRESS) cameraObject.processInput(Camera_Movement::LOOK_LEFT , deltaTime);
+		if (glfwGetKey(window, GLFW_KEY_RIGHT)	== GLFW_PRESS) cameraObject.processInput(Camera_Movement::LOOK_RIGHT , deltaTime);
 	}
 }
 

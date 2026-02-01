@@ -19,56 +19,67 @@ Camera::Camera(const glm::vec3& i_position,
 	double i_pitch,
 	float i_aspect,
 	float i_lookSpeed)
-	: position(i_position)
-	, worldUp(i_worldUP)
-	, front(glm::vec3(0.0f, 0.0f, -1.0f))
-	, movementSpeed(SPEED)
-	, mouseSensitivity(SENSITIVITY)
-	, nearPlane(i_nearPlane)
-	, farPlane(i_farPlane)
-	, aspect(i_aspect)
-	, zoom(ZOOM) {
-	lookSpeed = i_lookSpeed;
-	frustum.constructFrustum(aspect, getProjMat(aspect), getViewMat());
-	updateCameraVectors();
+	: m_pos(i_position)
+	, m_worldUp(i_worldUP)
+	, m_front(glm::vec3(0.0f, 0.0f, -1.0f))
+	, m_movementSpeed(SPEED)
+	, m_mouseSensitivity(SENSITIVITY)
+	, m_nearPlane(i_nearPlane)
+	, m_farPlane(i_farPlane)
+	, m_aspect(i_aspect)
+	, m_zoom(ZOOM) {
+	m_lookSpeed = i_lookSpeed;
+	m_frustum.constructFrustum(m_aspect, getProjMat(m_aspect), getViewMat());
 }
 
 // CONSTRUCTOR WITH SCALARS
 Camera::Camera(float posX, float posY, float posZ, float upX, float upY, float upZ, float i_nearPlane, float i_farPlane, float i_aspect, double yawIn, double pitchIn)
-	: front(glm::vec3(0.0f, 0.0f, -1.0f))
-	, movementSpeed(SPEED)
-	, mouseSensitivity(SENSITIVITY)
-	, nearPlane(i_nearPlane)
-	, farPlane(i_farPlane)
-	, aspect(i_aspect)
-	, zoom(ZOOM) {
-	position = glm::vec3(posX, posY, posZ);
-	worldUp = glm::vec3(upX, upY, upZ);
-	frustum.constructFrustum(aspect, getProjMat(aspect), getViewMat());
-	updateCameraVectors();
+	: m_pos(posX, posY, posZ)
+	, m_worldUp(upX, upY, upZ)
+	, m_front(glm::vec3(0.0f, 0.0f, -1.0f))
+	, m_movementSpeed(SPEED)
+	, m_mouseSensitivity(SENSITIVITY)
+	, m_nearPlane(i_nearPlane)
+	, m_farPlane(i_farPlane)
+	, m_aspect(i_aspect)
+	, m_zoom(ZOOM) {
+	m_frustum.constructFrustum(m_aspect, getProjMat(m_aspect), getViewMat());
 }
 
-void Camera::setPitchYaw(float pitch, float yaw) {
-	this->yaw = yaw;
-	this->pitch = pitch;
-	if (this->pitch > 89.0) { this->pitch = 89.0; }
-	if (this->pitch < -89.0) { this->pitch = -89.0; }
+void Camera::setAspect(float aspect) {
+	m_aspect = aspect;
 
 
 	// *** FLAGS ***
 	m_isDirtyCamVectors = true;
 }
 
-std::array<float, 2> Camera::getPitchYaw() const {
-	return { pitch, yaw };
+void Camera::setPitchYaw(float pitch, float yaw) {
+	m_yaw = yaw;
+	m_pitch = pitch;
+	if (m_pitch > 89.0) { m_pitch = 89.0; }
+	if (m_pitch < -89.0) { m_pitch = -89.0; }
+
+
+	// *** FLAGS ***
+	m_isDirtyCamVectors = true;
 }
+
+float Camera::getZoom() const { return m_zoom; }
+glm::vec3 Camera::getPos() const { return m_pos; }
+glm::vec3 Camera::getDir() const { return m_front; }
+
+
+std::array<float, 2> Camera::getPitchYaw() const { return { m_pitch, m_yaw }; }
 
 glm::mat4 Camera::getViewMat() const {
-	return glm::lookAt(position, position + front, up);
+	return glm::lookAt(m_pos, m_pos + m_front, m_up);
 }
 
+Frustum Camera::getFrustum() const { return m_frustum; }
+
 glm::mat4 Camera::getProjMat(float aspect) const {
-	return glm::perspective(glm::radians(zoom), aspect, nearPlane, farPlane);
+	return glm::perspective(glm::radians(m_zoom), aspect, m_nearPlane, m_farPlane);
 }
 
 MouseRay Camera::getMouseRay(float mouseX, float mouseY, int viewportHeight, int viewportWidth) {
@@ -85,7 +96,7 @@ MouseRay Camera::getMouseRay(float mouseX, float mouseY, int viewportHeight, int
 	glm::vec4 viewport(0.0f, 0.0f, (float)viewportWidth, (float)viewportHeight);
 
 	glm::vec3 nearPt = glm::unProject(glm::vec3(winX, winY, 0.0f), glm::mat4(1.0f), projView, viewport);
-	glm::vec3 farPt = glm::unProject(glm::vec3(winX, winY, 1.0f), glm::mat4(1.0f), projView, viewport);
+	glm::vec3 farPt  = glm::unProject(glm::vec3(winX, winY, 1.0f), glm::mat4(1.0f), projView, viewport);
 
 	mouseRay.origin = nearPt;
 	mouseRay.direction = glm::normalize(farPt - nearPt);
@@ -98,56 +109,66 @@ MouseRay Camera::getMouseRay(float mouseX, float mouseY, int viewportHeight, int
 void Camera::processInput(Camera_Movement type, float deltaTime) {
 	bool changedView = false;
 
-	float moveVelocity = movementSpeed * deltaTime;
-	if (type == FORWARD) { position += front * moveVelocity; changedView = true; }
-	if (type == BACKWARD) { position -= front * moveVelocity; changedView = true; }
-	if (type == LEFT) { position -= right * moveVelocity; changedView = true; }
-	if (type == RIGHT) { position += right * moveVelocity; changedView = true; }
-	if (type == UP) { position += up * moveVelocity; changedView = true; }
-	if (type == DOWN) { position -= up * moveVelocity; changedView = true; }
+	float moveVelocity = m_movementSpeed * deltaTime;
+	if (type == Camera_Movement::FORWARD)  { m_pos += m_front * moveVelocity; changedView = true; }
+	if (type == Camera_Movement::BACKWARD) { m_pos -= m_front * moveVelocity; changedView = true; }
+	if (type == Camera_Movement::LEFT)     { m_pos -= m_right * moveVelocity; changedView = true; }
+	if (type == Camera_Movement::RIGHT)    { m_pos += m_right * moveVelocity; changedView = true; }
+	if (type == Camera_Movement::UP)       { m_pos += m_up *    moveVelocity; changedView = true; }
+	if (type == Camera_Movement::DOWN)     { m_pos -= m_up *    moveVelocity; changedView = true; }
 
-	float lookVelocity = lookSpeed * deltaTime;
-	if (type == LOOK_UP) { pitch += lookSpeed * lookVelocity; changedView = true; if (pitch > 89.0) { pitch = 89.0; } }
-	if (type == LOOK_DOWN) { pitch -= lookSpeed * lookVelocity; changedView = true; if (pitch < -89.0) { pitch = -89.0; } }
-	if (type == LOOK_LEFT) { yaw -= lookSpeed * lookVelocity; changedView = true; }
-	if (type == LOOK_RIGHT) { yaw += lookSpeed * lookVelocity; changedView = true; }
+	float lookVelocity = m_lookSpeed * deltaTime;
+	if (type == Camera_Movement::LOOK_UP)    { m_pitch += m_lookSpeed * lookVelocity; changedView = true; if (m_pitch > 89.0) { m_pitch = 89.0; } }
+	if (type == Camera_Movement::LOOK_DOWN)  { m_pitch -= m_lookSpeed * lookVelocity; changedView = true; if (m_pitch < -89.0) { m_pitch = -89.0; } }
+	if (type == Camera_Movement::LOOK_LEFT)  { m_yaw   -= m_lookSpeed * lookVelocity; changedView = true; }
+	if (type == Camera_Movement::LOOK_RIGHT) { m_yaw   += m_lookSpeed * lookVelocity; changedView = true; }
 
 
 	// *** FLAGS ***
-	if (changedView) { m_isDirtyCamVectors; }
+	if (changedView) { m_isDirtyCamVectors = true; }
 }
 
 void Camera::processMouseMovement(double xOffset, double yOffset, GLboolean constrainPitch) {
-	xOffset *= mouseSensitivity;
-	yOffset *= mouseSensitivity;
+	xOffset *= m_mouseSensitivity;
+	yOffset *= m_mouseSensitivity;
 
-	yaw += xOffset;
-	pitch += yOffset;
+	m_yaw += xOffset;
+	m_pitch += yOffset;
 
-	setPitchYaw(pitch, yaw);
+	setPitchYaw(m_pitch, m_yaw);
+
+
+	// *** FLAGS ***
+	m_isDirtyCamVectors = true;
 }
 
 void Camera::processMouseScroll(double yOffset) {
-	zoom -= (double)yOffset;
-	if (zoom < 1.0) { zoom = 1.0; }
-	if (zoom > 45.0) { zoom = 45.0; }
+	m_zoom -= (double)yOffset;
+	if (m_zoom < MIN_ZOOM) { m_zoom = MIN_ZOOM; }
+	if (m_zoom > MAX_ZOOM) { m_zoom = MAX_ZOOM; }
+
+
+	// *** FLAGS ***
+	m_isDirtyCamVectors = true;
 }
 
-void Camera::updateCameraVectors() {
+void Camera::updateVectors() {
 	if (m_isDirtyCamVectors) {
 		// Calculating new camera front vector
 		glm::vec3 tempFront;
-		tempFront.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-		tempFront.y = sin(glm::radians(pitch));
-		tempFront.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
-		front = tempFront;
+		tempFront.x = cos(glm::radians(m_yaw)) * cos(glm::radians(m_pitch));
+		tempFront.y = sin(glm::radians(m_pitch));
+		tempFront.z = sin(glm::radians(m_yaw)) * cos(glm::radians(m_pitch));
+		m_front = tempFront;
 
 		// Calculating the right and up vectors
-		right = glm::normalize(glm::cross(front, worldUp));
-		up = glm::normalize(glm::cross(right, front));
+		m_right = glm::normalize(glm::cross(m_front, m_worldUp));
+		m_up    = glm::normalize(glm::cross(m_right, m_front));
 
 		// Reconstruct frustum
-		frustum.constructFrustum(aspect, getProjMat(aspect), getViewMat());
+		m_frustum.constructFrustum(m_aspect, getProjMat(m_aspect), getViewMat());
+
+		m_isDirtyCamVectors = false;
 	}
 
 }
