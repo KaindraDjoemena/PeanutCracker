@@ -24,32 +24,38 @@ enum class Camera_Movement {
 	LOOK_RIGHT	// Right
 };
 
-// DEFAULT CAMERA VALUES
-const double YAW = 0.0f;
-const double PITCH = 0.0f;
-const float FOV = 70.0f;
-const float SPEED = 5.0f;
-const float SENSITIVITY = 0.3f;
-const float ZOOM = FOV;
-const float LOOK_SPEED = 10.0f;
-const float MAX_ZOOM = 75.0f;
-const float MIN_ZOOM = 20.0f;
-
+const float c_yaw = 0.0f;
+const float c_pitch = 0.0f;
+const float c_fov = 70.0f;
+const float c_speed = 5.0f;
+const float c_sensitivity = 0.3f;
+const float c_zoom = c_fov;
+const float c_lookSpeed = 10.0f;
+const float c_maxZoom = 75.0f;
+const float c_minZoom = 20.0f;
 
 class Camera {
 public:
 	// CONSTRUCTOR WITH VECTORS
-	Camera(const glm::vec3& i_position = glm::vec3(0.0f, 0.0f, 0.0f),
+	Camera(
+		const glm::vec3& i_position = glm::vec3(0.0f, 0.0f, 0.0f),
 		const glm::vec3& i_worldUP = glm::vec3(0.0f, 1.0f, 0.0f),
 		float i_nearPlane = 0.1f,
 		float i_farPlane = 100.0f,
-		double i_yaw = YAW,
-		double i_pitch = PITCH,
+		float i_yaw = c_yaw,
+		float i_pitch = c_pitch,
 		float i_aspect = (16.0f / 9.0f),
-		float i_lookSpeed = LOOK_SPEED);
+		float i_lookSpeed = c_lookSpeed
+	);
 
 	// CONSTRUCTOR WITH SCALARS
-	Camera(float posX, float posY, float posZ, float upX, float upY, float upZ, float i_nearPlane, float i_farPlane, float i_aspect, double yawIn, double pitchIn);
+	Camera(
+		float posX, float posY, float posZ,
+		float upX, float upY, float upZ,
+		float i_nearPlane, float i_farPlane,
+		float i_aspect,
+		float yawIn, float pitchIn
+	);
 
 	void setAspect(float aspect);
 
