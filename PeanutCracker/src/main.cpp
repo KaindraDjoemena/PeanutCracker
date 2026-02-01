@@ -154,7 +154,6 @@ const int MSAA_SAMPLES = 4;
 
 
 int main() {
-	std::cout << "BRAH" << std::endl;
 	std::cout << "[MAIN] C++ version: " << __cplusplus << '\n';
 	std::cout << "[MAIN] current path: " << std::filesystem::current_path() << '\n';
 
@@ -214,89 +213,38 @@ int main() {
 
 
 	// === LIGHT STUFF =========================================
-	// -- Vertex position data
-	/*
-	float vertices[] = {
-		-0.5f, -0.5f, -0.5f,
-		 0.5f, -0.5f, -0.5f,
-		 0.5f,  0.5f, -0.5f,
-		 0.5f,  0.5f, -0.5f,
-		-0.5f,  0.5f, -0.5f,
-		-0.5f, -0.5f, -0.5f,
-
-		-0.5f, -0.5f,  0.5f,
-		 0.5f, -0.5f,  0.5f,
-		 0.5f,  0.5f,  0.5f,
-		 0.5f,  0.5f,  0.5f,
-		-0.5f,  0.5f,  0.5f,
-		-0.5f, -0.5f,  0.5f,
-
-		-0.5f,  0.5f,  0.5f,
-		-0.5f,  0.5f, -0.5f,
-		-0.5f, -0.5f, -0.5f,
-		-0.5f, -0.5f, -0.5f,
-		-0.5f, -0.5f,  0.5f,
-		-0.5f,  0.5f,  0.5f,
-
-		 0.5f,  0.5f,  0.5f,
-		 0.5f,  0.5f, -0.5f,
-		 0.5f, -0.5f, -0.5f,
-		 0.5f, -0.5f, -0.5f,
-		 0.5f, -0.5f,  0.5f,
-		 0.5f,  0.5f,  0.5f,
-
-		-0.5f, -0.5f, -0.5f,
-		 0.5f, -0.5f, -0.5f,
-		 0.5f, -0.5f,  0.5f,
-		 0.5f, -0.5f,  0.5f,
-		-0.5f, -0.5f,  0.5f,
-		-0.5f, -0.5f, -0.5f,
-
-		-0.5f,  0.5f, -0.5f,
-		 0.5f,  0.5f, -0.5f,
-		 0.5f,  0.5f,  0.5f,
-		 0.5f,  0.5f,  0.5f,
-		-0.5f,  0.5f,  0.5f,
-		-0.5f,  0.5f, -0.5f
-	};
-	*/
-	// -- Light buffer objects
-	//VAO pointlightVAO;
-	//pointlightVAO.bind();
-	//VBO pointlightVBO(vertices, 108 * sizeof(float));
-	//pointlightVAO.linkAttrib(pointlightVBO, 0, 3, GL_FLOAT, 3 * sizeof(float), (void*)0);
-	//pointlightVAO.unbind();
-
-	// POINT LIGHTS
-	/*
-	auto pointLight1 = std::make_unique<PointLight>(glm::vec3(0.0f, 0.0f, 5.0f),
-													Light(glm::vec3(0.05f), glm::vec3(1.0f), glm::vec3(0.5f)),
-													Attenuation(1.0f, 0.022f, 0.0019f));
+	
+	auto pointLight = std::make_unique<PointLight>(
+		glm::vec3(0.0f, 0.0f, 0.0f),
+		Light(glm::vec3(0.1f), glm::vec3(0.8f), glm::vec3(1.0f)),
+		Attenuation(1.0f, 0.022f, 0.009f),
+		0.1f, 20.0f
+	);
+	scene.createAndAddPointLight(std::move(pointLight));
+	auto pointLight1 = std::make_unique<PointLight>(
+		glm::vec3(0.0f, 0.0f, 10.0f),
+		Light(glm::vec3(0.1f), glm::vec3(0.8f), glm::vec3(1.0f)),
+		Attenuation(1.0f, 0.022f, 0.009f),
+		0.1f, 20.0f
+	);
 	scene.createAndAddPointLight(std::move(pointLight1));
 
-	auto pointLight2 = std::make_unique<PointLight>(glm::vec3(0.0f, 0.0f, -5.0f),
-													Light(glm::vec3(0.05f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.5f)),
-													Attenuation(1.0f, 0.022f, 0.0019f));
-	scene.createAndAddPointLight(std::move(pointLight2));
-	*/
+	//auto directionalLight = std::make_unique<DirectionalLight>(
+	//	glm::vec3(0.0f, 0.0f, -1.0f),
+	//	Light(glm::vec3(0.1f), glm::vec3(0.8f), glm::vec3(1.0f)),
+	//	0.1f, 100.0f
+	//);
+	//scene.createAndAddDirectionalLight(std::move(directionalLight));
 
-
-	auto directionalLight = std::make_unique<DirectionalLight>(
-		glm::vec3(0.0f, 0.0f, -1.0f),
-		Light(glm::vec3(0.1f), glm::vec3(0.8f), glm::vec3(1.0f)),
-		0.1f, 100.0f
-	);
-	scene.createAndAddDirectionalLight(std::move(directionalLight));
-
-	auto spotLight = std::make_unique<SpotLight>(
-		glm::vec3(0.0f, 0.0f, 10.0f),
-		glm::vec3(0.0f, 0.0f, -1.0f),
-		Light(glm::vec3(0.1f), glm::vec3(0.8f), glm::vec3(1.0f)),
-		Attenuation(),
-		cosf(glm::radians(10.0f)),
-		cosf(glm::radians(20.0f)),
-		0.01f, 10.0f);
-	scene.createAndAddSpotLight(std::move(spotLight));
+	//auto spotLight = std::make_unique<SpotLight>(
+	//	glm::vec3(0.0f, 0.0f, 10.0f),
+	//	glm::vec3(0.0f, 0.0f, -1.0f),
+	//	Light(glm::vec3(0.1f), glm::vec3(0.8f), glm::vec3(1.0f)),
+	//	Attenuation(),
+	//	cosf(glm::radians(10.0f)),
+	//	cosf(glm::radians(20.0f)),
+	//	0.01f, 10.0f);
+	//scene.createAndAddSpotLight(std::move(spotLight));
 
 	// STBI IMAGE FLIPPING FOR TEXTURES
 	stbi_set_flip_vertically_on_load(true);

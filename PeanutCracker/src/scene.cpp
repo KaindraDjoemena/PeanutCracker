@@ -25,7 +25,8 @@
 
 Scene::Scene(AssetManager* i_assetManager) : m_assetManager(i_assetManager) {
 	worldNode = std::make_unique<SceneNode>("Root");
-	m_depthShader = m_assetManager->loadShaderObject("defaultshaders/depth.vert", "defaultshaders/depth.frag");
+	m_dirDepthShader  = m_assetManager->loadShaderObject("defaultshaders/dirDepth.vert", "defaultshaders/dirDepth.frag");
+	m_omniDepthShader = m_assetManager->loadShaderObject("defaultshaders/omniDepth.vert", "defaultshaders/omniDepth.geom", "defaultshaders/omniDepth.frag");
 }
 //Scene::Scene(const Scene&) = delete;
 //Scene::Scene& operator = (const Scene&) = delete;
@@ -316,7 +317,18 @@ void Scene::draw(Camera& camera, float vWidth, float vHeight) {
 			}
 		}
 	}
-	// PointLights
+	for (auto& pointLight : pointLights) {
+		if (pointLight->shadowCasterComponent) {
+
+			pointLight->shadowCasterComponent->calcLightSpaceMats(pointLight->position);
+
+			// Check result immediately
+			std::array<glm::mat4, 6> test = pointLight->shadowCasterComponent->getLightSpaceMats();
+			if (glm::any(glm::isnan(test[0][0]))) {
+				std::cerr << "POINTLIGHT: Matrix became NaN inside calcLightSpaceMats!" << '\n';
+			}
+		}
+	}
 	for (auto& spotLight : spotLights) {
 		if (spotLight->shadowCasterComponent) {
 			// Check if direction is valid before calc
@@ -344,48 +356,58 @@ void Scene::draw(Camera& camera, float vWidth, float vHeight) {
 
 
 	// SHADOW PASS
-	m_depthShader->use();
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
-	glCullFace(GL_FRONT);		// Sampilng on the far face
+	glCullFace(GL_FRONT);
 
 	// --Rendering each object for each light from the lights pov,
 	// and storing the depth value to an FBO
 	// -- Directional lights
+	m_dirDepthShader->use();
 	for (auto& dirLight : directionalLights) {
 		if (!dirLight->shadowCasterComponent) continue;
 
 		const glm::vec2 res = dirLight->shadowCasterComponent->getShadowMapRes();
-		glBindFramebuffer(GL_FRAMEBUFFER, dirLight->shadowCasterComponent->getFboID());
 		glViewport(0, 0, res.x, res.y);
+		glBindFramebuffer(GL_FRAMEBUFFER, dirLight->shadowCasterComponent->getFboID());
 		glClear(GL_DEPTH_BUFFER_BIT);
 
-		m_depthShader->setMat4("lightSpaceMatrix", dirLight->shadowCasterComponent->getLightSpaceMatrix());
-		renderShadowRecursive(worldNode.get());
+		m_dirDepthShader->setMat4("lightSpaceMatrix", dirLight->shadowCasterComponent->getLightSpaceMatrix());
+		renderShadowRecursive(worldNode.get(), m_dirDepthShader.get());
 	}
 	// -- Point lights
+	m_omniDepthShader->use();
 	for (auto& pointLight : pointLights) {
 		if (!pointLight->shadowCasterComponent) continue;
 
 		const glm::vec2 res = pointLight->shadowCasterComponent->getShadowMapRes();
-		glBindFramebuffer(GL_FRAMEBUFFER, pointLight->shadowCasterComponent->getFboID());
 		glViewport(0, 0, res.x, res.y);
+		glBindFramebuffer(GL_FRAMEBUFFER, pointLight->shadowCasterComponent->getFboID());
 		glClear(GL_DEPTH_BUFFER_BIT);
 
-		m_depthShader->setMat4("lightSpaceMatrix", pointLight->shadowCasterComponent->getLightSpaceMatrix());
-		renderShadowRecursive(worldNode.get());
+		std::array<glm::mat4, 6> lightSpaceMats = pointLight->shadowCasterComponent->getLightSpaceMats();
+		m_omniDepthShader->setMat4("shadowMatrices[0]", lightSpaceMats[0]);
+		m_omniDepthShader->setMat4("shadowMatrices[1]", lightSpaceMats[1]);
+		m_omniDepthShader->setMat4("shadowMatrices[2]", lightSpaceMats[2]);
+		m_omniDepthShader->setMat4("shadowMatrices[3]", lightSpaceMats[3]);
+		m_omniDepthShader->setMat4("shadowMatrices[4]", lightSpaceMats[4]);
+		m_omniDepthShader->setMat4("shadowMatrices[5]", lightSpaceMats[5]);
+		m_omniDepthShader->setVec3("lightPos", pointLight->position);
+		m_omniDepthShader->setFloat("farPlane", pointLight->shadowCasterComponent->getFarPlane());
+		renderShadowRecursive(worldNode.get(), m_omniDepthShader.get());
 	}
 	// -- Spot lights
+	m_dirDepthShader->use();
 	for (auto& spotLight : spotLights) {
 		if (!spotLight->shadowCasterComponent) continue;
 
 		const glm::vec2 res = spotLight->shadowCasterComponent->getShadowMapRes();
-		glBindFramebuffer(GL_FRAMEBUFFER, spotLight->shadowCasterComponent->getFboID());
 		glViewport(0, 0, res.x, res.y);
+		glBindFramebuffer(GL_FRAMEBUFFER, spotLight->shadowCasterComponent->getFboID());
 		glClear(GL_DEPTH_BUFFER_BIT);
 
-		m_depthShader->setMat4("lightSpaceMatrix", spotLight->shadowCasterComponent->getLightSpaceMatrix());
-		renderShadowRecursive(worldNode.get());
+		m_dirDepthShader->setMat4("lightSpaceMatrix", spotLight->shadowCasterComponent->getLightSpaceMatrix());
+		renderShadowRecursive(worldNode.get(), m_dirDepthShader.get());
 	}
 
 	// --Reset opengl stuff
@@ -409,7 +431,7 @@ void Scene::draw(Camera& camera, float vWidth, float vHeight) {
 	for (size_t i = 0; i < pointLights.size() && i < MAX_LIGHTS; ++i) {
 		if (pointLights[i]->shadowCasterComponent) {
 			glActiveTexture(GL_TEXTURE0 + 20 + i);
-			glBindTexture(GL_TEXTURE_2D, pointLights[i]->shadowCasterComponent->getDepthMapTexID());
+			glBindTexture(GL_TEXTURE_CUBE_MAP, pointLights[i]->shadowCasterComponent->getDepthMapTexID());
 		}
 	}
 	// --Spot lights
@@ -420,6 +442,7 @@ void Scene::draw(Camera& camera, float vWidth, float vHeight) {
 		}
 	}
 
+	glActiveTexture(GL_TEXTURE0);
 	// --Rendering the final scene
 	// Skybox
 	glDisable(GL_STENCIL_TEST);
@@ -440,8 +463,8 @@ void Scene::draw(Camera& camera, float vWidth, float vHeight) {
 	drawSelectionStencil();
 
 	// --Debug drawing
-	drawDirectionalLightFrustums(camera.getProjMat(vWidth / vHeight), camera.getViewMat());
-	drawSpotLightFrustums(camera.getProjMat(vWidth / vHeight), camera.getViewMat());
+	//drawDirectionalLightFrustums(camera.getProjMat(vWidth / vHeight), camera.getViewMat());
+	//drawSpotLightFrustums(camera.getProjMat(vWidth / vHeight), camera.getViewMat());
 	drawDebugAABBs(worldNode.get());
 }
 
@@ -453,13 +476,15 @@ void Scene::renderRecursive(const Camera& camera, SceneNode* node) const {
 	if (node->sphereColliderComponent && node != worldNode.get()) {
 		BoundingSphere boundingSphere = { node->sphereColliderComponent->worldCenter, node->sphereColliderComponent->worldRadius };
 		if (!camera.frustum.isInFrustum(boundingSphere)) {
+			std::cout << "culling " << node->name << '\n';
 			isVisible = false;
 		}
 	}
 
 	if (isVisible) {
 		if (node->object) {
-			//std::cout << "rendering " << node->name << '\n';
+			//std::cout << "[SCENE] rendering " << node->name << std::endl;
+			std::cout << "rendering " << node->name << '\n';
 			node->object->draw(node->worldMatrix);
 		}
 
@@ -469,13 +494,15 @@ void Scene::renderRecursive(const Camera& camera, SceneNode* node) const {
 	}
 }
 // --For the shadow map
-void Scene::renderShadowRecursive(SceneNode* node) const {
+void Scene::renderShadowRecursive(SceneNode* node, Shader* depthShader) const {
+	if (!node) return;
+	
 	if (node->object) {
-		node->object->drawShadow(node->worldMatrix, m_depthShader.get());
+		node->object->drawShadow(node->worldMatrix, depthShader);
 	}
 
 	for (auto& child : node->children) {
-		renderShadowRecursive(child.get());
+		renderShadowRecursive(child.get(), depthShader);
 	}
 }
 
@@ -724,11 +751,11 @@ void Scene::updateShadowUBO() const {
 		}
 	}
 	// --Point lights
-	for (size_t i = 0; i < pointLights.size(); ++i) {
-		if (pointLights[i]->shadowCasterComponent) {
-			data.pointLightSpaceMatrices[i] = pointLights[i]->shadowCasterComponent->getLightSpaceMatrix();
-		}
-	}
+	//for (size_t i = 0; i < pointLights.size(); ++i) {
+	//	if (pointLights[i]->shadowCasterComponent) {
+	//		data.pointLightSpaceMatrices[i] = pointLights[i]->shadowCasterComponent->getLightSpaceMatrix();
+	//	}
+	//}
 	// --Spot lights
 	for (size_t i = 0; i < spotLights.size(); ++i) {
 		if (spotLights[i]->shadowCasterComponent) {
@@ -752,6 +779,12 @@ void Scene::setNodeShadowMapUniforms(SceneNode* node) const {
 		for (size_t i = 0; i < pointLights.size(); ++i) {
 			std::string uniformName = "PointShadowMap[" + std::to_string(i) + "]";
 			node->object->shaderPtr->setInt(uniformName, 20 + i);
+
+			float farPlane = pointLights[i]->shadowCasterComponent->getFarPlane();
+			if (farPlane <= 0.0f) {
+				std::cerr << "ERROR: Far plane is zero/negative for point light " << i << std::endl;
+			}
+			node->object->shaderPtr->setFloat("omniShadowMapFarPlanes[" + std::to_string(i) + "]", farPlane);
 		}
 		for (size_t i = 0; i < spotLights.size(); ++i) {
 			std::string uniformName = "SpotShadowMap[" + std::to_string(i) + "]";

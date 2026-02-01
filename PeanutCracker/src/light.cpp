@@ -56,7 +56,7 @@ PointLight::PointLight(
 	light(i_light),
 	attenuation(i_attenuation)
 {
-	shadowCasterComponent = std::make_unique<ShadowCasterComponent>(glm::vec2(1024, 1024), Shadow_Map_Projection::PERSPECTIVE, 1.0f, 50.0f, 50.0f, i_nearPlane, i_farPlane);
+	shadowCasterComponent = std::make_unique<ShadowCasterComponent>(1024, Shadow_Map_Projection::PERSPECTIVE, 90.0f, 50.0f, i_nearPlane, i_farPlane);
 }
 std::string PointLight::getUniformPrefix() const {
 	return "pointLight";

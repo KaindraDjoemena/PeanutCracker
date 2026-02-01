@@ -12,6 +12,7 @@ public:
 	unsigned int ID;
 
 	Shader(const std::filesystem::path& vertexPath, const std::filesystem::path& fragmentPath);
+	Shader(const std::filesystem::path& vertexPath, const std::filesystem::path& geomPath, const std::filesystem::path& fragmentPath);
 
 	~Shader();
 
@@ -42,6 +43,7 @@ private:
 
 	// SHADER PROGRAM COMPILATION
 	void compile(const char* vShaderCode, const char* fShaderCode);
+	void compile(const char* vShaderCode, const char* gShaderCode, const char* fShaderCode);
 
 	void checkCompileErrors(unsigned int shaderOrProgram, std::string type);
 

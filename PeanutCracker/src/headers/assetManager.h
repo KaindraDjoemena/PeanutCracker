@@ -20,10 +20,12 @@ public:
 	struct CachedShader {
 		std::shared_ptr<Shader> shader;
 		std::filesystem::file_time_type vertLastModified;
+		std::filesystem::file_time_type geomLastModified;
 		std::filesystem::file_time_type fragLastModified;
 	};
 
 	std::shared_ptr<Shader> loadShaderObject(const std::filesystem::path& vertPath, const std::filesystem::path& fragPath);
+	std::shared_ptr<Shader> loadShaderObject(const std::filesystem::path& vertPath, const std::filesystem::path& geomPath, const std::filesystem::path& fragPath);
 
 	// Force reload shader object
 	void reloadShader(const std::filesystem::path& vertPath, const std::filesystem::path& fragPath);

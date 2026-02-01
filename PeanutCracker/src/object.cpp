@@ -51,6 +51,8 @@ glm::vec3 Object::getEulerRotation() const {
 }
 
 void Object::draw(const glm::mat4& worldMatrix) const {
+	if (!shaderPtr) return;
+
 	shaderPtr->use();
 	shaderPtr->setMat4("model", worldMatrix);
 	glm::mat4 normalMatrix = glm::transpose(glm::inverse(worldMatrix));
@@ -60,14 +62,9 @@ void Object::draw(const glm::mat4& worldMatrix) const {
 }
 
 void Object::drawShadow(const glm::mat4& modelMatrix, Shader* depthShader) const {
-	if (depthShader) {
-		depthShader->use();
+	if (!depthShader) return;
 
-		depthShader->setMat4("model", modelMatrix);
-
-		modelPtr->draw(depthShader);
-	}
-	else {
-		draw(modelMatrix);
-	}
+	depthShader->use();
+	depthShader->setMat4("model", modelMatrix);
+	modelPtr->draw(depthShader);
 }

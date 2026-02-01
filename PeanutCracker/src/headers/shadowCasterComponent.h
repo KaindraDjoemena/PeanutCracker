@@ -18,15 +18,18 @@ class ShadowCasterComponent {
 public:
 	Frustum frustum;
 
-	ShadowCasterComponent(const glm::vec2 i_shadowMapRes, Shadow_Map_Projection i_projectionType, float i_width, float i_height, float i_nearPlane, float i_farPlane);
-	ShadowCasterComponent(const glm::vec2 i_shadowMapRes, Shadow_Map_Projection i_projectionType, float i_outCosCutoff, float i_width, float i_height, float i_nearPlane, float i_farPlane);
+	ShadowCasterComponent(const glm::vec2& i_shadowMapRes, Shadow_Map_Projection i_projectionType, float i_width, float i_height, float i_nearPlane, float i_farPlane);
+	ShadowCasterComponent(const glm::vec2& i_shadowMapRes, Shadow_Map_Projection i_projectionType, float i_outCosCutoff, float i_width, float i_height, float i_nearPlane, float i_farPlane);
+	ShadowCasterComponent(int i_shadowMapRes, Shadow_Map_Projection i_projectionType, float i_fov, float i_size, float i_nearPlane, float i_farPlane);
 
 	~ShadowCasterComponent();
 
 	unsigned int getDepthMapTexID() const { return m_depthMapTextureID; }
 	unsigned int getFboID() const { return m_fboID; }
 	std::array<float, 6> getPlanes() const { return {m_leftPlane, m_rightPlane, m_bottomPlane, m_topPlane, m_nearPlane, m_farPlane}; }
+	float getFarPlane() const { return m_farPlane; }
 	glm::mat4 getLightSpaceMatrix() const { return m_lightSpaceMatrix; }
+	std::array<glm::mat4, 6> getLightSpaceMats() const { return m_lightSpaceMatrices; }
 	glm::vec2 getShadowMapRes() const { return m_shadowMapResolution; }
 
 	void updateFrustum();
@@ -38,16 +41,18 @@ public:
 	glm::mat4 calcViewMat(const glm::vec3& lightDirection, const glm::vec3& position = glm::vec3(0.0f, 0.0f, 0.0f)) const;
 
 	void calcLightSpaceMat(const glm::vec3& lightDirection, const glm::vec3& position = glm::vec3(0.0f, 0.0f, 0.0f));
+	void calcLightSpaceMats(const glm::vec3& position);
 
 private:
 	unsigned int m_depthMapTextureID = 0;
 	unsigned int m_fboID = 0;
 	glm::vec2	 m_shadowMapResolution;
 
-	Shadow_Map_Projection m_projectionType;
+	Shadow_Map_Projection m_projType;
 	glm::mat4 m_lightViewMat = glm::mat4(1.0f);
 	glm::mat4 m_lightProjMat = glm::mat4(1.0f);
 	glm::mat4	 m_lightSpaceMatrix = glm::mat4(1.0f);
+	std::array<glm::mat4, 6> m_lightSpaceMatrices;
 
 	float m_leftPlane	= -50.0f;
 	float m_rightPlane	= 50.0f;
@@ -66,5 +71,6 @@ private:
 	bool _isDirty = true;
 
 
-	void generateShadowMap(bool linearFilter = true);
+	void genDirShadowMap(bool linearFilter = true);
+	void genOmniShadowMap(bool linearFilter = true);
 };

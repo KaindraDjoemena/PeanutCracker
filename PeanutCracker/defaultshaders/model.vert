@@ -9,7 +9,6 @@ out vec3 FragPos;
 out vec3 Normal;
 out vec2 TexCoord;
 out vec4 DirectionalLightSpacePos[MAX_LIGHTS];
-out vec4 PointLightSpacePos[MAX_LIGHTS];
 out vec4 SpotLightSpacePos[MAX_LIGHTS];
 
 // LIGHT STRUCTS
@@ -65,7 +64,6 @@ layout (std140) uniform LightingUBOData {
 
 layout (std140) uniform ShadowMatricesUBOData {
     mat4 directionalLightSpaceMatrices[MAX_LIGHTS];
-    mat4 pointLightSpaceMatrices[MAX_LIGHTS];
     mat4 spotLightSpaceMatrices[MAX_LIGHTS];
 } shadowMatricesBlock;
 
@@ -79,15 +77,10 @@ void main()
     Normal   = mat3(normalMatrix) * aNormal;
     TexCoord = aTexCoords;
 
-    // Use projection and view from the UBO
     gl_Position = projection * view * model * vec4(aPos, 1.0f);
 
 	for (int i = 0; i < lightingBlock.numDirectionalLights; ++i) {
 		DirectionalLightSpacePos[i] = shadowMatricesBlock.directionalLightSpaceMatrices[i] * model * vec4(aPos, 1.0f);
-	}
-   
-	for (int i = 0; i < lightingBlock.numPointLights; ++i) {
-		PointLightSpacePos[i] = shadowMatricesBlock.pointLightSpaceMatrices[i] * model * vec4(aPos, 1.0f);
 	}
     
 	for (int i = 0; i < lightingBlock.numSpotLights; ++i) {

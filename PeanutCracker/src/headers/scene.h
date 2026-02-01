@@ -85,7 +85,7 @@ public:
 	// --For objects
 	void renderRecursive(const Camera& camera, SceneNode* node) const;
 	// --For the shadow map
-	void renderShadowRecursive(SceneNode* node) const;
+	void renderShadowRecursive(SceneNode* node, Shader* depthShader) const;
 
 	void init();
 
@@ -145,9 +145,8 @@ private:
 		int padding;											// 4
 	};
 
-	struct ShadowMatricesUBOData {								// 1536 Bytes
+	struct ShadowMatricesUBOData {								// 1024 Bytes
 		glm::mat4 directionalLightSpaceMatrices[MAX_LIGHTS];	// 64 * 8  = 512
-		glm::mat4 pointLightSpaceMatrices[MAX_LIGHTS];			// 64 * 8  = 512
 		glm::mat4 spotLightSpaceMatrices[MAX_LIGHTS];			// 64 * 8  = 512
 	};
 
@@ -163,14 +162,15 @@ private:
 	std::vector<std::filesystem::path> loadQueue;
 
 	unsigned int numDirectionalLights = 0;
-	unsigned int numPointLights = 0;
-	unsigned int numSpotLights = 0;
+	unsigned int numPointLights       = 0;
+	unsigned int numSpotLights        = 0;
 
 	unsigned int cameraMatricesUBO = 0;
-	unsigned int lightingUBO = 0;
-	unsigned int shadowUBO = 0;
+	unsigned int lightingUBO       = 0;
+	unsigned int shadowUBO         = 0;
 
-	std::shared_ptr<Shader> m_depthShader;
+	std::shared_ptr<Shader> m_dirDepthShader;
+	std::shared_ptr<Shader> m_omniDepthShader;
 	std::shared_ptr<Shader> m_outlineShader;
 
 	VAO m_debugVAO;

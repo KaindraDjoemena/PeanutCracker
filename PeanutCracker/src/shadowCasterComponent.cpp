@@ -9,27 +9,39 @@
 #include <iostream>
 
 
-ShadowCasterComponent::ShadowCasterComponent(const glm::vec2 i_shadowMapRes, Shadow_Map_Projection i_projectionType, float i_width, float i_height, float i_nearPlane, float i_farPlane)
+ShadowCasterComponent::ShadowCasterComponent(const glm::vec2& i_shadowMapRes, Shadow_Map_Projection i_projectionType, float i_width, float i_height, float i_nearPlane, float i_farPlane)
 	: m_shadowMapResolution(i_shadowMapRes)
-	, m_projectionType(i_projectionType)
+	, m_projType(i_projectionType)
 	, m_planeWidth(i_width)
 	, m_planeHeight(i_height)
 	, m_nearPlane(i_nearPlane)
 	, m_farPlane(i_farPlane)
 {
-	generateShadowMap();
+	genDirShadowMap();
 }
-ShadowCasterComponent::ShadowCasterComponent(const glm::vec2 i_shadowMapRes, Shadow_Map_Projection i_projectionType, float i_outCosCutoff, float i_width, float i_height, float i_nearPlane, float i_farPlane)
+ShadowCasterComponent::ShadowCasterComponent(const glm::vec2& i_shadowMapRes, Shadow_Map_Projection i_projectionType, float i_outCosCutoff, float i_width, float i_height, float i_nearPlane, float i_farPlane)
 	: m_shadowMapResolution(i_shadowMapRes)
-	, m_projectionType(i_projectionType)
+	, m_projType(i_projectionType)
 	, m_fov(glm::degrees(acos(glm::clamp(i_outCosCutoff, -1.0f, 1.0f)) * 2.0f + glm::radians(2.0f)))
 	, m_planeWidth(i_width)
 	, m_planeHeight(i_height)
 	, m_nearPlane(i_nearPlane)
 	, m_farPlane(i_farPlane)
 {
-	generateShadowMap();
+	genDirShadowMap();
 }
+ShadowCasterComponent::ShadowCasterComponent(int i_shadowMapRes, Shadow_Map_Projection i_projectionType, float i_fov, float i_size, float i_nearPlane, float i_farPlane)
+	: m_shadowMapResolution{ i_shadowMapRes, i_shadowMapRes }
+	, m_projType(i_projectionType)
+	, m_fov(i_fov)
+	, m_planeWidth(i_size)
+	, m_planeHeight(i_size)
+	, m_nearPlane(i_nearPlane)
+	, m_farPlane(i_farPlane)
+{
+	genOmniShadowMap();
+}
+
 
 ShadowCasterComponent::~ShadowCasterComponent() {
 	glDeleteFramebuffers(1, &m_fboID);
@@ -60,7 +72,7 @@ void ShadowCasterComponent::setFrustumPlanes(float i_left, float i_right, float 
 
 glm::mat4 ShadowCasterComponent::calcProjMat() const {
 	glm::mat4 projMat = glm::mat4(1.0f);
-	switch (m_projectionType) {
+	switch (m_projType) {
 	case Shadow_Map_Projection::ORTHOGRAPHIC:
 		projMat = glm::ortho(m_leftPlane, m_rightPlane,
 			m_bottomPlane, m_topPlane,
@@ -89,7 +101,7 @@ glm::mat4 ShadowCasterComponent::calcViewMat(const glm::vec3& lightDirection, co
 	float depth = 50.0f;
 	glm::mat4 viewMat = glm::mat4(1.0f);
 	glm::vec3 lightPos = position - normDir * depth;
-	switch (m_projectionType) {
+	switch (m_projType) {
 	case Shadow_Map_Projection::ORTHOGRAPHIC:
 		viewMat = glm::lookAt(lightPos, position, upVec);
 		break;
@@ -113,8 +125,18 @@ void ShadowCasterComponent::calcLightSpaceMat(const glm::vec3& lightDirection, c
 	m_lightViewMat = calcViewMat(lightDirection, position);
 	m_lightSpaceMatrix = m_lightProjMat * m_lightViewMat;
 }
+void ShadowCasterComponent::calcLightSpaceMats(const glm::vec3& position) {
+	m_lightProjMat = calcProjMat();
 
-void ShadowCasterComponent::generateShadowMap(bool linearFilter) {
+	m_lightSpaceMatrices[0] = m_lightProjMat * glm::lookAt(position, position + glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)); 
+	m_lightSpaceMatrices[1] = m_lightProjMat * glm::lookAt(position, position + glm::vec3(-1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f));
+	m_lightSpaceMatrices[2] = m_lightProjMat * glm::lookAt(position, position + glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));  
+	m_lightSpaceMatrices[3] = m_lightProjMat * glm::lookAt(position, position + glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f));
+	m_lightSpaceMatrices[4] = m_lightProjMat * glm::lookAt(position, position + glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, -1.0f, 0.0f)); 
+	m_lightSpaceMatrices[5] = m_lightProjMat * glm::lookAt(position, position + glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, -1.0f, 0.0f));
+}
+
+void ShadowCasterComponent::genDirShadowMap(bool linearFilter) {
 	glGenFramebuffers(1, &m_fboID);
 	std::cout << "[SHADOW CASTER] Generating Shadow Map for: " << m_fboID << '\n';
 
@@ -148,11 +170,53 @@ void ShadowCasterComponent::generateShadowMap(bool linearFilter) {
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-		std::cerr << "ERROR: Shadow framebuffer not complete!" << '\n';
+		std::cerr << "ERROR: Directional Shadow framebuffer not complete!" << '\n';
 	}
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+
+	// *** FLAGS ***
+	_isDirty = false;
+}
+
+void ShadowCasterComponent::genOmniShadowMap(bool linearFilter) {
+	glGenFramebuffers(1, &m_fboID);
+	std::cout << "[SHADOW CASTER] Generating Omni Shadow Map for: " << m_fboID << '\n';
+
+	glGenTextures(1, &m_depthMapTextureID);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, m_depthMapTextureID);
+
+	for (unsigned int i = 0; i < 6; ++i) {
+		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_DEPTH_COMPONENT, m_shadowMapResolution.x, m_shadowMapResolution.y, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+	}
+
+	if (linearFilter) {
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	}
+	else {
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	}
+
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, m_fboID);
+
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, m_depthMapTextureID, 0);
+
+	glDrawBuffer(GL_NONE);
+	glReadBuffer(GL_NONE);
+
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+		std::cerr << "ERROR: Omni Shadow framebuffer not complete!" << '\n';
+	}
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 
 	// *** FLAGS ***
 	_isDirty = false;

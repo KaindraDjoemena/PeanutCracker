@@ -21,10 +21,26 @@ Shader::Shader(const std::filesystem::path& vertexPath, const std::filesystem::p
 
 	if (vertexCode.empty() || fragmentCode.empty()) {
 		std::cerr << "ERROR::SHADER::SOURCE_EMPTY" << '\n';
-		return;
+		throw std::runtime_error("Empty shader source file detected");
 	}
 
 	compile(vertexCode.c_str(), fragmentCode.c_str());
+}
+Shader::Shader(const std::filesystem::path& vertexPath, const std::filesystem::path& geomPath, const std::filesystem::path& fragmentPath) {
+	std::cout << "[SHADER] opening shader file at: " << vertexPath << '\n';
+	std::cout << "[SHADER] opening shader file at: " << geomPath << '\n';
+	std::cout << "[SHADER] opening shader file at: " << fragmentPath << '\n';
+
+	std::string vertexCode   = readFile(vertexPath);
+	std::string geomCode	 = readFile(geomPath);
+	std::string fragmentCode = readFile(fragmentPath);
+
+	if (vertexCode.empty() || geomCode.empty() || fragmentCode.empty()) {
+		std::cerr << "ERROR::SHADER::SOURCE_EMPTY" << '\n';
+		throw std::runtime_error("Empty shader source file detected");
+	}
+
+	compile(vertexCode.c_str(), geomCode.c_str(), fragmentCode.c_str());
 }
 
 Shader::~Shader() {
@@ -120,6 +136,33 @@ void Shader::compile(const char* vShaderCode, const char* fShaderCode) {
 	glDeleteShader(vertex);
 	glDeleteShader(fragment);
 }
+void Shader::compile(const char* vShaderCode, const char* gShaderCode, const char* fShaderCode) {
+	unsigned int vertex = glCreateShader(GL_VERTEX_SHADER);
+	glShaderSource(vertex, 1, &vShaderCode, NULL);
+	glCompileShader(vertex);
+	checkCompileErrors(vertex, "VERTEX");
+
+	unsigned int geometry = glCreateShader(GL_GEOMETRY_SHADER);
+	glShaderSource(geometry, 1, &gShaderCode, NULL);
+	glCompileShader(geometry);
+	checkCompileErrors(geometry, "GEOMETRY");
+
+	unsigned int fragment = glCreateShader(GL_FRAGMENT_SHADER);
+	glShaderSource(fragment, 1, &fShaderCode, NULL);
+	glCompileShader(fragment);
+	checkCompileErrors(fragment, "FRAGMENT");
+
+	ID = glCreateProgram();
+	glAttachShader(ID, vertex);
+	glAttachShader(ID, geometry);
+	glAttachShader(ID, fragment);
+	glLinkProgram(ID);
+	checkCompileErrors(ID, "PROGRAM");
+
+	glDeleteShader(vertex);
+	glDeleteShader(geometry);
+	glDeleteShader(fragment);
+}
 
 void Shader::checkCompileErrors(unsigned int shaderOrProgram, std::string type) {
 	int success;
@@ -132,7 +175,7 @@ void Shader::checkCompileErrors(unsigned int shaderOrProgram, std::string type) 
 			std::cout << "ERROR::SHADER_COMPILATION_ERROR of type: " << type << "\n" << infoLog << "\n -- --------------------------------------------------- -- " << '\n';
 		}
 		else {
-			std::cout << "[SHADER] shader compilation successful of type" << std::endl;
+			std::cout << "[SHADER] shader compilation successful of type " << type << std::endl;
 		}
 	}
 	else {
