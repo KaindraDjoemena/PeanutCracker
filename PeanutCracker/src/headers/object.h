@@ -56,5 +56,5 @@ public:
 
 	void draw(const glm::mat4& worldMatrix) const;
 
-	void drawShadow(const glm::mat4& modelMatrix, Shader* depthShader) const;
+	void drawShadow(const glm::mat4& modelMatrix, const Shader& depthShader) const;
 };

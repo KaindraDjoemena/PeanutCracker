@@ -7,6 +7,7 @@
 #include "light.h"
 #include "object.h"
 #include "transform.h"
+#include "renderer.h"
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -41,7 +42,7 @@ public:
 	~GUI();
 
 	// Returns the available viewport size
-	ImVec2 update(float deltaTime, Camera& camera, Scene& scene, unsigned int textureID);
+	ImVec2 update(float deltaTime, Camera& camera, Scene& scene, Renderer& renderer, unsigned int textureID);
 
 	void render();
 

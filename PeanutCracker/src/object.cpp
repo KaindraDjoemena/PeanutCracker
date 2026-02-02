@@ -58,13 +58,11 @@ void Object::draw(const glm::mat4& worldMatrix) const {
 	glm::mat4 normalMatrix = glm::transpose(glm::inverse(worldMatrix));
 	shaderPtr->setMat4("normalMatrix", normalMatrix);
 	shaderPtr->setFloat("material.shininess", 32.0f);
-	modelPtr->draw(shaderPtr);
+	modelPtr->draw(*shaderPtr);
 }
 
-void Object::drawShadow(const glm::mat4& modelMatrix, Shader* depthShader) const {
-	if (!depthShader) return;
-
-	depthShader->use();
-	depthShader->setMat4("model", modelMatrix);
+void Object::drawShadow(const glm::mat4& modelMatrix, const Shader& depthShader) const {
+	depthShader.use();
+	depthShader.setMat4("model", modelMatrix);
 	modelPtr->draw(depthShader);
 }

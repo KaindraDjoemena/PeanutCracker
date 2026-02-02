@@ -19,7 +19,7 @@ Mesh::Mesh(std::vector<Vertex> i_vertices, std::vector<unsigned int> i_indices, 
 	setupMesh();
 }
 
-void Mesh::draw(Shader* shader, bool isShadowPass) {
+void Mesh::draw(const Shader& shader, bool isShadowPass) const {
 	// Texture Binding
 	unsigned int diffuseNr = 1;
 	unsigned int specularNr = 1;
@@ -40,7 +40,7 @@ void Mesh::draw(Shader* shader, bool isShadowPass) {
 		else if (name == "texture_height")
 			number = std::to_string(heightNr++);
 
-		shader->setInt(("material." + name + number), i);
+		shader.setInt(("material." + name + number), i);
 		glBindTexture(GL_TEXTURE_2D, textures[i].id);
 	}
 

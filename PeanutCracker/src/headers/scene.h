@@ -21,28 +21,34 @@
 
 const unsigned int MAX_LIGHTS = 8;
 
-enum class Render_Mode {
-	STANDARD_DIFFUSE,
-	IMAGE_BASED_LIGHTING,
-	WIREFRAME
-};
-
 
 class Scene {
 public:
-	std::unique_ptr<SceneNode> worldNode;	// Scene graph parent
+	std::unique_ptr<SceneNode> m_worldNode;	// Scene graph parent
+	std::unique_ptr<Cubemap>						m_skybox;
 
-	std::unique_ptr<Cubemap>						skybox;
-	std::vector<std::unique_ptr<DirectionalLight>>	directionalLights;
-	std::vector<std::unique_ptr<PointLight>>		pointLights;
-	std::vector<std::unique_ptr<SpotLight>>			spotLights;
-
-	std::vector<SceneNode*>							selectedEntities;
+	std::vector<std::unique_ptr<DirectionalLight>>	m_directionalLights;
+	std::vector<std::unique_ptr<PointLight>>		m_pointLights;
+	std::vector<std::unique_ptr<SpotLight>>			m_spotLights;
+	std::vector<SceneNode*>							m_selectedEntities;
 
 	Scene(AssetManager* i_assetManager);
 	Scene(const Scene&) = delete;
 	//Scene& operator = (const Scene&);
 
+
+	/* ===== GETTERS =================================================================================== */
+	const SceneNode* getWorldNode() const { return m_worldNode.get(); }
+	SceneNode* getWorldNode() { return m_worldNode.get(); }
+	const Cubemap* getSkybox() const { return m_skybox.get(); }
+	const Shader& getDirDepthShader() const { return *m_dirDepthShader; }
+	const Shader& getOmniDepthShader() const { return *m_omniDepthShader; }
+	const Shader& getOutlineShader() const { return *m_outlineShader; }
+
+	const std::vector<std::unique_ptr<DirectionalLight>>& getDirectionalLights() const { return m_directionalLights; }
+	const std::vector<std::unique_ptr<PointLight>>& getPointLights() const { return m_pointLights; }
+	const std::vector<std::unique_ptr<SpotLight>>& getSpotLights() const { return m_spotLights; }
+	const std::vector<SceneNode*>& getSelectedEnts() const { return m_selectedEntities; }
 
 	/* ===== OBJECT PICKING & OPERATIONS ================================================================= */
 	// --PICKING
@@ -68,8 +74,10 @@ public:
 
 
 	/* ===== SCENE SETTERS (RENDERER) ================================================================= */
-	void setRenderMode(Render_Mode mode);
+	//void setRenderMode(Render_Mode mode);
 
+
+	void bindDepthMaps() const;
 
 	/* ===== UBOs ============================================================================*/
 	// --ALLOCATION
@@ -78,14 +86,29 @@ public:
 	void bindToUBOs(const Shader* shader) const;
 	void setupSkyboxShaderUBOs(const Shader* shader) const;
 
+	/* ===== UPDATING UBOs ================================================================= */
+	// BINDING NODE SHADERS TO UBOs
+	void setupNodeUBOs(SceneNode* node);
+	// CAMERA UBO
+	void updateCameraUBO(const glm::mat4& projection, const glm::mat4& view, const glm::vec3& cameraPos) const;
+	// LIGHTING UBO
+	void updateLightingUBO() const;
+	// SHADOW UBO
+	void updateShadowUBO() const;
+
+	// LOAD EVERY SHADOW MAP TO OBJECT SHADERS
+	void setNodeShadowMapUniforms(const SceneNode* node) const;
 
 	/* ===== RENDERING ================================================================================== */
-	void draw(Camera& camera, float vWidth, float vHeight);
+	//void draw(Camera& camera, float vWidth, float vHeight);
+
+	void updateShadowMapLSMats() const;
+
 	// RENDERING
 	// --For objects
 	void renderRecursive(const Camera& camera, SceneNode* node) const;
 	// --For the shadow map
-	void renderShadowRecursive(SceneNode* node, Shader* depthShader) const;
+	void renderShadowRecursive(const SceneNode* node, const Shader& depthShader) const;
 
 	void init();
 
@@ -157,7 +180,7 @@ private:
 	};
 
 
-	Render_Mode renderMode = Render_Mode::STANDARD_DIFFUSE;
+	//Render_Mode renderMode = Render_Mode::STANDARD_DIFFUSE;
 
 	std::vector<std::filesystem::path> loadQueue;
 
@@ -195,24 +218,8 @@ private:
 	//void drawPointLightFrustums();
 	void drawSpotLightFrustums(const glm::mat4& projMat, const glm::mat4& viewMat, const glm::vec4& color = glm::vec4(0.0f, 1.0f, 1.0f, 1.0f), float lineWidth = 2.0f) const;
 
-
-	/* ===== UPDATING UBOs ================================================================= */
-	// BINDING NODE SHADERS TO UBOs
-	void setupNodeUBOs(SceneNode* node);
-	// CAMERA UBO
-	void updateCameraUBO(const glm::mat4& projection, const glm::mat4& view, const glm::vec3& cameraPos) const;
-	// LIGHTING UBO
-	void updateLightingUBO() const;
-	// SHADOW UBO
-	void updateShadowUBO() const;
-
-	// LOAD EVERY SHADOW MAP TO OBJECT SHADERS
-	void setNodeShadowMapUniforms(SceneNode* node) const;
-
 	/* ===== SELECTION DRAWING ================================================================= */
-	void initSelectionOutline();
 	void drawSelectionStencil() const;
-
 
 	/* ===== AABB BOX DRAWING ================================================================= */
 	void initDebugAABBDrawing();

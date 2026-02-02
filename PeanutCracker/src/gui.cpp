@@ -33,7 +33,7 @@ GUI::~GUI() {
 }
 
 // Returns the available viewport size
-ImVec2 GUI::update(float deltaTime, Camera& camera, Scene& scene, unsigned int textureID) {
+ImVec2 GUI::update(float deltaTime, Camera& camera, Scene& scene, Renderer& renderer, unsigned int textureID) {
 	float screenWidth = ImGui::GetIO().DisplaySize.x;
 	float screenHeight = ImGui::GetIO().DisplaySize.y;
 	float statusBarHeight = 25.0f;
@@ -75,7 +75,7 @@ ImVec2 GUI::update(float deltaTime, Camera& camera, Scene& scene, unsigned int t
 
 	// -- Objects
 	int itemID = 0;
-	for (auto* node : scene.selectedEntities) {
+	for (auto* node : scene.getSelectedEnts()) {
 		if (!node) continue;
 
 		ImGui::PushID(itemID);
@@ -196,14 +196,13 @@ ImVec2 GUI::update(float deltaTime, Camera& camera, Scene& scene, unsigned int t
 
 	// --Rendering Pipeline
 	if (ImGui::CollapsingHeader("Rendering Pipeline", ImGuiTreeNodeFlags_DefaultOpen)) {
-		const char* modes[] = { "Standard Diffuse", "IBL", "Wireframe" };
+		const char* modes[] = { "Standard Diffuse", "Wireframe" };
 		static int renderMode = 0;
 		ImGui::Combo("Render Mode", &renderMode, modes, IM_ARRAYSIZE(modes));
 		switch (renderMode) {
-		case 0: scene.setRenderMode(Render_Mode::STANDARD_DIFFUSE); break;
-		case 1: scene.setRenderMode(Render_Mode::IMAGE_BASED_LIGHTING); break;
-		case 2: scene.setRenderMode(Render_Mode::WIREFRAME); break;
-		default: break;
+			case 0: renderer.setRenderMode(Render_Mode::STANDARD_DIFFUSE); break;
+			case 1: renderer.setRenderMode(Render_Mode::WIREFRAME); break;
+			default: break;
 		}
 
 		static bool checkboxPlaceholder = false;
@@ -233,7 +232,7 @@ ImVec2 GUI::update(float deltaTime, Camera& camera, Scene& scene, unsigned int t
 		// --Directional light
 		ImGui::Spacing();
 		ImGui::SeparatorText("DIRECTIONAL LIGHT");
-		for (auto& dirLight : scene.directionalLights) {
+		for (auto& dirLight : scene.getDirectionalLights()) {
 
 			ImGui::Indent();
 			ImGui::Text("Direction (World Space)");
@@ -337,12 +336,12 @@ ImVec2 GUI::update(float deltaTime, Camera& camera, Scene& scene, unsigned int t
 	glm::mat4 proj = camera.getProjMat(aspect);
 
 	// === GIZMO ======================================================================
-	if (!scene.selectedEntities.empty()) {
+	if (!scene.getSelectedEnts().empty()) {
 		ImGuizmo::SetDrawlist();
 		ImGuizmo::SetRect(viewportBoundsMin.x, viewportBoundsMin.y, viewportSize.x, viewportSize.y);
 
 		// Select the first object in the selection
-		auto selectedNode = scene.selectedEntities[0];
+		auto selectedNode = scene.getSelectedEnts()[0];
 		glm::mat4 modelMatrix = selectedNode->worldMatrix;
 
 		// Draw and Interact

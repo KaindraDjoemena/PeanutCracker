@@ -12,6 +12,7 @@
 #include "headers/gui.h"
 #include "headers/scene.h"
 #include "headers/assetManager.h"
+#include "headers/renderer.h"
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -35,79 +36,6 @@
 struct WindowContext {
 	GUI* gui;
 	Scene* scene;
-};
-
-
-
-struct Framebuffer {
-	unsigned int fbo = 0, texture = 0, rbo = 0;
-
-	unsigned int resolveFbo = 0, resolveTexture = 0;
-	int samples = 4;
-
-	int width = 0, height = 0;
-
-	void setup(int w, int h) {
-		glGenFramebuffers(1, &fbo);
-		glGenTextures(1, &texture);
-		glGenRenderbuffers(1, &rbo);
-
-		glGenFramebuffers(1, &resolveFbo);
-		glGenTextures(1, &resolveTexture);
-
-		rescale(w, h);
-	}
-
-	void rescale(int w, int h) {
-		if (w <= 0 || h <= 0) return;
-		if (w == width && h == height) return;
-		width = w;
-		height = h;
-
-		glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, texture);
-		glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, samples, GL_RGBA16F, width, height, GL_TRUE);
-
-		glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-		glRenderbufferStorageMultisample(GL_RENDERBUFFER, samples, GL_DEPTH24_STENCIL8, width, height);
-
-		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D_MULTISAMPLE, texture, 0);
-		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
-
-		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-			std::cerr << "ERROR: Multisampled FBO incomplete\n";
-
-		glBindTexture(GL_TEXTURE_2D, resolveTexture);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-		glBindFramebuffer(GL_FRAMEBUFFER, resolveFbo);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, resolveTexture, 0);
-
-		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-			std::cerr << "ERROR: Resolve FBO incomplete\n";
-
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	}
-
-	void resolve() const {
-		glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo);
-		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, resolveFbo);
-		glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	}
-
-	void cleanUp() {
-		if (fbo) glDeleteFramebuffers(1, &fbo);
-		if (texture) glDeleteTextures(1, &texture);
-		if (rbo) glDeleteRenderbuffers(1, &rbo);
-		if (resolveFbo) glDeleteFramebuffers(1, &resolveFbo);
-		if (resolveTexture) glDeleteTextures(1, &resolveTexture);
-		fbo = texture = rbo = resolveFbo = resolveTexture = 0;
-	}
-
-	~Framebuffer() { cleanUp(); }
 };
 
 
@@ -249,9 +177,11 @@ int main() {
 	// STBI IMAGE FLIPPING FOR TEXTURES
 	stbi_set_flip_vertically_on_load(true);
 
+	Renderer renderer(SCR_WIDTH, SCR_HEIGHT);
+
 	// === GUI ==================================================
-	Framebuffer sceneFBO;
-	sceneFBO.setup(SCR_WIDTH, SCR_HEIGHT);
+	//Framebuffer sceneFBO;
+	//sceneFBO.setup(SCR_WIDTH, SCR_HEIGHT);
 	GUI gui(window, "#version 330");
 	glfwSetWindowUserPointer(window, &gui);
 
@@ -268,15 +198,15 @@ int main() {
 		lastFrame = currentFrame;
 
 		// A. Update UI and get the Viewport size
-		ImVec2 vSize = gui.update(deltaTime, cameraObject, scene, sceneFBO.resolveTexture);
+		ImVec2 vSize = gui.update(deltaTime, cameraObject, scene, renderer, renderer.getViewportFBO()->resolveTexture);
 		gui.render();
 
 		// B. Rescale FBO and Update Projection if the UI viewport changed
-		sceneFBO.rescale((int)vSize.x, (int)vSize.y);
+		renderer.getViewportFBO()->rescale((int)vSize.x, (int)vSize.y);
 		float aspect = (vSize.y > 0) ? vSize.x / vSize.y : 1.0f;
 
 		// RENDER TO FBO
-		glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO.fbo);
+		glBindFramebuffer(GL_FRAMEBUFFER, renderer.getViewportFBO()->fbo);
 		glViewport(0, 0, (int)vSize.x, (int)vSize.y);
 
 		// BUFFER STUFF
@@ -284,10 +214,13 @@ int main() {
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
 
-		// SCENE RENDERING
-		scene.draw(cameraObject, vSize.x, vSize.y);
+		renderer.update(scene, cameraObject, vSize.x, vSize.y);
+		renderer.renderScene(scene, cameraObject, vSize.x, vSize.y);
 
-		sceneFBO.resolve();
+		// SCENE RENDERING
+		//scene.draw(cameraObject, vSize.x, vSize.y);
+
+		renderer.getViewportFBO()->resolve();
 
 		// UNBIND FRAME BUFFER
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);

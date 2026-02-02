@@ -24,9 +24,10 @@
 
 
 Scene::Scene(AssetManager* i_assetManager) : m_assetManager(i_assetManager) {
-	worldNode = std::make_unique<SceneNode>("Root");
+	m_worldNode = std::make_unique<SceneNode>("Root");
 	m_dirDepthShader  = m_assetManager->loadShaderObject("defaultshaders/dirDepth.vert", "defaultshaders/dirDepth.frag");
 	m_omniDepthShader = m_assetManager->loadShaderObject("defaultshaders/omniDepth.vert", "defaultshaders/omniDepth.geom", "defaultshaders/omniDepth.frag");
+	m_outlineShader = m_assetManager->loadShaderObject("defaultshaders/outline.vert", "defaultshaders/outline.frag");
 }
 //Scene::Scene(const Scene&) = delete;
 //Scene::Scene& operator = (const Scene&) = delete;
@@ -37,8 +38,8 @@ void Scene::selectEntity(MouseRay& worldRay, bool isHoldingShift) {
 	float shortestDist = FLT_MAX;
 	SceneNode* bestNode = nullptr;
 
-	if (worldNode) {
-		findBestNodeRecursive(worldNode.get(), worldRay, shortestDist, bestNode);
+	if (m_worldNode) {
+		findBestNodeRecursive(m_worldNode.get(), worldRay, shortestDist, bestNode);
 	}
 
 	if (bestNode) {
@@ -50,11 +51,11 @@ void Scene::selectEntity(MouseRay& worldRay, bool isHoldingShift) {
 }
 // --DELETION
 void Scene::deleteSelectedEntities() {
-	if (selectedEntities.empty()) return;
-	std::cout << "[SCENE] Deleting " << selectedEntities.size() << " entities..." << '\n';
+	if (m_selectedEntities.empty()) return;
+	std::cout << "[SCENE] Deleting " << m_selectedEntities.size() << " entities..." << '\n';
 
-	for (SceneNode* node : selectedEntities) {
-		if (node == worldNode.get()) {
+	for (SceneNode* node : m_selectedEntities) {
+		if (node == m_worldNode.get()) {
 			std::cout << "  WARNING: Cannot delete root node!" << '\n';
 			continue;
 		}
@@ -75,20 +76,20 @@ void Scene::deleteSelectedEntities() {
 		);
 	}
 
-	selectedEntities.clear();
+	m_selectedEntities.clear();
 
-	worldNode->update(glm::mat4(1.0f), false);
+	m_worldNode->update(glm::mat4(1.0f), false);
 
 	std::cout << "[SCENE] Deleted selected entities" << '\n';
 }
 // --DUPLICATION
 void Scene::duplicateSelectedEntities() {
-	if (selectedEntities.empty()) return;
-	std::cout << "[SCENE] Duplicating " << selectedEntities.size() << " selected entities..." << '\n';
+	if (m_selectedEntities.empty()) return;
+	std::cout << "[SCENE] Duplicating " << m_selectedEntities.size() << " selected entities..." << '\n';
 
 	std::vector<SceneNode*> newSelection;
 
-	for (SceneNode* source : selectedEntities) {
+	for (SceneNode* source : m_selectedEntities) {
 		std::cout << "  Processing: " << source->name << '\n';
 
 		if (!source->parent) {
@@ -117,9 +118,9 @@ void Scene::duplicateSelectedEntities() {
 		newSelection.push_back(rawPtr);
 	}
 
-	selectedEntities = newSelection;
+	m_selectedEntities = newSelection;
 
-	worldNode->update(glm::mat4(1.0f), false);
+	m_worldNode->update(glm::mat4(1.0f), false);
 
 	std::cout << "[SCENE] Duplicated " << newSelection.size() << " entities." << '\n';
 }
@@ -157,25 +158,25 @@ void Scene::createAndAddObject(const std::string& modelPath, const std::filesyst
 	newNode->setSphereComponentRadius();
 
 	bindToUBOs(shaderObjectPtr.get());
-	worldNode->addChild(std::move(newNode));
+	m_worldNode->addChild(std::move(newNode));
 }
 void Scene::createAndAddSkybox(const Faces& faces, const std::filesystem::path& vertPath, const std::filesystem::path& fragPath) {
 	std::shared_ptr<Shader> shaderObjectPtr = m_assetManager->loadShaderObject(vertPath, fragPath);
-	auto skyboxPtr = std::make_unique<Cubemap>(faces, shaderObjectPtr.get());
+	auto m_skyboxPtr = std::make_unique<Cubemap>(faces, shaderObjectPtr.get());
 
 	setupSkyboxShaderUBOs(shaderObjectPtr.get());
-	skybox = std::move(skyboxPtr);
+	m_skybox = std::move(m_skyboxPtr);
 }
 void Scene::createAndAddDirectionalLight(std::unique_ptr<DirectionalLight> light) {
-	directionalLights.push_back(std::move(light));
+	m_directionalLights.push_back(std::move(light));
 	numDirectionalLights++;
 }
 void Scene::createAndAddPointLight(std::unique_ptr<PointLight> light) {
-	pointLights.push_back(std::move(light));
+	m_pointLights.push_back(std::move(light));
 	numPointLights++;
 }
 void Scene::createAndAddSpotLight(std::unique_ptr<SpotLight> light) {
-	spotLights.push_back(std::move(light));
+	m_spotLights.push_back(std::move(light));
 	numSpotLights++;
 }
 void Scene::createAndAddSkyboxFromDirectory(const std::string& directory) {
@@ -218,20 +219,20 @@ void Scene::createAndAddSkyboxFromDirectory(const std::string& directory) {
 				finalPaths[2], finalPaths[4], finalPaths[5]
 			);
 			createAndAddSkybox(faces, "defaultshaders/skybox.vert", "defaultshaders/skybox.frag");
-			std::cout << "[SKYBOX] Successfully loaded environment from: " << directory << '\n';
+			std::cout << "[m_skybox] Successfully loaded environment from: " << directory << '\n';
 			return;
 		}
 	}
 
-	std::cerr << "[Skybox Error] No recognized naming convention found in: " << directory << '\n';
-	std::cerr << "[Skybox Error] Supported formats: right/left/top/bottom/front/back, px/nx/py/ny/pz/nz, etc.\n";
+	std::cerr << "[m_skybox Error] No recognized naming convention found in: " << directory << '\n';
+	std::cerr << "[m_skybox Error] Supported formats: right/left/top/bottom/front/back, px/nx/py/ny/pz/nz, etc.\n";
 }
 
 
 /* ===== SCENE SETTERS (RENDERER) ================================================================= */
-void Scene::setRenderMode(Render_Mode mode) {
-	renderMode = mode;
-}
+//void Scene::setRenderMode(Render_Mode mode) {
+//	renderMode = mode;
+//}
 
 
 /* ===== UBOs ============================================================================*/
@@ -280,7 +281,7 @@ void Scene::bindToUBOs(const Shader* shader) const {
 	}
 }
 void Scene::setupSkyboxShaderUBOs(const Shader* shader) const {
-	if (!skybox || !shader) return;
+	if (!m_skybox || !shader) return;
 
 	unsigned int camIndex = glGetUniformBlockIndex(shader->ID, "CameraMatricesUBOData");
 	if (camIndex != GL_INVALID_INDEX) {
@@ -288,17 +289,9 @@ void Scene::setupSkyboxShaderUBOs(const Shader* shader) const {
 	}
 }
 
-
-/* ===== RENDERING ================================================================================== */
-void Scene::draw(Camera& camera, float vWidth, float vHeight) {
-	GLint previousFBO;
-	glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previousFBO);
-
-	// --Updating Camera vectors
-	camera.updateVectors();
-
+void Scene::updateShadowMapLSMats() const {
 	// -- Updating light space matrices
-	for (auto& dirLight : directionalLights) {
+	for (auto& dirLight : m_directionalLights) {
 		if (dirLight->shadowCasterComponent) {
 			// Check if direction is valid before calc
 			if (glm::length(dirLight->direction) < 0.001f) {
@@ -317,7 +310,7 @@ void Scene::draw(Camera& camera, float vWidth, float vHeight) {
 			}
 		}
 	}
-	for (auto& pointLight : pointLights) {
+	for (auto& pointLight : m_pointLights) {
 		if (pointLight->shadowCasterComponent) {
 
 			pointLight->shadowCasterComponent->calcLightSpaceMats(pointLight->position);
@@ -329,7 +322,7 @@ void Scene::draw(Camera& camera, float vWidth, float vHeight) {
 			}
 		}
 	}
-	for (auto& spotLight : spotLights) {
+	for (auto& spotLight : m_spotLights) {
 		if (spotLight->shadowCasterComponent) {
 			// Check if direction is valid before calc
 			if (glm::length(spotLight->direction) < 0.001f) {
@@ -348,124 +341,6 @@ void Scene::draw(Camera& camera, float vWidth, float vHeight) {
 			}
 		}
 	}
-
-	// --Updating UBOs
-	updateCameraUBO(camera.getProjMat(vWidth / vHeight), camera.getViewMat(), camera.getPos());
-	updateLightingUBO();
-	updateShadowUBO();
-
-
-	// SHADOW PASS
-	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_CULL_FACE);
-	glCullFace(GL_FRONT);
-
-	// --Rendering each object for each light from the lights pov,
-	// and storing the depth value to an FBO
-	// -- Directional lights
-	m_dirDepthShader->use();
-	for (auto& dirLight : directionalLights) {
-		if (!dirLight->shadowCasterComponent) continue;
-
-		const glm::vec2 res = dirLight->shadowCasterComponent->getShadowMapRes();
-		glViewport(0, 0, res.x, res.y);
-		glBindFramebuffer(GL_FRAMEBUFFER, dirLight->shadowCasterComponent->getFboID());
-		glClear(GL_DEPTH_BUFFER_BIT);
-
-		m_dirDepthShader->setMat4("lightSpaceMatrix", dirLight->shadowCasterComponent->getLightSpaceMatrix());
-		renderShadowRecursive(worldNode.get(), m_dirDepthShader.get());
-	}
-	// -- Point lights
-	m_omniDepthShader->use();
-	for (auto& pointLight : pointLights) {
-		if (!pointLight->shadowCasterComponent) continue;
-
-		const glm::vec2 res = pointLight->shadowCasterComponent->getShadowMapRes();
-		glViewport(0, 0, res.x, res.y);
-		glBindFramebuffer(GL_FRAMEBUFFER, pointLight->shadowCasterComponent->getFboID());
-		glClear(GL_DEPTH_BUFFER_BIT);
-
-		std::array<glm::mat4, 6> lightSpaceMats = pointLight->shadowCasterComponent->getLightSpaceMats();
-		m_omniDepthShader->setMat4("shadowMatrices[0]", lightSpaceMats[0]);
-		m_omniDepthShader->setMat4("shadowMatrices[1]", lightSpaceMats[1]);
-		m_omniDepthShader->setMat4("shadowMatrices[2]", lightSpaceMats[2]);
-		m_omniDepthShader->setMat4("shadowMatrices[3]", lightSpaceMats[3]);
-		m_omniDepthShader->setMat4("shadowMatrices[4]", lightSpaceMats[4]);
-		m_omniDepthShader->setMat4("shadowMatrices[5]", lightSpaceMats[5]);
-		m_omniDepthShader->setVec3("lightPos", pointLight->position);
-		m_omniDepthShader->setFloat("farPlane", pointLight->shadowCasterComponent->getFarPlane());
-		renderShadowRecursive(worldNode.get(), m_omniDepthShader.get());
-	}
-	// -- Spot lights
-	m_dirDepthShader->use();
-	for (auto& spotLight : spotLights) {
-		if (!spotLight->shadowCasterComponent) continue;
-
-		const glm::vec2 res = spotLight->shadowCasterComponent->getShadowMapRes();
-		glViewport(0, 0, res.x, res.y);
-		glBindFramebuffer(GL_FRAMEBUFFER, spotLight->shadowCasterComponent->getFboID());
-		glClear(GL_DEPTH_BUFFER_BIT);
-
-		m_dirDepthShader->setMat4("lightSpaceMatrix", spotLight->shadowCasterComponent->getLightSpaceMatrix());
-		renderShadowRecursive(worldNode.get(), m_dirDepthShader.get());
-	}
-
-	// --Reset opengl stuff
-	glCullFace(GL_BACK);
-
-
-	// LIGHT PASS
-	glBindFramebuffer(GL_FRAMEBUFFER, previousFBO);
-	glViewport(0, 0, vWidth, vHeight);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	// --Binding the depth maps
-	// --Directinoal lights
-	for (size_t i = 0; i < directionalLights.size() && i < MAX_LIGHTS; ++i) {
-		if (directionalLights[i]->shadowCasterComponent) {
-			glActiveTexture(GL_TEXTURE0 + 10 + i);
-			glBindTexture(GL_TEXTURE_2D, directionalLights[i]->shadowCasterComponent->getDepthMapTexID());
-		}
-	}
-	// --Point lights
-	for (size_t i = 0; i < pointLights.size() && i < MAX_LIGHTS; ++i) {
-		if (pointLights[i]->shadowCasterComponent) {
-			glActiveTexture(GL_TEXTURE0 + 20 + i);
-			glBindTexture(GL_TEXTURE_CUBE_MAP, pointLights[i]->shadowCasterComponent->getDepthMapTexID());
-		}
-	}
-	// --Spot lights
-	for (size_t i = 0; i < spotLights.size() && i < MAX_LIGHTS; ++i) {
-		if (spotLights[i]->shadowCasterComponent) {
-			glActiveTexture(GL_TEXTURE0 + 30 + i);
-			glBindTexture(GL_TEXTURE_2D, spotLights[i]->shadowCasterComponent->getDepthMapTexID());
-		}
-	}
-
-	glActiveTexture(GL_TEXTURE0);
-	// --Rendering the final scene
-	// Skybox
-	glDisable(GL_STENCIL_TEST);
-	if (skybox) skybox->draw();
-
-
-	worldNode->update(glm::mat4(1.0f), true);
-
-	setNodeShadowMapUniforms(worldNode.get());		// Set fragment shader shadow map uniformms
-
-	if (renderMode == Render_Mode::WIREFRAME) { glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); }
-	renderRecursive(camera, worldNode.get());
-	if (renderMode == Render_Mode::WIREFRAME) { glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); }
-
-
-
-	// --Drawing selected objects
-	drawSelectionStencil();
-
-	// --Debug drawing
-	//drawDirectionalLightFrustums(camera.getProjMat(vWidth / vHeight), camera.getViewMat());
-	//drawSpotLightFrustums(camera.getProjMat(vWidth / vHeight), camera.getViewMat());
-	drawDebugAABBs(worldNode.get());
 }
 
 // RENDERING
@@ -473,7 +348,7 @@ void Scene::draw(Camera& camera, float vWidth, float vHeight) {
 void Scene::renderRecursive(const Camera& camera, SceneNode* node) const {
 	// Camera Frustum Culling
 	bool isVisible = true;
-	if (node->sphereColliderComponent && node != worldNode.get()) {
+	if (node->sphereColliderComponent && node != m_worldNode.get()) {
 		BoundingSphere boundingSphere = { node->sphereColliderComponent->worldCenter, node->sphereColliderComponent->worldRadius };
 		if (!camera.getFrustum().isInFrustum(boundingSphere)) {
 			isVisible = false;
@@ -491,7 +366,7 @@ void Scene::renderRecursive(const Camera& camera, SceneNode* node) const {
 	}
 }
 // --For the shadow map
-void Scene::renderShadowRecursive(SceneNode* node, Shader* depthShader) const {
+void Scene::renderShadowRecursive(const SceneNode* node, const Shader& depthShader) const {
 	if (!node) return;
 	
 	if (node->object) {
@@ -509,13 +384,12 @@ void Scene::init() {
 	initLightFrustumDebug();
 	initDebugAABBDrawing();
 
-	initSelectionOutline();
 	bindToUBOs(m_outlineShader.get());
 
-	setupNodeUBOs(worldNode.get());
+	setupNodeUBOs(m_worldNode.get());
 
-	if (skybox && skybox->shaderPtr) {
-		setupSkyboxShaderUBOs(skybox->shaderPtr);
+	if (m_skybox && m_skybox->shaderPtr) {
+		setupSkyboxShaderUBOs(m_skybox->shaderPtr);
 	}
 }
 
@@ -541,26 +415,26 @@ void Scene::findBestNodeRecursive(SceneNode* node, MouseRay& worldRay, float& sh
 void Scene::handleSelectionLogic(SceneNode* node, bool isHoldingShift) {
 	if (isHoldingShift) {
 		// Toggle selection
-		auto it = std::find(selectedEntities.begin(), selectedEntities.end(), node);
-		if (it == selectedEntities.end()) {
+		auto it = std::find(m_selectedEntities.begin(), m_selectedEntities.end(), node);
+		if (it == m_selectedEntities.end()) {
 			node->isSelected = true;
-			selectedEntities.push_back(node);
+			m_selectedEntities.push_back(node);
 		}
 		else {
 			node->isSelected = false;
-			selectedEntities.erase(it);
+			m_selectedEntities.erase(it);
 		}
 	}
 	else {
 		// Single select
 		clearSelection();
 		node->isSelected = true;
-		selectedEntities.push_back(node);
+		m_selectedEntities.push_back(node);
 	}
 }
 void Scene::clearSelection() {
-	for (auto* node : selectedEntities) node->isSelected = false;
-	selectedEntities.clear();
+	for (auto* node : m_selectedEntities) node->isSelected = false;
+	m_selectedEntities.clear();
 }
 void Scene::debugPrintSceneGraph(SceneNode* node, int depth) {
 	for (auto& child : node->children) {
@@ -618,7 +492,7 @@ void Scene::drawDirectionalLightFrustums(const glm::mat4& projMat, const glm::ma
 
 	m_lightFrustumVAO.bind();
 
-	for (auto& dirLight : directionalLights) {
+	for (auto& dirLight : m_directionalLights) {
 		if (!dirLight->shadowCasterComponent) continue;
 
 		glm::mat4 lightVP = dirLight->shadowCasterComponent->getLightSpaceMatrix();
@@ -649,7 +523,7 @@ void Scene::drawSpotLightFrustums(const glm::mat4& projMat, const glm::mat4& vie
 
 	m_lightFrustumVAO.bind();
 
-	for (auto& spotLight : spotLights) {
+	for (auto& spotLight : m_spotLights) {
 		if (!spotLight->shadowCasterComponent) continue;
 
 		glm::mat4 lightVP = spotLight->shadowCasterComponent->getLightSpaceMatrix();
@@ -665,6 +539,30 @@ void Scene::drawSpotLightFrustums(const glm::mat4& projMat, const glm::mat4& vie
 	m_lightFrustumVAO.unbind();
 }
 
+
+void Scene::bindDepthMaps() const {
+	// --Directinoal lights
+	for (size_t i = 0; i < m_directionalLights.size() && i < MAX_LIGHTS; ++i) {
+		if (m_directionalLights[i]->shadowCasterComponent) {
+			glActiveTexture(GL_TEXTURE0 + 10 + i);
+			glBindTexture(GL_TEXTURE_2D, m_directionalLights[i]->shadowCasterComponent->getDepthMapTexID());
+		}
+	}
+	// --Point lights
+	for (size_t i = 0; i < m_pointLights.size() && i < MAX_LIGHTS; ++i) {
+		if (m_pointLights[i]->shadowCasterComponent) {
+			glActiveTexture(GL_TEXTURE0 + 20 + i);
+			glBindTexture(GL_TEXTURE_CUBE_MAP, m_pointLights[i]->shadowCasterComponent->getDepthMapTexID());
+		}
+	}
+	// --Spot lights
+	for (size_t i = 0; i < m_spotLights.size() && i < MAX_LIGHTS; ++i) {
+		if (m_spotLights[i]->shadowCasterComponent) {
+			glActiveTexture(GL_TEXTURE0 + 30 + i);
+			glBindTexture(GL_TEXTURE_2D, m_spotLights[i]->shadowCasterComponent->getDepthMapTexID());
+		}
+	}
+}
 
 /* ===== UPDATING UBOs ================================================================= */
 // BINDING NODE SHADERS TO UBOs
@@ -689,13 +587,13 @@ void Scene::updateCameraUBO(const glm::mat4& projection, const glm::mat4& view, 
 void Scene::updateLightingUBO() const {
 	LightingUBOData data = {};
 
-	data.numDirLights = static_cast<int>(directionalLights.size());
-	data.numPointLights = static_cast<int>(pointLights.size());
-	data.numSpotLights = static_cast<int>(spotLights.size());
+	data.numDirLights = static_cast<int>(m_directionalLights.size());
+	data.numPointLights = static_cast<int>(m_pointLights.size());
+	data.numSpotLights = static_cast<int>(m_spotLights.size());
 
 	// --Directional
-	for (size_t i = 0; i < directionalLights.size() && i < MAX_LIGHTS; ++i) {
-		auto& src = directionalLights[i];
+	for (size_t i = 0; i < m_directionalLights.size() && i < MAX_LIGHTS; ++i) {
+		auto& src = m_directionalLights[i];
 		auto& dst = data.directionalLight[i];
 		dst.direction = glm::vec4(src->direction, 0.0f);
 		dst.ambient = glm::vec4(src->light.ambient, 1.0f);
@@ -703,8 +601,8 @@ void Scene::updateLightingUBO() const {
 		dst.specular = glm::vec4(src->light.specular, 1.0f);
 	}
 	// --Point
-	for (size_t i = 0; i < pointLights.size() && i < MAX_LIGHTS; ++i) {
-		auto& src = pointLights[i];
+	for (size_t i = 0; i < m_pointLights.size() && i < MAX_LIGHTS; ++i) {
+		auto& src = m_pointLights[i];
 		auto& dst = data.pointLight[i];
 		dst.position = glm::vec4(src->position, 1.0f);
 		dst.ambient = glm::vec4(src->light.ambient, 1.0f);
@@ -715,8 +613,8 @@ void Scene::updateLightingUBO() const {
 		dst.quadratic = src->attenuation.quadratic;
 	}
 	// --Spot
-	for (size_t i = 0; i < spotLights.size() && i < MAX_LIGHTS; ++i) {
-		auto& src = spotLights[i];
+	for (size_t i = 0; i < m_spotLights.size() && i < MAX_LIGHTS; ++i) {
+		auto& src = m_spotLights[i];
 		auto& dst = data.spotLight[i];
 		dst.position = glm::vec4(src->position, 1.0f);
 		dst.direction = glm::vec4(src->direction, 0.0f);
@@ -739,9 +637,9 @@ void Scene::updateShadowUBO() const {
 	ShadowMatricesUBOData data = {};
 
 	// --Directional lights
-	for (size_t i = 0; i < directionalLights.size() && i < MAX_LIGHTS; ++i) {
-		if (directionalLights[i]->shadowCasterComponent) {
-			data.directionalLightSpaceMatrices[i] = directionalLights[i]->shadowCasterComponent->getLightSpaceMatrix();
+	for (size_t i = 0; i < m_directionalLights.size() && i < MAX_LIGHTS; ++i) {
+		if (m_directionalLights[i]->shadowCasterComponent) {
+			data.directionalLightSpaceMatrices[i] = m_directionalLights[i]->shadowCasterComponent->getLightSpaceMatrix();
 		}
 		else {
 			data.directionalLightSpaceMatrices[i] = glm::mat4(1.0f);
@@ -754,9 +652,9 @@ void Scene::updateShadowUBO() const {
 	//	}
 	//}
 	// --Spot lights
-	for (size_t i = 0; i < spotLights.size(); ++i) {
-		if (spotLights[i]->shadowCasterComponent) {
-			data.spotLightSpaceMatrices[i] = spotLights[i]->shadowCasterComponent->getLightSpaceMatrix();
+	for (size_t i = 0; i < m_spotLights.size(); ++i) {
+		if (m_spotLights[i]->shadowCasterComponent) {
+			data.spotLightSpaceMatrices[i] = m_spotLights[i]->shadowCasterComponent->getLightSpaceMatrix();
 		}
 	}
 
@@ -766,24 +664,24 @@ void Scene::updateShadowUBO() const {
 }
 
 // LOAD EVERY SHADOW MAP TO OBJECT SHADERS
-void Scene::setNodeShadowMapUniforms(SceneNode* node) const {
+void Scene::setNodeShadowMapUniforms(const SceneNode* node) const {
 	if (node->object && node->object->shaderPtr) {
 		node->object->shaderPtr->use();
-		for (size_t i = 0; i < directionalLights.size(); ++i) {
+		for (size_t i = 0; i < m_directionalLights.size(); ++i) {
 			std::string uniformName = "DirectionalShadowMap[" + std::to_string(i) + "]";
 			node->object->shaderPtr->setInt(uniformName, 10 + i);
 		}
-		for (size_t i = 0; i < pointLights.size(); ++i) {
+		for (size_t i = 0; i < m_pointLights.size(); ++i) {
 			std::string uniformName = "PointShadowMap[" + std::to_string(i) + "]";
 			node->object->shaderPtr->setInt(uniformName, 20 + i);
 
-			float farPlane = pointLights[i]->shadowCasterComponent->getFarPlane();
+			float farPlane = m_pointLights[i]->shadowCasterComponent->getFarPlane();
 			if (farPlane <= 0.0f) {
 				std::cerr << "ERROR: Far plane is zero/negative for point light " << i << std::endl;
 			}
 			node->object->shaderPtr->setFloat("omniShadowMapFarPlanes[" + std::to_string(i) + "]", farPlane);
 		}
-		for (size_t i = 0; i < spotLights.size(); ++i) {
+		for (size_t i = 0; i < m_spotLights.size(); ++i) {
 			std::string uniformName = "SpotShadowMap[" + std::to_string(i) + "]";
 			node->object->shaderPtr->setInt(uniformName, 30 + i);
 		}
@@ -795,11 +693,8 @@ void Scene::setNodeShadowMapUniforms(SceneNode* node) const {
 }
 
 /* ===== SELECTION DRAWING ================================================================= */
-void Scene::initSelectionOutline() {
-	m_outlineShader = m_assetManager->loadShaderObject("defaultshaders/outline.vert", "defaultshaders/outline.frag");
-}
 void Scene::drawSelectionStencil() const {
-	if (selectedEntities.empty()) return;
+	if (m_selectedEntities.empty()) return;
 
 	// WRITE TO THE STENCIL BUFFER
 	glEnable(GL_STENCIL_TEST);
@@ -810,11 +705,11 @@ void Scene::drawSelectionStencil() const {
 	glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
 	glDepthMask(GL_FALSE);
 
-	for (SceneNode* selectedNode : selectedEntities) {
+	for (SceneNode* selectedNode : m_selectedEntities) {
 		if (!selectedNode->object) continue;
 		m_outlineShader->use();
 		m_outlineShader->setMat4("model", selectedNode->worldMatrix);
-		selectedNode->object->modelPtr->draw(m_outlineShader.get());
+		selectedNode->object->modelPtr->draw(*m_outlineShader);
 	}
 
 	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
@@ -828,12 +723,12 @@ void Scene::drawSelectionStencil() const {
 	m_outlineShader->use();
 	m_outlineShader->setVec4("color", glm::vec4(0.8f, 0.4f, 1.0f, 0.2f));
 
-	for (SceneNode* selectedNode : selectedEntities) {
+	for (SceneNode* selectedNode : m_selectedEntities) {
 		if (!selectedNode->object) continue;
 
 		glm::mat4 fatterModel = glm::scale(selectedNode->worldMatrix, glm::vec3(1.03f));
 		m_outlineShader->setMat4("model", fatterModel);
-		selectedNode->object->modelPtr->draw(m_outlineShader.get());
+		selectedNode->object->modelPtr->draw(*m_outlineShader);
 	}
 
 	// OPENGL STATE CLEANUP
@@ -872,7 +767,7 @@ void Scene::drawDebugAABBs(SceneNode* node) const {
 
 		// Check if this node is selected
 		bool isSelected = false;
-		for (auto* sel : selectedEntities) {
+		for (auto* sel : m_selectedEntities) {
 			if (sel == node) {
 				isSelected = true;
 				break;

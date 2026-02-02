@@ -40,7 +40,7 @@ public:
 
 	Mesh(std::vector<Vertex> i_vertices, std::vector<unsigned int> i_indices, std::vector<Texture> i_textures);
 
-	void draw(Shader* shader, bool isShadowPass = false);
+	void draw(const Shader& shader, bool isShadowPass = false) const;
 
 private:
 	unsigned int VBO, EBO;

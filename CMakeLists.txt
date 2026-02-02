@@ -40,6 +40,7 @@ add_executable(PeanutCracker
     "PeanutCracker/src/model.cpp"
     "PeanutCracker/src/object.cpp"
     "PeanutCracker/src/ray.cpp"
+    "PeanutCracker/src/renderer.cpp"
     "PeanutCracker/src/scene.cpp"
     "PeanutCracker/src/sceneNode.cpp"
     "PeanutCracker/src/shader.cpp"
