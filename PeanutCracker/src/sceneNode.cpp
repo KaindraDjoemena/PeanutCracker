@@ -28,10 +28,34 @@ void SceneNode::setPosition(const glm::vec3& pos) {
 	// *** FLAGS ***
 	isDirty = true;
 }
-void SceneNode::setScale(const glm::vec3& scl) {
-	localTransform.scale.x = scl.x < epsilon ? epsilon : scl.x;
-	localTransform.scale.y = scl.y < epsilon ? epsilon : scl.y;
-	localTransform.scale.z = scl.z < epsilon ? epsilon : scl.z;
+void SceneNode::setScale(const glm::vec3& scl, bool uniform) {
+	glm::vec3 finalScale = scl;
+
+	if (uniform) {
+		glm::vec3 currScale = localTransform.scale;
+		float ratio = 1.0f;
+		const float EPS = 1e-5f;
+
+		if (std::abs(scl.x - currScale.x) > EPS) {
+			ratio = (std::abs(currScale.x) > EPS) ? (scl.x / currScale.x) : scl.x;
+			finalScale.y = currScale.y * ratio;
+			finalScale.z = currScale.z * ratio;
+		}
+		else if (std::abs(scl.y - currScale.y) > EPS) {
+			ratio = (std::abs(currScale.y) > EPS) ? (scl.y / currScale.y) : scl.y;
+			finalScale.x = currScale.x * ratio;
+			finalScale.z = currScale.z * ratio;
+		}
+		else if (std::abs(scl.z - currScale.z) > EPS) {
+			ratio = (std::abs(currScale.z) > EPS) ? (scl.z / currScale.z) : scl.z;
+			finalScale.x = currScale.x * ratio;
+			finalScale.y = currScale.y * ratio;
+		}
+	}
+
+	localTransform.scale.x = std::max(finalScale.x, epsilon);
+	localTransform.scale.y = std::max(finalScale.y, epsilon);
+	localTransform.scale.z = std::max(finalScale.z, epsilon);
 
 
 	// *** FLAGS ***

@@ -24,6 +24,10 @@ struct Framebuffer {
 		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 	}
 
+	void unbind() const {
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	}
+
 	void setup(int w, int h) {
 		glGenFramebuffers(1, &fbo);
 		glGenTextures(1, &texture);
@@ -91,12 +95,14 @@ class Renderer {
 public:
 	Renderer(int i_vWidth, int i_vHeight)  { m_viewportFBO.setup(i_vWidth, i_vHeight); }
 
+	void initScene(Scene& scene);
 	void update(Scene& scene, Camera& cam, int vWidth, int vHeight);
 	void renderScene(const Scene& scene, const Camera& cam, int vWidth, int vHeight) const;
 
 	Framebuffer* getViewportFBO() { return &m_viewportFBO; }
 
 	void setRenderMode(Render_Mode renderMode) { _renderMode = renderMode; }
+	void setShadowMode(bool usingShadowMap)    { _usingShadowMap = usingShadowMap; }
 
 private:
 	Render_Mode _renderMode     = Render_Mode::STANDARD_DIFFUSE;

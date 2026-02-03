@@ -229,10 +229,16 @@ void Scene::createAndAddSkyboxFromDirectory(const std::string& directory) {
 }
 
 
-/* ===== SCENE SETTERS (RENDERER) ================================================================= */
-//void Scene::setRenderMode(Render_Mode mode) {
-//	renderMode = mode;
-//}
+/* ===== DDELETING ENTITIES ================================================================= */
+void Scene::deleteDirLight(int index) {
+	m_directionalLights.erase(m_directionalLights.begin() + index);
+}
+void Scene::deletePointLight(int index) {
+	m_pointLights.erase(m_pointLights.begin() + index);
+}
+void Scene::deleteSpotLight(int index) {
+	m_spotLights.erase(m_spotLights.begin() + index);
+}
 
 
 /* ===== UBOs ============================================================================*/
@@ -343,7 +349,8 @@ void Scene::updateShadowMapLSMats() const {
 	}
 }
 
-// RENDERING
+
+/* ===== RENDERING ================================================================================== */
 // --For objects
 void Scene::renderRecursive(const Camera& camera, SceneNode* node) const {
 	// Camera Frustum Culling
@@ -384,6 +391,7 @@ void Scene::init() {
 	initLightFrustumDebug();
 	initDebugAABBDrawing();
 
+	//initSelectionOutline();
 	bindToUBOs(m_outlineShader.get());
 
 	setupNodeUBOs(m_worldNode.get());

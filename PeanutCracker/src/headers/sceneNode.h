@@ -35,7 +35,7 @@ public:
 
 	// --Setters
 	void setPosition(const glm::vec3& pos);
-	void setScale(const glm::vec3& scl);
+	void setScale(const glm::vec3& scl, bool uniform = false);
 	void setEulerRotation(const glm::vec3& eulerRotDegrees);
 	void setSphereComponentRadius();
 

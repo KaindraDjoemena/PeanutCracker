@@ -29,7 +29,7 @@ void widgetStretch(T&& func) {
 
 class GUI {
 public:
-	float panelWidth = 300.0f;
+	float panelWidth = 375.f;
 	bool isViewportHovered = false;
 	bool pathErrorState = false;
 
@@ -42,7 +42,7 @@ public:
 	~GUI();
 
 	// Returns the available viewport size
-	ImVec2 update(float deltaTime, Camera& camera, Scene& scene, Renderer& renderer, unsigned int textureID);
+	ImVec2 update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& scene, Renderer& renderer, unsigned int textureID);
 
 	void render();
 
@@ -53,8 +53,11 @@ private:
 	ImGuizmo::OPERATION mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
 	ImGuizmo::MODE mCurrentGizmoMode = ImGuizmo::LOCAL;
 
-	void setPurpleTheme() const;
-
 	// STATUS BAR
 	void showStatusBar(int statusbarHeight, Camera& camera) const;
+	
+	// HELPERS
+	void DrawProperty(const char* label, std::function<void()> widget, float labelWidth = 0.2f);
+	void DrawAttenuationGraph(float nearP, float farP, const Attenuation& atten);
+	void setPurpleTheme() const;
 };

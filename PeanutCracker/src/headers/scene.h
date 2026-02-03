@@ -24,14 +24,6 @@ const unsigned int MAX_LIGHTS = 8;
 
 class Scene {
 public:
-	std::unique_ptr<SceneNode> m_worldNode;	// Scene graph parent
-	std::unique_ptr<Cubemap>						m_skybox;
-
-	std::vector<std::unique_ptr<DirectionalLight>>	m_directionalLights;
-	std::vector<std::unique_ptr<PointLight>>		m_pointLights;
-	std::vector<std::unique_ptr<SpotLight>>			m_spotLights;
-	std::vector<SceneNode*>							m_selectedEntities;
-
 	Scene(AssetManager* i_assetManager);
 	Scene(const Scene&) = delete;
 	//Scene& operator = (const Scene&);
@@ -73,8 +65,10 @@ public:
 	void createAndAddSkyboxFromDirectory(const std::string& directory);
 
 
-	/* ===== SCENE SETTERS (RENDERER) ================================================================= */
-	//void setRenderMode(Render_Mode mode);
+	/* ===== DDELETING ENTITIES ================================================================= */
+	void deleteDirLight(int index);
+	void deletePointLight(int index);
+	void deleteSpotLight(int index);
 
 
 	void bindDepthMaps() const;
@@ -99,12 +93,9 @@ public:
 	// LOAD EVERY SHADOW MAP TO OBJECT SHADERS
 	void setNodeShadowMapUniforms(const SceneNode* node) const;
 
-	/* ===== RENDERING ================================================================================== */
-	//void draw(Camera& camera, float vWidth, float vHeight);
-
 	void updateShadowMapLSMats() const;
 
-	// RENDERING
+	/* ===== RENDERING ================================================================================== */
 	// --For objects
 	void renderRecursive(const Camera& camera, SceneNode* node) const;
 	// --For the shadow map
@@ -180,7 +171,13 @@ private:
 	};
 
 
-	//Render_Mode renderMode = Render_Mode::STANDARD_DIFFUSE;
+	std::unique_ptr<SceneNode> m_worldNode;	// Scene graph parent
+	std::unique_ptr<Cubemap>   m_skybox;
+
+	std::vector<std::unique_ptr<DirectionalLight>> m_directionalLights;
+	std::vector<std::unique_ptr<PointLight>>	   m_pointLights;
+	std::vector<std::unique_ptr<SpotLight>>		   m_spotLights;
+	std::vector<SceneNode*>						   m_selectedEntities;
 
 	std::vector<std::filesystem::path> loadQueue;
 

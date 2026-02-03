@@ -52,7 +52,7 @@ void processInput(GLFWwindow* window);
 
 
 // WINDOW SETUP
-const unsigned int SCR_WIDTH  = 1000;
+const unsigned int SCR_WIDTH  = 1200;
 const unsigned int SCR_HEIGHT = 750;
 int scr_width  = SCR_WIDTH;
 int scr_height = SCR_HEIGHT;
@@ -123,12 +123,6 @@ int main() {
 		return -1;
 	}
 
-	glfwSwapInterval(0);	// Disable VSYNC
-
-	auto assetManagerPtr = std::make_unique<AssetManager>();
-	Scene scene(assetManagerPtr.get());
-
-
 
 	// === OPENGL SETTINGS =====================================
 	// -- Rendering
@@ -138,10 +132,23 @@ int main() {
 	glFrontFace(GL_CCW);
 	glCullFace(GL_BACK);
 	glEnable(GL_MULTISAMPLE);
+	glfwSwapInterval(0);	// Disable VSYNC
 
 
-	// === LIGHT STUFF =========================================
-	
+	// STBI IMAGE FLIPPING FOR TEXTURES
+	stbi_set_flip_vertically_on_load(true);
+
+
+	auto assetManagerPtr = std::make_unique<AssetManager>();
+	Scene scene(assetManagerPtr.get());
+	GUI gui(window, "#version 330");
+	Renderer renderer(SCR_WIDTH, SCR_HEIGHT);
+	renderer.initScene(scene);
+
+	WindowContext context = { &gui, &scene };
+	glfwSetWindowUserPointer(window, &gui);
+	glfwSetWindowUserPointer(window, &context);
+
 	auto pointLight = std::make_unique<PointLight>(
 		glm::vec3(0.0f, 0.0f, 0.0f),
 		Light(glm::vec3(0.1f), glm::vec3(0.8f), glm::vec3(1.0f)),
@@ -156,7 +163,6 @@ int main() {
 		0.1f, 20.0f
 	);
 	scene.createAndAddPointLight(std::move(pointLight1));
-
 	//auto directionalLight = std::make_unique<DirectionalLight>(
 	//	glm::vec3(0.0f, 0.0f, -1.0f),
 	//	Light(glm::vec3(0.1f), glm::vec3(0.8f), glm::vec3(1.0f)),
@@ -174,21 +180,6 @@ int main() {
 	//	0.01f, 10.0f);
 	//scene.createAndAddSpotLight(std::move(spotLight));
 
-	// STBI IMAGE FLIPPING FOR TEXTURES
-	stbi_set_flip_vertically_on_load(true);
-
-	Renderer renderer(SCR_WIDTH, SCR_HEIGHT);
-
-	// === GUI ==================================================
-	//Framebuffer sceneFBO;
-	//sceneFBO.setup(SCR_WIDTH, SCR_HEIGHT);
-	GUI gui(window, "#version 330");
-	glfwSetWindowUserPointer(window, &gui);
-
-	scene.init();
-
-	WindowContext context = { &gui, &scene };
-	glfwSetWindowUserPointer(window, &context);
 
 	// === RENDER LOOP ==========================================
 	while (!glfwWindowShouldClose(window)) {
@@ -198,7 +189,7 @@ int main() {
 		lastFrame = currentFrame;
 
 		// A. Update UI and get the Viewport size
-		ImVec2 vSize = gui.update(deltaTime, cameraObject, scene, renderer, renderer.getViewportFBO()->resolveTexture);
+		ImVec2 vSize = gui.update(deltaTime, window, cameraObject, scene, renderer, renderer.getViewportFBO()->resolveTexture);
 		gui.render();
 
 		// B. Rescale FBO and Update Projection if the UI viewport changed
@@ -217,13 +208,6 @@ int main() {
 		renderer.update(scene, cameraObject, vSize.x, vSize.y);
 		renderer.renderScene(scene, cameraObject, vSize.x, vSize.y);
 
-		// SCENE RENDERING
-		//scene.draw(cameraObject, vSize.x, vSize.y);
-
-		renderer.getViewportFBO()->resolve();
-
-		// UNBIND FRAME BUFFER
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 		// WINDOWING STUFF
 		glfwSwapBuffers(window);
@@ -275,7 +259,6 @@ void mouseCallback(GLFWwindow* window, double xPos, double yPos) {
 void keyPressCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
 	WindowContext* ctx = static_cast<WindowContext*>(glfwGetWindowUserPointer(window));
 	if (!ctx || !ctx->gui) return;
-	ImGuiIO& io = ImGui::GetIO();
 	if (ImGui::GetIO().WantCaptureMouse && !ctx->gui->isViewportHovered) return;
 	if (action != GLFW_PRESS) return;
 
@@ -310,7 +293,6 @@ void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
 
 		float relX = (float)xPos - ctx->gui->viewportBoundsMin.x;
 		float relY = (float)yPos - ctx->gui->viewportBoundsMin.y;
-		//std::cout << "viewportsize.x: " << ctx->gui->viewportSize.x << '\n';
 
 		if (!ctx->gui->isViewportHovered) return;
 		if (ctx->gui->viewportSize.x <= 0 || ctx->gui->viewportSize.y <= 0) return;

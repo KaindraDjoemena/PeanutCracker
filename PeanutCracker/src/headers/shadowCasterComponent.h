@@ -28,13 +28,17 @@ public:
 	unsigned int getFboID() const { return m_fboID; }
 	std::array<float, 6> getPlanes() const { return {m_leftPlane, m_rightPlane, m_bottomPlane, m_topPlane, m_nearPlane, m_farPlane}; }
 	float getFarPlane() const { return m_farPlane; }
+	float getNearPlane() const { return m_nearPlane; }
 	glm::mat4 getLightSpaceMatrix() const { return m_lightSpaceMatrix; }
 	std::array<glm::mat4, 6> getLightSpaceMats() const { return m_lightSpaceMatrices; }
 	glm::vec2 getShadowMapRes() const { return m_shadowMapResolution; }
 
 	void updateFrustum();
 
+	void setFOVDeg(float fov) { m_fov = fov * 2.0f + 2.0f; _isDirty = true; updateFrustum(); }
 	void setFrustumPlanes(float i_left, float i_right, float i_bottom, float i_top, float i_near, float i_far);
+	void setNearPlane(float n) { m_nearPlane = n; _isDirty = true; updateFrustum(); }
+	void setFarPlane(float f)  { m_farPlane  = f; _isDirty = true; updateFrustum(); }
 
 	glm::mat4 calcProjMat() const;
 

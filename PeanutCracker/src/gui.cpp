@@ -5,6 +5,7 @@
 #include "headers/object.h"
 #include "headers/transform.h"
 
+#include <GLFW/glfw3.h>
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
@@ -33,14 +34,14 @@ GUI::~GUI() {
 }
 
 // Returns the available viewport size
-ImVec2 GUI::update(float deltaTime, Camera& camera, Scene& scene, Renderer& renderer, unsigned int textureID) {
-	float screenWidth = ImGui::GetIO().DisplaySize.x;
+ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& scene, Renderer& renderer, unsigned int textureID) {
+	float screenWidth =  ImGui::GetIO().DisplaySize.x;
 	float screenHeight = ImGui::GetIO().DisplaySize.y;
-	float statusBarHeight = 25.0f;
-	float toolbarHeight = 0.0f;		// change this when adding toolbar
-	float viewportHeight = screenHeight - statusBarHeight - toolbarHeight;
+	float statusBarHeight  = 25.0f;
+	float toolbarHeight    = 0.0f;		// change this when adding toolbar
+	float viewportHeight   = screenHeight - statusBarHeight - toolbarHeight;
 	float rightPanelHeight = viewportHeight;
-	float inspectorHeight = rightPanelHeight * 0.65f;
+	float inspectorHeight  = rightPanelHeight * 0.65f;
 	float sceneConfigurationHeight = rightPanelHeight - inspectorHeight;
 
 	// ImGui frame init
@@ -49,165 +50,361 @@ ImVec2 GUI::update(float deltaTime, Camera& camera, Scene& scene, Renderer& rend
 	ImGui::NewFrame();
 	ImGuizmo::BeginFrame();
 
-	if (ImGui::IsKeyPressed(ImGuiKey_1)) mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
-	if (ImGui::IsKeyPressed(ImGuiKey_2)) mCurrentGizmoOperation = ImGuizmo::ROTATE;
-	if (ImGui::IsKeyPressed(ImGuiKey_3)) mCurrentGizmoOperation = ImGuizmo::SCALE;
+
+	// TODO: WINDOWING CLASS
+	if (ImGui::IsAnyItemActive()) {
+		if (ImGui::IsMouseDragging(ImGuiMouseButton_Left) && !ImGui::GetIO().WantTextInput) {
+			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+		}
+	} 
+	else {
+    	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+	}
 
 
-	// === INSPECTOR PANEL ======================================================
+	/* ===== INSPECTOR PANEL ====================================================== */
 	ImGui::SetNextWindowPos(ImVec2(screenWidth - panelWidth, toolbarHeight));
 	ImGui::SetNextWindowSize(ImVec2(panelWidth, inspectorHeight));
 
 	ImGuiWindowFlags inspectorFlags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
 
-	ImGui::Begin("Inspector", NULL, inspectorFlags);
+	ImGui::Begin("INSPECTOR", NULL, inspectorFlags);
 	panelWidth = ImGui::GetWindowWidth(); // Capture resizing
 
-	// --Light
-	//if (ImGui::CollapsingHeader("Scene Light", ImGuiTreeNodeFlags_DefaultOpen)) {
-	//    ImGui::PushID("Light");
-	//    ImGui::DragFloat3("Position", glm::value_ptr(light.position), 0.1f);
-	//    ImGui::ColorEdit3("Color", glm::value_ptr(light.light.diffuse));
-	//    ImGui::PopID();
-	//}
+	if (ImGui::BeginTabBar("InspectorTabs")) {
+		if (ImGui::BeginTabItem("Selection")) {
+			// --Objects
+			int itemID = 0;
+			for (auto* node : scene.getSelectedEnts()) {
+				if (!node) continue;
 
-	//ImGui::Separator
+				ImGui::PushID(itemID);
 
-	// -- Objects
-	int itemID = 0;
-	for (auto* node : scene.getSelectedEnts()) {
-		if (!node) continue;
+				ImGui::TextWrapped(node->name.c_str());
 
-		ImGui::PushID(itemID);
+				// --Object Path
+				if (node->object && node->object->modelPtr) {
 
-		ImGui::TextWrapped(node->name.c_str());
+					char pathBuffer[256];
+					strcpy_s(pathBuffer, 256, node->object->modelPtr->path.c_str());
+					if (ImGui::InputText("Path", pathBuffer, IM_ARRAYSIZE(pathBuffer))) {
+						node->object->modelPtr->path = pathBuffer;
+						// Handle model reloading logic here
+					}
 
-		// -- Object Path
-		if (node->object && node->object->modelPtr) {
-
-			char pathBuffer[256];
-			strcpy_s(pathBuffer, 256, node->object->modelPtr->path.c_str());
-			if (ImGui::InputText("Path", pathBuffer, IM_ARRAYSIZE(pathBuffer))) {
-				node->object->modelPtr->path = pathBuffer;
-				// Handle model reloading logic here
-			}
-
-			if (pathErrorState) {
-				ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(100, 0, 0, 255));
-				ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 0, 255));
-				ImGui::PopStyleColor();
-				ImGui::PopStyleColor();
-				ImGui::TextColored(ImVec4(1, 0, 0, 1), "Invalid Path!");
-			}
-		}
-
-		// -- Node Transformation
-		if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
-
-			// --Position
-			ImGui::SeparatorText("POSITION");
-			ImGui::Indent();
-			glm::vec3 positionDisplay = node->getPosition();
-			widgetStretch([&]() {
-				if (ImGui::DragFloat3("##Position", glm::value_ptr(positionDisplay), 0.05f)) {
-					node->setPosition(positionDisplay);
+					if (pathErrorState) {
+						ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(100, 0, 0, 255));
+						ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(255, 255, 0, 255));
+						ImGui::PopStyleColor();
+						ImGui::PopStyleColor();
+						ImGui::TextColored(ImVec4(1, 0, 0, 1), "Invalid Path!");
+					}
 				}
-				});
-			ImGui::Unindent();
 
-			// --Scale
-			ImGui::SeparatorText("SCALE");
-			ImGui::Indent();
-			ImGui::Checkbox("##UniformLock", &mUniformScale);
-			ImGui::SameLine();
-			glm::vec3 scaleDisplay = node->getScale();
-			glm::vec3 tempScale = scaleDisplay;
-			widgetStretch([&]() {
-				if (ImGui::DragFloat3("##Scale", glm::value_ptr(tempScale), 0.05f)) {
-					if (mUniformScale) {
-						const float EPSILON = 0.0001f;
+				// --Node Transformation
+				if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
+					// --Position
+					glm::vec3 pos = node->getPosition();
+					DrawProperty("Pos", [&]() {
+						if (ImGui::DragFloat3("##Position", glm::value_ptr(pos), 0.05f)) {
+							node->setPosition(pos);
+						}
+					});
 
-						if (std::abs(tempScale.x - scaleDisplay.x) > 0.0f) {
-							if (std::abs(scaleDisplay.x) < EPSILON) {
-								tempScale.y = tempScale.x;
-								tempScale.z = tempScale.x;
-							}
-							else {
-								float factor = tempScale.x / scaleDisplay.x;
-								tempScale.y = scaleDisplay.y * factor;
-								tempScale.z = scaleDisplay.z * factor;
-							}
+					// --Scale
+					glm::vec3 scaleDisplay = node->getScale();
+					glm::vec3 tempScale = scaleDisplay;
+					DrawProperty("Scale", [&]() {
+						ImGui::Checkbox("##UniformLock", &mUniformScale);
+						ImGui::SameLine();
+						ImGui::SetNextItemWidth(-1.0f);
+
+						if (ImGui::DragFloat3("##Scale", glm::value_ptr(tempScale), 0.05f)) {
+							node->setScale(tempScale, mUniformScale);
 						}
-						else if (std::abs(tempScale.y - scaleDisplay.y) > 0.0f) {
-							if (std::abs(scaleDisplay.y) < EPSILON) {
-								tempScale.x = tempScale.y;
-								tempScale.z = tempScale.y;
-							}
-							else {
-								float factor = tempScale.y / scaleDisplay.y;
-								tempScale.x = scaleDisplay.x * factor;
-								tempScale.z = scaleDisplay.z * factor;
-							}
+					});
+
+					// --Rotation
+					glm::vec3 rot = node->getEulerRotation();
+					DrawProperty("Rot", [&]() {
+						if (ImGui::DragFloat3("##Rotation", glm::value_ptr(rot), 0.05f)) {
+							node->setEulerRotation(rot);
 						}
-						else if (std::abs(tempScale.z - scaleDisplay.z) > 0.0f) {
-							if (std::abs(scaleDisplay.z) < EPSILON) {
-								tempScale.x = tempScale.z;
-								tempScale.y = tempScale.z;
+					});
+				}
+
+				// --Textures Section
+				if (node->object && node->object->modelPtr) {
+					if (ImGui::CollapsingHeader("Textures", ImGuiTreeNodeFlags_DefaultOpen)) {
+
+						float thumbSize = 64.0f;
+						float padding = 8.0f;
+						float windowVisibleX2 = ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x;
+
+						for (int i = 0; i < node->object->modelPtr->textures_loaded.size(); i++) {
+							auto& tex = node->object->modelPtr->textures_loaded[i];
+
+							ImGui::PushID(i);
+							ImGui::BeginGroup();
+
+							ImGui::TextDisabled("%s", tex.type.c_str());
+
+							// Thumbnail
+							ImTextureID texID = (ImTextureID)(intptr_t)tex.id;
+							ImGui::Image(texID, ImVec2(thumbSize, thumbSize), ImVec2(0, 1), ImVec2(1, 0), ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 0.5f));
+							if (ImGui::IsItemHovered()) {
+								ImGui::BeginTooltip();
+								ImGui::Text("ID: %d", tex.id);
+								ImGui::Text("Path: %s", tex.path.c_str());
+								ImGui::Image(texID, ImVec2(256, 256), ImVec2(0, 1), ImVec2(1, 0));
+								ImGui::EndTooltip();
 							}
-							else {
-								float factor = tempScale.z / scaleDisplay.z;
-								tempScale.x = scaleDisplay.x * factor;
-								tempScale.y = scaleDisplay.y * factor;
-							}
+							ImGui::EndGroup();
+
+							float lastX2 = ImGui::GetItemRectMax().x;
+							float nextX2 = lastX2 + padding + thumbSize;
+							if (i + 1 < node->object->modelPtr->textures_loaded.size() && nextX2 < windowVisibleX2)
+								ImGui::SameLine();
+
+							ImGui::PopID();
 						}
 					}
-					node->setScale(tempScale);
 				}
-				});
-			ImGui::Unindent();
 
-			// --Rotation
-			ImGui::SeparatorText("ROTATION");
-			ImGui::Indent();
-			glm::vec3 eulerRotationDisplay = node->getEulerRotation();
-			widgetStretch([&]() {
-				if (ImGui::DragFloat3("##Rotation", glm::value_ptr(eulerRotationDisplay), 0.05f)) {
-					node->setEulerRotation(eulerRotationDisplay);
-				}
-				});
-			ImGui::Unindent();
+				ImGui::PopID();
+				itemID++;
+			}
+			ImGui::EndTabItem();
 		}
 
-		ImGui::PopID();
-		itemID++;
+		if (ImGui::BeginTabItem("Lights")) {
+			if (ImGui::BeginTabBar("LightingTabs")) {
+
+				// --Directional Lights
+				static int selectedDir = 0;
+				if (ImGui::BeginTabItem("Directional")) {
+					ImGui::BeginGroup();
+					ImGui::BeginChild("DirList", ImVec2(130, -70), true);
+					for (int i = 0; i < (int)scene.getDirectionalLights().size(); i++) {
+						char label[32]; sprintf(label, "Dir %d", i);
+						if (ImGui::Selectable(label, selectedDir == i)) selectedDir = i;
+					}
+					ImGui::EndChild();
+					// --Add button
+					bool isMaxDir   = (scene.getDirectionalLights().size() == MAX_LIGHTS);
+					bool isEmptyDir = (scene.getDirectionalLights().empty());
+					if (isMaxDir) { ImGui::BeginDisabled(); }
+					if (ImGui::Button("(+)", ImVec2(130, 0))) {
+						scene.createAndAddDirectionalLight(std::make_unique<DirectionalLight>(glm::vec3(0, -1, 0), Light(), 0.1f, 100.f));
+						selectedDir = (int)scene.getDirectionalLights().size() - 1;
+					}
+					if (isMaxDir) { ImGui::EndDisabled(); }
+					// --Delete button
+					if (isEmptyDir) { ImGui::BeginDisabled(); }
+					if (ImGui::Button("(-)", ImVec2(130, 0))) {
+						if (selectedDir >= 0 && selectedDir < (int)scene.getDirectionalLights().size()) {
+							scene.deleteDirLight(selectedDir);
+							selectedDir--;
+						}
+					}
+					if (isEmptyDir) { ImGui::EndDisabled(); }
+					ImGui::EndGroup();
+					ImGui::SameLine();
+
+					ImGui::BeginChild("DirDetails", ImVec2(0, 0), false);
+					if (selectedDir >= 0 && selectedDir < (int)scene.getDirectionalLights().size()) {
+						auto& l = *scene.getDirectionalLights()[selectedDir];
+
+						// Transform
+						ImGui::SeparatorText("Transform");
+						DrawProperty("Dir", [&]() { ImGui::DragFloat3("##d", &l.direction.x, 0.01f); });
+
+						// Colors
+						ImGui::SeparatorText("Colors");
+						DrawProperty("Amb",  [&]() { ImGui::ColorEdit3("##a", &l.light.ambient.x); });
+						DrawProperty("Diff", [&]() { ImGui::ColorEdit3("##d", &l.light.diffuse.x); });
+						DrawProperty("Spec", [&]() { ImGui::ColorEdit3("##s", &l.light.specular.x); });
+
+						ImGui::Spacing();
+					}
+					ImGui::EndChild();
+					ImGui::EndTabItem();
+				}
+
+				// --Point Lights
+				static int selectedPoint = 0;
+				if (ImGui::BeginTabItem("Point")) {
+					ImGui::BeginGroup();
+					ImGui::BeginChild("PointList", ImVec2(130, -70), true);
+					for (int i = 0; i < (int)scene.getPointLights().size(); i++) {
+						char label[32]; sprintf(label, "Point %d", i);
+						if (ImGui::Selectable(label, selectedPoint == i)) selectedPoint = i;
+					}
+					ImGui::EndChild();
+					// --Add button
+					bool isMaxPoint   = (scene.getPointLights().size() >= MAX_LIGHTS);
+					bool isEmptyPoint = (scene.getPointLights().empty());
+					if (isMaxPoint) { ImGui::BeginDisabled(); }
+					if (ImGui::Button("(+)", ImVec2(130, 0))) {
+						scene.createAndAddPointLight(std::make_unique<PointLight>(glm::vec3(0.0f), Light(), Attenuation(), 0.01f, 20.0f));
+						selectedPoint = (int)scene.getPointLights().size() - 1;
+					}
+					if (isMaxPoint) { ImGui::EndDisabled(); }
+					// --Delete button
+					if (isEmptyPoint) { ImGui::BeginDisabled(); }
+					if (ImGui::Button("(-)", ImVec2(130, 0))) {
+						if (selectedPoint >= 0 && selectedPoint < (int)scene.getPointLights().size()) {
+							scene.deletePointLight(selectedPoint);
+							selectedPoint--;
+						}
+					}
+					if (isEmptyPoint) { ImGui::EndDisabled(); }
+					ImGui::EndGroup();
+					ImGui::SameLine();
+
+					ImGui::BeginChild("PointDetails", ImVec2(0, 0), false);
+					if (selectedPoint >= 0 && selectedPoint < (int)scene.getPointLights().size()) {
+						auto& l = *scene.getPointLights()[selectedPoint];
+
+						// Transform
+						ImGui::SeparatorText("Transform");
+						DrawProperty("Pos", [&]() { ImGui::DragFloat3("##p", &l.position.x, 0.01f); });
+
+						// Colors
+						ImGui::SeparatorText("Colors");
+						DrawProperty("Amb",  [&]() { ImGui::ColorEdit3("##a", &l.light.ambient.x); });
+						DrawProperty("Diff", [&]() { ImGui::ColorEdit3("##d", &l.light.diffuse.x); });
+						DrawProperty("Spec", [&]() { ImGui::ColorEdit3("##s", &l.light.specular.x); });
+
+						// Attenuation
+						ImGui::Spacing();
+						ImGui::Separator();
+						ImGui::Spacing();
+						ImGui::SeparatorText("Attenuation");
+						DrawProperty("Kc", [&]() { ImGui::DragFloat("##c", &l.attenuation.constant, 0.01f); });
+						DrawProperty("Kl", [&]() { ImGui::DragFloat("##l", &l.attenuation.linear, 0.001f); });
+						DrawProperty("Kq", [&]() { ImGui::DragFloat("##q", &l.attenuation.quadratic, 0.0001f); });
+
+						// Frustum
+						ImGui::SeparatorText("Frustum Planes");
+						float nearP = l.shadowCasterComponent->getNearPlane();
+						float farP = l.shadowCasterComponent->getFarPlane();
+						DrawProperty("Near", [&]() { if (ImGui::DragFloat("##n", &nearP, 0.1f, 0.01f, 10.0f)) { l.shadowCasterComponent->setNearPlane(nearP); }});
+						DrawProperty("Far", [&]() { if (ImGui::DragFloat("##f", &farP, 1.0f, 0.1f, 1000.0f)) { l.shadowCasterComponent->setFarPlane(farP); }});
+
+						ImGui::Spacing();
+						DrawAttenuationGraph(nearP, farP, l.attenuation);
+						ImGui::Spacing();
+					}
+					ImGui::EndChild();
+					ImGui::EndTabItem();
+				}
+
+				// --Spot Lights
+				static int selectedSpot = 0;
+				if (ImGui::BeginTabItem("Spot")) {
+					ImGui::BeginGroup();
+					ImGui::BeginChild("SpotList", ImVec2(130, -70), true);
+					for (int i = 0; i < (int)scene.getSpotLights().size(); i++) {
+						char label[32]; sprintf(label, "Spot %d", i);
+						if (ImGui::Selectable(label, selectedSpot == i)) selectedSpot = i;
+					}
+					ImGui::EndChild();
+					// --Add button
+					bool isMaxSpot   = (scene.getSpotLights().size() == MAX_LIGHTS);
+					bool isEmptySpot = (scene.getSpotLights().empty());
+					if (isMaxSpot) { ImGui::BeginDisabled(); }
+					if (ImGui::Button("(+)", ImVec2(130, 0))) {
+						scene.createAndAddSpotLight(std::make_unique<SpotLight>(glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, -1.0f), Light(), Attenuation(), cosf(glm::radians(10.0f)), cosf(glm::radians(12.5f)), 0.01f, 20.0f));
+						selectedSpot = (int)scene.getSpotLights().size() - 1;
+					}
+					if (isMaxSpot) { ImGui::EndDisabled(); }
+					// --Delete button
+					if (isEmptySpot) { ImGui::BeginDisabled(); }
+					if (ImGui::Button("(-)", ImVec2(130, 0))) {
+						if (selectedSpot >= 0 && selectedSpot < (int)scene.getSpotLights().size()) {
+							scene.deleteSpotLight(selectedSpot);
+							selectedSpot--;
+						}
+					}
+					if (isEmptySpot) { ImGui::EndDisabled(); }
+					ImGui::EndGroup();
+					ImGui::SameLine();
+
+					ImGui::BeginChild("SpotDetails", ImVec2(0, 0), false);
+					if (selectedSpot >= 0 && selectedSpot < (int)scene.getSpotLights().size()) {
+						auto& l = *scene.getSpotLights()[selectedSpot];
+
+						// Transform
+						ImGui::SeparatorText("Transform");
+						DrawProperty("Pos", [&]() { ImGui::DragFloat3("##p", &l.position.x, 0.01f); });
+						DrawProperty("Dir", [&]() { ImGui::DragFloat3("##d", &l.direction.x, 0.01f); });
+
+						// Angles
+						ImGui::SeparatorText("Light Cone Angles");
+						float iDeg = glm::degrees(acos(l.inCosCutoff));
+						float oDeg = glm::degrees(acos(l.outCosCutoff));
+						DrawProperty("Inner", [&]() { if (ImGui::DragFloat("##i", &iDeg, 0.01f, 0.0f, oDeg,  "%.1f deg")) { l.inCosCutoff  = cosf(glm::radians(iDeg)); } });
+						DrawProperty("Outer", [&]() { if (ImGui::DragFloat("##o", &oDeg, 0.01f, iDeg, 90.0f, "%.1f deg")) { l.outCosCutoff = cosf(glm::radians(oDeg)); l.shadowCasterComponent->setFOVDeg(oDeg); } });
+
+						// Colors
+						ImGui::SeparatorText("Colors");
+						DrawProperty("Amb",  [&]() { ImGui::ColorEdit3("##a", &l.light.ambient.x); });
+						DrawProperty("Diff", [&]() { ImGui::ColorEdit3("##d", &l.light.diffuse.x); });
+						DrawProperty("Spec", [&]() { ImGui::ColorEdit3("##s", &l.light.specular.x); });
+
+						// Attenuation
+						ImGui::Spacing();
+						ImGui::Separator();
+						ImGui::Spacing();
+						ImGui::SeparatorText("Attenuation");
+						DrawProperty("Kc", [&]() { ImGui::DragFloat("##c", &l.attenuation.constant, 0.01f); });
+						DrawProperty("Kl", [&]() { ImGui::DragFloat("##l", &l.attenuation.linear, 0.001f); });
+						DrawProperty("Kq", [&]() { ImGui::DragFloat("##q", &l.attenuation.quadratic, 0.0001f); });
+
+						// Frustum
+						ImGui::SeparatorText("Frustum Planes");
+						float nearP = l.shadowCasterComponent->getNearPlane();
+						float farP  = l.shadowCasterComponent->getFarPlane();
+						DrawProperty("Near", [&]() { if (ImGui::DragFloat("##n", &nearP, 0.1f, 0.01f, 10.0f)) { l.shadowCasterComponent->setNearPlane(nearP); }});
+						DrawProperty("Far",  [&]() { if (ImGui::DragFloat("##f", &farP, 1.0f, 0.1f, 1000.0f)) { l.shadowCasterComponent->setFarPlane(farP); }});
+
+						ImGui::Spacing();
+						DrawAttenuationGraph(nearP, farP, l.attenuation);
+						ImGui::Spacing();
+					}
+					ImGui::EndChild();
+					ImGui::EndTabItem();
+				}
+				ImGui::EndTabBar();
+			}
+			ImGui::EndTabItem();
+		}
+
+		ImGui::EndTabBar();
 	}
 	ImGui::End();
 
 
-	// === SCENE CONFIGURATION PANEL =====================================================
+	/* ===== CONFIGURATION PANEL ==================================================== */
 	ImGui::SetNextWindowPos(ImVec2(screenWidth - panelWidth, toolbarHeight + inspectorHeight));
 	ImGui::SetNextWindowSize(ImVec2(panelWidth, sceneConfigurationHeight));
-	ImGui::Begin("Scene Configuration", NULL, inspectorFlags);
-
-	//if (ImGui::CollapsingHeader("Environment", ImGuiTreeNodeFlags_DefaultOpen)) {
-	//	ImGui::ColorEdit3("Ambient Color", glm::value_ptr(scene.ambientColor));
-	//	ImGui::SliderFloat("Skybox Intensity", &scene.skyboxIntensity, 0.0f, 5.0f);
-	//}
+	ImGui::Begin("Configuration", NULL, inspectorFlags);
 
 	// --Rendering Pipeline
 	if (ImGui::CollapsingHeader("Rendering Pipeline", ImGuiTreeNodeFlags_DefaultOpen)) {
 		const char* modes[] = { "Standard Diffuse", "Wireframe" };
 		static int renderMode = 0;
-		ImGui::Combo("Render Mode", &renderMode, modes, IM_ARRAYSIZE(modes));
-		switch (renderMode) {
+		DrawProperty("Mode", [&]() {
+			ImGui::Combo("##rm", &renderMode, modes, IM_ARRAYSIZE(modes));
+			switch (renderMode) {
 			case 0: renderer.setRenderMode(Render_Mode::STANDARD_DIFFUSE); break;
 			case 1: renderer.setRenderMode(Render_Mode::WIREFRAME); break;
 			default: break;
-		}
-
-		static bool checkboxPlaceholder = false;
-		ImGui::Checkbox("Enable Shadow Mapping", &checkboxPlaceholder);
+			}
+		});
 	}
+
 	// --Environment
 	if (ImGui::CollapsingHeader("Environment")) {
 		// --Skybox
@@ -228,83 +425,6 @@ ImVec2 GUI::update(float deltaTime, Camera& camera, Scene& scene, Renderer& rend
 		ImGui::TextWrapped("Expected files: right, left, top, bottom, front, back (jpg/png)");
 		ImGui::PopStyleColor();
 		ImGui::Unindent();
-
-		// --Directional light
-		ImGui::Spacing();
-		ImGui::SeparatorText("DIRECTIONAL LIGHT");
-		for (auto& dirLight : scene.getDirectionalLights()) {
-
-			ImGui::Indent();
-			ImGui::Text("Direction (World Space)");
-			ImGui::SameLine();
-			ImGui::TextDisabled("(?)");
-			if (ImGui::IsItemHovered())
-				ImGui::SetTooltip("Direction the light points toward");
-
-			glm::vec3 tempDir = dirLight->direction;
-			widgetStretch([&]() {
-				if (ImGui::DragFloat3("##Direction", glm::value_ptr(tempDir), 0.05f)) {
-					dirLight->direction = glm::normalize(tempDir);
-				}
-				});
-
-			//ImGui::Spacing();
-			ImGui::Separator();
-			//ImGui::Spacing();
-
-			ImGui::Text("Frustum (Light Space)");
-
-			std::array<float, 6> planes = dirLight->shadowCasterComponent->getPlanes();
-			bool changed = false;
-
-			if (ImGui::BeginTable("FrustumPlanes", 2, ImGuiTableFlags_SizingStretchProp)) {
-				ImGui::TableNextColumn();
-				ImGui::Text("L/R");
-				ImGui::TableNextColumn();
-				changed |= ImGui::DragFloat2("##LR", &planes[0], 0.1f);
-
-				ImGui::TableNextColumn();
-				ImGui::Text("B/T");
-				ImGui::TableNextColumn();
-				changed |= ImGui::DragFloat2("##BT", &planes[2], 0.1f);
-
-				ImGui::TableNextColumn();
-				ImGui::Text("N/F");
-				ImGui::TableNextColumn();
-				changed |= ImGui::DragFloat2("##NF", &planes[4], 0.1f);
-
-				ImGui::EndTable();
-			}
-
-			if (changed) {
-				// Validation prevents NaN matrices
-				if (planes[0] < planes[1] && planes[2] < planes[3] && planes[4] < planes[5]) {
-					dirLight->shadowCasterComponent->setFrustumPlanes(
-						planes[0], planes[1], planes[2], planes[3], planes[4], planes[5]
-					);
-				}
-				else {
-					ImGui::TextColored(ImVec4(1, 0, 0, 1), "Invalid: Min must be < Max!");
-				}
-			}
-
-			// Presets
-			ImGui::Spacing();
-			if (ImGui::Button("10m^3")) {
-				dirLight->shadowCasterComponent->setFrustumPlanes(-5, 5, -5, 5, 0.1f, 20);
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("50m^3")) {
-				dirLight->shadowCasterComponent->setFrustumPlanes(-25, 25, -25, 25, 0.1f, 50);
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("100m^2")) {
-				dirLight->shadowCasterComponent->setFrustumPlanes(-50, 50, -50, 50, 0.1f, 100);
-			}
-
-
-			ImGui::Unindent();
-		}
 	}
 
 	ImGui::End();
@@ -336,6 +456,9 @@ ImVec2 GUI::update(float deltaTime, Camera& camera, Scene& scene, Renderer& rend
 	glm::mat4 proj = camera.getProjMat(aspect);
 
 	// === GIZMO ======================================================================
+	if (ImGui::IsKeyPressed(ImGuiKey_1) && !ImGui::GetIO().WantTextInput) mCurrentGizmoOperation = ImGuizmo::TRANSLATE;
+	if (ImGui::IsKeyPressed(ImGuiKey_2) && !ImGui::GetIO().WantTextInput) mCurrentGizmoOperation = ImGuizmo::SCALE;
+	if (ImGui::IsKeyPressed(ImGuiKey_3) && !ImGui::GetIO().WantTextInput) mCurrentGizmoOperation = ImGuizmo::ROTATE;
 	if (!scene.getSelectedEnts().empty()) {
 		ImGuizmo::SetDrawlist();
 		ImGuizmo::SetRect(viewportBoundsMin.x, viewportBoundsMin.y, viewportSize.x, viewportSize.y);
@@ -387,12 +510,12 @@ ImVec2 GUI::update(float deltaTime, Camera& camera, Scene& scene, Renderer& rend
 
 	// Define axis directions in world space
 	glm::vec3 axes[] = {
-		glm::vec3(1, 0, 0),  // +X
-		glm::vec3(-1, 0, 0), // -X
-		glm::vec3(0, 1, 0),  // +Y
-		glm::vec3(0, -1, 0), // -Y
-		glm::vec3(0, 0, -1),  // -Z
-		glm::vec3(0, 0, 1) // +Z
+		glm::vec3(1, 0, 0),    // +X
+		glm::vec3(-1, 0, 0),   // -X
+		glm::vec3(0, 1, 0),    // +Y
+		glm::vec3(0, -1, 0),   // -Y
+		glm::vec3(0, 0, -1),   // -Z
+		glm::vec3(0, 0, 1)     // +Z
 	};
 
 	const char* labels[] = { "+X", "-X", "+Y", "-Y", "+Z", "-Z" };
@@ -443,17 +566,121 @@ void GUI::render() {
 	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
+// STATUS BAR
+void GUI::showStatusBar(int statusbarHeight, Camera& camera) const {
+	float screenWidth = ImGui::GetIO().DisplaySize.x;
+	float screenHeight = ImGui::GetIO().DisplaySize.y;
+
+	ImGui::SetNextWindowPos(ImVec2(0, screenHeight - statusbarHeight));
+	ImGui::SetNextWindowSize(ImVec2(screenWidth, statusbarHeight));
+
+	// Keep it tight: no padding, no scrolling
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10, 4));
+	ImGui::Begin("##StatusBar", NULL, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoScrollbar);
+
+	// Using a table with specific flags to stop the "pushing"
+	if (ImGui::BeginTable("##StatusBarTable", 2, ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_SizingFixedFit)) {
+
+		// Column 0: Stretch (Takes all available space)
+		ImGui::TableSetupColumn("##Stats", ImGuiTableColumnFlags_WidthStretch);
+		// Column 1: Fixed (Only takes what it needs)
+		ImGui::TableSetupColumn("##Device", ImGuiTableColumnFlags_WidthFixed);
+
+		ImGui::TableNextRow();
+
+		// --- LEFT COLUMN ---
+		ImGui::TableNextColumn();
+		glm::vec3 camPos = camera.getPos();
+		glm::vec3 camDir = camera.getDir();
+		// Use a more compact format to save space
+		ImGui::Text("Zoom: %.1f% | P: (%.1f, %.1f, %.1f) | D: (%.1f, %.1f)",
+			camera.getZoom(), camPos.x, camPos.y, camPos.z, camDir.x, camDir.y);
+
+		// --- RIGHT COLUMN ---
+		ImGui::TableNextColumn();
+		const char* gpuName = (const char*)glGetString(GL_RENDERER);
+		char rightText[256];
+		sprintf_s(rightText, "FPS: %.1f | %s", ImGui::GetIO().Framerate, gpuName);
+
+		// Right-align the text INSIDE this column
+		float textSize = ImGui::CalcTextSize(rightText).x;
+		float colWidth = ImGui::GetColumnWidth();
+		if (colWidth > textSize) {
+			ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (colWidth - textSize));
+		}
+
+		ImGui::TextDisabled("%s", rightText);
+
+		ImGui::EndTable();
+	}
+
+	ImGui::End();
+	ImGui::PopStyleVar();
+}
+
+/* ===== HELPERS ========================================================== */
+void GUI::DrawProperty(const char* label, std::function<void()> widget, float labelWidth) {
+	ImGui::AlignTextToFramePadding();
+	ImGui::TextUnformatted(label);
+	ImGui::SameLine(ImGui::GetWindowWidth() * labelWidth);
+	ImGui::SetNextItemWidth(-1);
+	widget();
+}
+
+void GUI::DrawAttenuationGraph(float nearP, float farP, const Attenuation& atten) {
+	ImGui::Spacing();
+	ImGui::TextDisabled("Intensity / Distance");
+
+	float samples[64];
+	float range = std::max(0.1f, farP - nearP);
+
+	for (int i = 0; i < 64; i++) {
+		float d = nearP + (static_cast<float>(i) / 63.0f) * range;
+		float denom = atten.constant + atten.linear * d + atten.quadratic * (d * d);
+		samples[i] = (denom > 0.001f) ? (1.0f / denom) : 1.0f;
+	}
+
+	float graphHeight = 80.0f;
+
+	ImGui::BeginGroup();
+	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 2.0f);
+	ImGui::TextDisabled("1.0");
+	ImGui::Dummy(ImVec2(0, graphHeight - 32.0f));
+	ImGui::TextDisabled("0.0");
+	ImGui::EndGroup();
+
+	ImGui::SameLine();
+
+	ImGui::BeginGroup();
+	ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.10f, 0.10f, 0.12f, 1.00f));
+	ImGui::PushStyleColor(ImGuiCol_PlotLines, ImVec4(0.44f, 0.22f, 1.00f, 1.00f));
+
+	ImGui::PlotLines("##AttenGraph", samples, 64, 0, nullptr, 0.0f, 1.0f, ImVec2(-FLT_MIN, graphHeight));
+
+	ImGui::PopStyleColor(2);
+
+	ImGui::TextDisabled("%.1f", nearP);
+	ImGui::SameLine();
+
+	float avail = ImGui::GetContentRegionAvail().x;
+	ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (avail / 2.0f) - 30.0f);
+
+	ImGui::SameLine(ImGui::GetWindowWidth() - 75.0f);
+	ImGui::TextDisabled("%.1f", farP);
+	ImGui::EndGroup();
+}
+
 void GUI::setPurpleTheme() const {
-	// Grab the current style
 	auto& style = ImGui::GetStyle();
+	style.TabRounding = 0.0f;
 	ImVec4* colors = style.Colors;
 
 	// --Palette
-	ImVec4 purple = ImVec4(0.44f, 0.22f, 1.00f, 1.00f);
-	ImVec4 lightPurple = ImVec4(0.54f, 0.36f, 1.00f, 1.00f);
-	ImVec4 darkPurple = ImVec4(0.35f, 0.15f, 0.80f, 1.00f);
-	ImVec4 darkBg = ImVec4(0.15f, 0.15f, 0.18f, 1.00f);
-	ImVec4 darkerBg = ImVec4(0.10f, 0.10f, 0.12f, 1.00f);
+	ImVec4 purple       = ImVec4(0.44f, 0.22f, 1.00f, 1.00f);
+	ImVec4 lightPurple  = ImVec4(0.54f, 0.36f, 1.00f, 1.00f);
+	ImVec4 darkPurple   = ImVec4(0.35f, 0.15f, 0.80f, 1.00f);
+	ImVec4 darkBg       = ImVec4(0.15f, 0.15f, 0.18f, 1.00f);
+	ImVec4 darkerBg     = ImVec4(0.10f, 0.10f, 0.12f, 1.00f);
 	ImVec4 peanutYellow = ImVec4(1.00f, 0.84f, 0.30f, 1.00f);
 
 	// --Applying palette
@@ -496,36 +723,14 @@ void GUI::setPurpleTheme() const {
 	colors[ImGuiCol_ScrollbarBg] = darkBg;
 	colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.30f, 0.30f, 0.32f, 1.00f);
 
-	// Text (usually left white/near-white)
+	// Text
 	colors[ImGuiCol_Text] = ImVec4(0.90f, 0.90f, 0.90f, 1.00f);
 	colors[ImGuiCol_TextDisabled] = peanutYellow;
-}
 
-// STATUS BAR
-void GUI::showStatusBar(int statusbarHeight, Camera& camera) const{
-	float width = ImGui::GetIO().DisplaySize.x;
-	float height = ImGui::GetIO().DisplaySize.y;
-	ImGui::SetNextWindowPos(ImVec2(0, height - statusbarHeight));
-	ImGui::SetNextWindowSize(ImVec2(width, statusbarHeight));
-	ImGui::Begin("##StatusBar", NULL, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoInputs);
-	float camZoom = camera.getZoom();
-	glm::vec3 camPos = camera.getPos();
-	glm::vec3 camDir = camera.getDir();
-	ImGui::Text("v0.2 | FPS: %.1f | Zoom: %.1f | P(%.1f, %.1f, %.1f) D(%.1f, %.1f, %.1f)",
-		ImGui::GetIO().Framerate, camera.getZoom(), camPos.x, camPos.y, camPos.z, camDir.x, camDir.y, camDir.z);
-
-	//ImGui::SameLine();
-	//ImGui::Text("cam(x/y/z): ");
-	//ImGui::SameLine();
-	//ImGui::DragFloat3("##CamPos", glm::value_ptr(camera.position), 0.1f);
-	//ImGui::SameLine();
-	//ImGui::Text("cam(p/y): ");
-	//ImGui::SameLine();
-	//float pitchYaw[2] = { camera.pitch, camera.yaw };
-	//if (ImGui::DragFloat2("##Cam", pitchYaw, 0.1f)) {
-	//	camera.setPitchYaw(pitchYaw[0], pitchYaw[1]);
-	//}
-
-
-	ImGui::End();
+	// Tabs
+	colors[ImGuiCol_Tab] = ImVec4(0.15f, 0.15f, 0.18f, 1.00f);
+	colors[ImGuiCol_TabHovered] = lightPurple;
+	colors[ImGuiCol_TabActive] = purple;
+	colors[ImGuiCol_TabUnfocused] = darkerBg;
+	colors[ImGuiCol_TabUnfocusedActive] = ImVec4(0.20f, 0.20f, 0.22f, 1.00f);
 }

@@ -22,7 +22,7 @@ ShadowCasterComponent::ShadowCasterComponent(const glm::vec2& i_shadowMapRes, Sh
 ShadowCasterComponent::ShadowCasterComponent(const glm::vec2& i_shadowMapRes, Shadow_Map_Projection i_projectionType, float i_outCosCutoff, float i_width, float i_height, float i_nearPlane, float i_farPlane)
 	: m_shadowMapResolution(i_shadowMapRes)
 	, m_projType(i_projectionType)
-	, m_fov(glm::degrees(acos(glm::clamp(i_outCosCutoff, -1.0f, 1.0f)) * 2.0f + glm::radians(2.0f)))
+	, m_fov(glm::degrees(acos(glm::clamp(i_outCosCutoff, -1.0f, 1.0f)) * 2.0f) + 2.0f)
 	, m_planeWidth(i_width)
 	, m_planeHeight(i_height)
 	, m_nearPlane(i_nearPlane)
@@ -217,6 +217,7 @@ void ShadowCasterComponent::genOmniShadowMap(bool linearFilter) {
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+
 
 	// *** FLAGS ***
 	_isDirty = false;

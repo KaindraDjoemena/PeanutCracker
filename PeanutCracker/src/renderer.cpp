@@ -1,5 +1,9 @@
 #include "headers/renderer.h"
 
+void Renderer::initScene(Scene& scene) {
+	scene.init();
+}
+
 void Renderer::update(Scene& scene, Camera& cam, int vWidth, int vHeight) {
 	if (m_viewportFBO.fbo == 0) {
 		m_viewportFBO.setup(vWidth, vHeight);
@@ -26,6 +30,9 @@ void Renderer::renderScene(const Scene& scene, const Camera& cam, int vWidth, in
 	renderLightPass(scene, cam, vWidth, vHeight);
 
 	renderSelectionHightlight(scene);
+
+	m_viewportFBO.resolve();
+	m_viewportFBO.unbind();
 }
 
 void Renderer::renderShadowPass(const Scene& scene, const Camera& cam) const {
@@ -96,7 +103,6 @@ void Renderer::renderLightPass(const Scene& scene, const Camera& cam, int vWidth
 
 	glActiveTexture(GL_TEXTURE0);
 	// --Rendering the final scene
-	glDisable(GL_STENCIL_TEST);
 	renderSkybox(scene.getSkybox());
 
 
@@ -198,6 +204,7 @@ void Renderer::renderSelectionHightlight(const Scene& scene) const {
 	}
 
 	// OPENGL STATE CLEANUP
+	glDisable(GL_STENCIL_TEST);
 	glEnable(GL_DEPTH_TEST);
 	glDisable(GL_STENCIL_TEST);
 	glStencilMask(0xFF);
