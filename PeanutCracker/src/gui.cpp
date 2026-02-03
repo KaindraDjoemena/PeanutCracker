@@ -393,12 +393,12 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
 
 	// --Rendering Pipeline
 	if (ImGui::CollapsingHeader("Rendering Pipeline", ImGuiTreeNodeFlags_DefaultOpen)) {
-		const char* modes[] = { "Standard Diffuse", "Wireframe" };
+		const char* modes[] = { "Blinn-Phong", "Wireframe" };
 		static int renderMode = 0;
 		DrawProperty("Mode", [&]() {
 			ImGui::Combo("##rm", &renderMode, modes, IM_ARRAYSIZE(modes));
 			switch (renderMode) {
-			case 0: renderer.setRenderMode(Render_Mode::STANDARD_DIFFUSE); break;
+			case 0: renderer.setRenderMode(Render_Mode::BLINN_PHONG); break;
 			case 1: renderer.setRenderMode(Render_Mode::WIREFRAME); break;
 			default: break;
 			}

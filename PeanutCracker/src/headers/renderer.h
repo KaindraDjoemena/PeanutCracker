@@ -8,7 +8,7 @@
 #include "cubemap.h"
 
 enum class Render_Mode {
-	STANDARD_DIFFUSE,
+	BLINN_PHONG,
 	WIREFRAME
 };
 
@@ -105,7 +105,7 @@ public:
 	void setShadowMode(bool usingShadowMap)    { _usingShadowMap = usingShadowMap; }
 
 private:
-	Render_Mode _renderMode     = Render_Mode::STANDARD_DIFFUSE;
+	Render_Mode _renderMode     = Render_Mode::BLINN_PHONG;
 	bool        _usingShadowMap = true;
 
 	Framebuffer m_viewportFBO;
