@@ -21,7 +21,6 @@
 
 const unsigned int MAX_LIGHTS = 8;
 
-
 class Scene {
 public:
 	Scene(AssetManager* i_assetManager);
@@ -107,6 +106,13 @@ public:
 
 private:
 	AssetManager* m_assetManager;
+
+	enum Texture_Slot {
+		DIR_SHADOW_MAP_SLOT = 10,
+		POINT_SHADOW_MAP_SLOT = 20,
+		SPOT_SHADOW_MAP_SLOT = 30,
+		IRRADIANCE_MAP_SLOT = 40
+	};
 
 	// BINDING POINT ENUM
 	enum Binding_Point {

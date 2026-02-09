@@ -26,9 +26,9 @@
 Scene::Scene(AssetManager* i_assetManager) : m_assetManager(i_assetManager) {
 	m_worldNode = std::make_unique<SceneNode>("Root");
 
-	m_dirDepthShader    = m_assetManager->loadShaderObject("dirDepth.vert", "dirDepth.frag");
-	m_omniDepthShader   = m_assetManager->loadShaderObject("omniDepth.vert", "omniDepth.frag", "omniDepth.geom");
-	m_outlineShader     = m_assetManager->loadShaderObject("outline.vert", "outline.frag");
+	m_dirDepthShader = m_assetManager->loadShaderObject("dirDepth.vert", "dirDepth.frag");
+	m_omniDepthShader = m_assetManager->loadShaderObject("omniDepth.vert", "omniDepth.frag", "omniDepth.geom");
+	m_outlineShader = m_assetManager->loadShaderObject("outline.vert", "outline.frag");
 	m_postProcessShader = m_assetManager->loadShaderObject("postprocess.vert", "postprocess.frag");
 }
 //Scene::Scene(const Scene&) = delete;
@@ -73,7 +73,7 @@ void Scene::deleteSelectedEntities() {
 		siblings.erase(
 			std::remove_if(siblings.begin(), siblings.end(), [node](const std::unique_ptr<SceneNode>& child) {
 				return child.get() == node;
-			}),
+				}),
 			siblings.end()
 		);
 	}
@@ -182,7 +182,7 @@ void Scene::createAndAddSpotLight(std::unique_ptr<SpotLight> light) {
 	numSpotLights++;
 }
 void Scene::createAndAddSkyboxHDR(const std::string& path) {
-	std::shared_ptr<Shader> skyboxShader = m_assetManager->loadShaderObject("skybox.vert", "rereskybox.frag");
+	std::shared_ptr<Shader> skyboxShader = m_assetManager->loadShaderObject("skybox.vert", "skybox.frag");
 	std::shared_ptr<Shader> conversionShader = m_assetManager->loadShaderObject("equirectToUnitCube.vert", "equirectToUnitCube.frag");
 	std::shared_ptr<Shader> convolutionShader = m_assetManager->loadShaderObject("cubemapConvolution.vert", "cubemapConvolution.frag");
 	auto m_skyboxPtr = std::make_unique<Cubemap>(path, skyboxShader.get(), convolutionShader.get(), *conversionShader);
@@ -339,7 +339,7 @@ void Scene::renderRecursive(const Camera& camera, SceneNode* node) const {
 // --For the shadow map
 void Scene::renderShadowRecursive(const SceneNode* node, const Shader& depthShader) const {
 	if (!node) return;
-	
+
 	if (node->object) {
 		node->object->drawShadow(node->worldMatrix, depthShader);
 	}
@@ -516,28 +516,28 @@ void Scene::bindDepthMaps() const {
 	// --Directinoal lights
 	for (size_t i = 0; i < m_directionalLights.size() && i < MAX_LIGHTS; ++i) {
 		if (m_directionalLights[i]->shadowCasterComponent) {
-			glActiveTexture(GL_TEXTURE0 + 10 + i);
+			glActiveTexture(GL_TEXTURE0 + DIR_SHADOW_MAP_SLOT + i);
 			glBindTexture(GL_TEXTURE_2D, m_directionalLights[i]->shadowCasterComponent->getDepthMapTexID());
 		}
 	}
 	// --Point lights
 	for (size_t i = 0; i < m_pointLights.size() && i < MAX_LIGHTS; ++i) {
 		if (m_pointLights[i]->shadowCasterComponent) {
-			glActiveTexture(GL_TEXTURE0 + 20 + i);
+			glActiveTexture(GL_TEXTURE0 + POINT_SHADOW_MAP_SLOT + i);
 			glBindTexture(GL_TEXTURE_CUBE_MAP, m_pointLights[i]->shadowCasterComponent->getDepthMapTexID());
 		}
 	}
 	// --Spot lights
 	for (size_t i = 0; i < m_spotLights.size() && i < MAX_LIGHTS; ++i) {
 		if (m_spotLights[i]->shadowCasterComponent) {
-			glActiveTexture(GL_TEXTURE0 + 30 + i);
+			glActiveTexture(GL_TEXTURE0 + POINT_SHADOW_MAP_SLOT + i);
 			glBindTexture(GL_TEXTURE_2D, m_spotLights[i]->shadowCasterComponent->getDepthMapTexID());
 		}
 	}
 }
 void Scene::bindIBLMaps() const {
 	if (m_skybox) {
-		glActiveTexture(GL_TEXTURE0 + 40);
+		glActiveTexture(GL_TEXTURE0 + IRRADIANCE_MAP_SLOT);
 		glBindTexture(GL_TEXTURE_CUBE_MAP, m_skybox->getIrradianceMapID());
 	}
 }
@@ -647,11 +647,11 @@ void Scene::setNodeShadowMapUniforms(const SceneNode* node) const {
 		node->object->shaderPtr->use();
 		for (size_t i = 0; i < m_directionalLights.size(); ++i) {
 			std::string uniformName = "DirectionalShadowMap[" + std::to_string(i) + "]";
-			node->object->shaderPtr->setInt(uniformName, 10 + i);
+			node->object->shaderPtr->setInt(uniformName, DIR_SHADOW_MAP_SLOT + i);
 		}
 		for (size_t i = 0; i < m_pointLights.size(); ++i) {
 			std::string uniformName = "PointShadowMap[" + std::to_string(i) + "]";
-			node->object->shaderPtr->setInt(uniformName, 20 + i);
+			node->object->shaderPtr->setInt(uniformName, POINT_SHADOW_MAP_SLOT + i);
 
 			float farPlane = m_pointLights[i]->shadowCasterComponent->getFarPlane();
 			if (farPlane <= 0.0f) {
@@ -661,7 +661,7 @@ void Scene::setNodeShadowMapUniforms(const SceneNode* node) const {
 		}
 		for (size_t i = 0; i < m_spotLights.size(); ++i) {
 			std::string uniformName = "SpotShadowMap[" + std::to_string(i) + "]";
-			node->object->shaderPtr->setInt(uniformName, 30 + i);
+			node->object->shaderPtr->setInt(uniformName, SPOT_SHADOW_MAP_SLOT + i);
 		}
 	}
 
@@ -674,9 +674,7 @@ void Scene::setNodeIBLMapUniforms(const SceneNode* node) const {
 	if (node->object && node->object->shaderPtr && m_skybox) {
 		node->object->shaderPtr->use();
 
-		int irradianceMapTexSlot = 40;		// TODO: ENUMS FOR THE TEXTURE SLOTS
-
-		node->object->shaderPtr->setInt("irradianceMap", irradianceMapTexSlot);
+		node->object->shaderPtr->setInt("irradianceMap", IRRADIANCE_MAP_SLOT);
 	}
 
 	for (auto& child : node->children) {

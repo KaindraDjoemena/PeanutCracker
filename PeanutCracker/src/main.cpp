@@ -173,10 +173,8 @@ int main() {
 		glViewport(0, 0, (int)vSize.x, (int)vSize.y);
 
 		shaderTimer += deltaTime;
-		if (shaderTimer >= 0.5f) { // Every half-second
-			if (glfwGetWindowAttrib(window, GLFW_FOCUSED)) {
-				assetManagerPtr->reloadShaders();
-			}
+		if (shaderTimer >= 1.0f) { // Every half-second
+			assetManagerPtr->reloadShaders();
 			shaderTimer = 0.0f;
 		}
 

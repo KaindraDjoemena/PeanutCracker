@@ -134,7 +134,7 @@ void main() {
     
     vec3 irradiance = texture(irradianceMap, norm).rgb;
     vec3 diffuse    = irradiance * albedo;
-    vec3 ambient    = (kD * diffuse) * ao; 
+    vec3 ambient    = (kD * diffuse) * ao;
 
     // Final color
     vec3 color = ambient + directLighting;
