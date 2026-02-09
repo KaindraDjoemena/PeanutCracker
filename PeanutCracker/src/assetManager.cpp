@@ -15,116 +15,88 @@
 AssetManager::AssetManager() = default;
 
 std::shared_ptr<Shader> AssetManager::loadShaderObject(const std::filesystem::path& vertPath, const std::filesystem::path& fragPath) {
-	std::string compositeKey = vertPath.string() + "|" + fragPath.string();
-	
-	auto cacheIt = shaderCache.find(compositeKey);
-	if (cacheIt != shaderCache.end()) {
-		auto currentVertTime = std::filesystem::last_write_time(vertPath);
-		auto currentFragTime = std::filesystem::last_write_time(fragPath);
-	
-		if (currentVertTime == cacheIt->second.vertLastModified &&
-			currentFragTime == cacheIt->second.fragLastModified) {
-			return cacheIt->second.shader;
-		}
-	
-		std::cout << "[AssetManager] Reloading modified shader: " << compositeKey << '\n';
-		shaderCache.erase(cacheIt);
-	}
-	
-	// Load new or modified shader
-	try {
-		auto newShaderObject = std::make_shared<Shader>(vertPath, fragPath);
-	
-		CachedShader cached;
-		cached.shader = newShaderObject;
-		cached.vertLastModified = std::filesystem::last_write_time(vertPath);
-		cached.fragLastModified = std::filesystem::last_write_time(fragPath);
-	
-		shaderCache[compositeKey] = cached;
-		return newShaderObject;
-	}
-	catch (const std::exception& e) {
-		std::cerr << "[AssetManager] Failed to load shader: " << e.what() << '\n';
-	
-		if (cacheIt != shaderCache.end()) {
-			std::cout << "[AssetManager] Keeping old cached version due to compile error" << '\n';
-			return cacheIt->second.shader;
-		}
-		return nullptr;
-	}
-}
-std::shared_ptr<Shader> AssetManager::loadShaderObject(const std::filesystem::path& vertPath, const std::filesystem::path& geomPath, const std::filesystem::path& fragPath) {
-	std::string compositeKey = vertPath.string() + "|" + geomPath.string() + "|" + fragPath.string();
-	
-	auto cacheIt = shaderCache.find(compositeKey);
-	if (cacheIt != shaderCache.end()) {
-		auto currentVertTime = std::filesystem::last_write_time(vertPath);
-		auto currentGeomTime = std::filesystem::last_write_time(geomPath);
-		auto currentFragTime = std::filesystem::last_write_time(fragPath);
-	
-		if (currentVertTime == cacheIt->second.vertLastModified &&
-			currentGeomTime == cacheIt->second.geomLastModified &&
-			currentFragTime == cacheIt->second.fragLastModified) {
-			return cacheIt->second.shader;
-		}
-	
-		std::cout << "[AssetManager] Reloading modified shader: " << compositeKey << '\n';
-		shaderCache.erase(cacheIt);
-	}
-	
-	// Load new or modified shader
-	try {
-		auto newShaderObject = std::make_shared<Shader>(vertPath, geomPath, fragPath);
-	
-		CachedShader cached;
-		cached.shader = newShaderObject;
-		cached.vertLastModified = std::filesystem::last_write_time(vertPath);
-		cached.geomLastModified = std::filesystem::last_write_time(geomPath);
-		cached.fragLastModified = std::filesystem::last_write_time(fragPath);
-	
-		shaderCache[compositeKey] = cached;
-		return newShaderObject;
-	}
-	catch (const std::exception& e) {
-		std::cerr << "[AssetManager] Failed to load shader: " << e.what() << '\n';
-	
-		if (cacheIt != shaderCache.end()) {
-			std::cout << "[AssetManager] Keeping old cached version due to compile error" << '\n';
-			return cacheIt->second.shader;
-		}
-		return nullptr;
-	}
+    std::string compositeKey = vertPath.string() + "|" + fragPath.string();
+    if (shaderCache.find(compositeKey) != shaderCache.end()) {
+        return shaderCache[compositeKey].shader;
+    }
+
+    auto newShaderObject = std::make_shared<Shader>(vertPath, fragPath);
+
+    auto fullV = std::filesystem::path(SHADER_DIR) / vertPath;
+    auto fullF = std::filesystem::path(SHADER_DIR) / fragPath;
+
+    CachedShader cached;
+    cached.shader = newShaderObject;
+    cached.vertPath = vertPath;
+    cached.fragPath = fragPath;
+    cached.hasGeom = false;
+    cached.vertLastModified = std::filesystem::last_write_time(fullV);
+    cached.fragLastModified = std::filesystem::last_write_time(fullF);
+
+    shaderCache[compositeKey] = cached;
+
+    return newShaderObject;
 }
 
-// Force reload shader object
-void AssetManager::reloadShader(const std::filesystem::path& vertPath, const std::filesystem::path& fragPath) {
-	std::string compositeKey = vertPath.string() + "|" + fragPath.string();
+std::shared_ptr<Shader> AssetManager::loadShaderObject(const std::filesystem::path& vertPath, const std::filesystem::path& fragPath, const std::filesystem::path& geomPath) {
+	auto newShaderObject = std::make_shared<Shader>(vertPath, fragPath, geomPath);
 
-	auto cacheIt = shaderCache.find(compositeKey);
-
-	try {
-		auto newShader = std::make_shared<Shader>(vertPath, fragPath);
-
-		if (cacheIt != shaderCache.end()) {
-			std::cout << "[AssetManager] Hot-reloaded shader: " << compositeKey << '\n';
-		}
-
-		CachedShader cached;
-		cached.shader = newShader;
-		cached.vertLastModified = std::filesystem::last_write_time(vertPath);
-		cached.fragLastModified = std::filesystem::last_write_time(fragPath);
-		shaderCache[compositeKey] = cached;
-
+	std::string compositeKey = vertPath.string() + "|" + fragPath.string() + "|" + geomPath.string();
+	if (shaderCache.find(compositeKey) != shaderCache.end()) {
+		return shaderCache[compositeKey].shader;
 	}
-	catch (const std::exception& e) {
-		std::cerr << "[AssetManager] Hot-reload failed: " << e.what() << '\n';
-	}
+
+	auto fullV = std::filesystem::path(SHADER_DIR) / vertPath;
+	auto fullF = std::filesystem::path(SHADER_DIR) / fragPath;
+	auto fullG = std::filesystem::path(SHADER_DIR) / geomPath;
+
+	CachedShader cached;
+	cached.shader = newShaderObject;
+	cached.vertPath = vertPath;
+	cached.fragPath = fragPath;
+	cached.geomPath = geomPath;
+	cached.hasGeom = true;
+	cached.vertLastModified = std::filesystem::last_write_time(fullV);
+	cached.fragLastModified = std::filesystem::last_write_time(fullF);
+	cached.geomLastModified = std::filesystem::last_write_time(fullG);
+
+	shaderCache[compositeKey] = cached;
+
+	return newShaderObject;
 }
 
-// Clear shader cache
-void AssetManager::clearShaderCache() {
-	shaderCache.clear();
-	std::cout << "[AssetManager] Shader cache cleared" << '\n';
+void AssetManager::reloadShaders() {
+    for (auto& [key, cached] : shaderCache) {
+        auto fullV = std::filesystem::path(SHADER_DIR) / cached.vertPath;
+        auto fullF = std::filesystem::path(SHADER_DIR) / cached.fragPath;
+
+        try {
+            auto curVTime = std::filesystem::last_write_time(fullV);
+            auto curFTime = std::filesystem::last_write_time(fullF);
+
+            bool changed = (curVTime != cached.vertLastModified || curFTime != cached.fragLastModified);
+
+            std::filesystem::file_time_type curGTime;
+            std::filesystem::path fullG = "";
+
+            if (cached.hasGeom) {
+                fullG = std::filesystem::path(SHADER_DIR) / cached.geomPath;
+                curGTime = std::filesystem::last_write_time(fullG);
+                if (curGTime != cached.geomLastModified) changed = true;
+            }
+
+            if (changed) {
+                cached.shader->reload(fullV, fullF, fullG);
+
+                cached.vertLastModified = curVTime;
+                cached.fragLastModified = curFTime;
+                if (cached.hasGeom) cached.geomLastModified = curGTime;
+            }
+        }
+        catch (const std::filesystem::filesystem_error& e) {
+            std::cout << "[AssetManager] Skipping reload, file busy..." << std::endl;
+        }
+    }
 }
 
 std::shared_ptr<Model> AssetManager::loadModel(const std::string& path) {

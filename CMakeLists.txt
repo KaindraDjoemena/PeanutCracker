@@ -70,10 +70,6 @@ target_include_directories(PeanutCracker PRIVATE
     "PeanutCracker/dependencies/assimp/include"
 )
 
-# Asset copying
-add_custom_command(TARGET PeanutCracker POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory 
-        "${CMAKE_SOURCE_DIR}/PeanutCracker/defaultshaders" 
-        "$<TARGET_FILE_DIR:PeanutCracker>/defaultshaders"
-    COMMENT "Copying defaultshaders assets"
+target_compile_definitions(PeanutCracker PRIVATE 
+    SHADER_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/PeanutCracker/defaultshaders/\"
 )

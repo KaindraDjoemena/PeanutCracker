@@ -16,6 +16,7 @@ struct Framebuffer {
 	unsigned int fbo = 0, texture = 0, rbo = 0;
 
 	unsigned int resolveFbo = 0, resolveTexture = 0;
+	unsigned int screenFbo = 0, screenTexture = 0;
 	int samples = 4;
 
 	int width = 0, height = 0;
@@ -37,6 +38,9 @@ struct Framebuffer {
 
 		glGenFramebuffers(1, &resolveFbo);
 		glGenTextures(1, &resolveTexture);
+
+		glGenFramebuffers(1, &screenFbo);
+		glGenTextures(1, &screenTexture);
 
 		rescale(w, h);
 	}
@@ -71,6 +75,13 @@ struct Framebuffer {
 		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 			std::cerr << "ERROR: Resolve FBO incomplete\n";
 
+		glBindTexture(GL_TEXTURE_2D, screenTexture);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glBindFramebuffer(GL_FRAMEBUFFER, screenFbo);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, screenTexture, 0);
+
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}
 
@@ -78,7 +89,6 @@ struct Framebuffer {
 		glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo);
 		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, resolveFbo);
 		glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	}
 
 	void cleanUp() {
@@ -87,6 +97,8 @@ struct Framebuffer {
 		if (rbo) glDeleteRenderbuffers(1, &rbo);
 		if (resolveFbo) glDeleteFramebuffers(1, &resolveFbo);
 		if (resolveTexture) glDeleteTextures(1, &resolveTexture);
+		if (screenFbo) glDeleteFramebuffers(1, &screenFbo);
+		if (screenTexture) glDeleteTextures(1, &screenTexture);
 		fbo = texture = rbo = resolveFbo = resolveTexture = 0;
 	}
 
@@ -117,6 +129,13 @@ private:
 
 	Framebuffer m_viewportFBO;
 
+	// Post-processing
+	VAO m_quadVAO;
+	VBO m_quadVBO;
+	float m_exposure = 1.0f;
+
+	void setupPostProcessQuad();
+	void renderPostProcess(const Scene& scene, int vWidth, int vHeight) const;
 
 	void renderShadowPass(const Scene& scene, const Camera& cam) const;
 	void renderLightPass(const Scene& scene, const Camera& cam, int vWidth, int vHeight) const;

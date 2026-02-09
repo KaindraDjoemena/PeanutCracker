@@ -25,9 +25,11 @@
 
 Scene::Scene(AssetManager* i_assetManager) : m_assetManager(i_assetManager) {
 	m_worldNode = std::make_unique<SceneNode>("Root");
-	m_dirDepthShader  = m_assetManager->loadShaderObject("defaultshaders/dirDepth.vert", "defaultshaders/dirDepth.frag");
-	m_omniDepthShader = m_assetManager->loadShaderObject("defaultshaders/omniDepth.vert", "defaultshaders/omniDepth.geom", "defaultshaders/omniDepth.frag");
-	m_outlineShader = m_assetManager->loadShaderObject("defaultshaders/outline.vert", "defaultshaders/outline.frag");
+
+	m_dirDepthShader    = m_assetManager->loadShaderObject("dirDepth.vert", "dirDepth.frag");
+	m_omniDepthShader   = m_assetManager->loadShaderObject("omniDepth.vert", "omniDepth.frag", "omniDepth.geom");
+	m_outlineShader     = m_assetManager->loadShaderObject("outline.vert", "outline.frag");
+	m_postProcessShader = m_assetManager->loadShaderObject("postprocess.vert", "postprocess.frag");
 }
 //Scene::Scene(const Scene&) = delete;
 //Scene::Scene& operator = (const Scene&) = delete;
@@ -136,8 +138,8 @@ void Scene::processLoadQueue() {
 	for (const auto& path : loadQueue) {
 		createAndAddObject(
 			path.string(),
-			"defaultshaders/model.vert",
-			"defaultshaders/colll.frag"
+			"model.vert",
+			"model.frag"
 		);
 	}
 	loadQueue.clear();
@@ -180,9 +182,9 @@ void Scene::createAndAddSpotLight(std::unique_ptr<SpotLight> light) {
 	numSpotLights++;
 }
 void Scene::createAndAddSkyboxHDR(const std::string& path) {
-	std::shared_ptr<Shader> skyboxShader = m_assetManager->loadShaderObject("defaultshaders/skybox.vert", "defaultshaders/skybox.frag");
-	std::shared_ptr<Shader> conversionShader = m_assetManager->loadShaderObject("defaultshaders/equirectToUnitCube.vert", "defaultshaders/equirectToUnitCube.frag");
-	std::shared_ptr<Shader> convolutionShader = m_assetManager->loadShaderObject("defaultshaders/cubemapConvolution.vert", "defaultshaders/cubemapConvolution.frag");
+	std::shared_ptr<Shader> skyboxShader = m_assetManager->loadShaderObject("skybox.vert", "rereskybox.frag");
+	std::shared_ptr<Shader> conversionShader = m_assetManager->loadShaderObject("equirectToUnitCube.vert", "equirectToUnitCube.frag");
+	std::shared_ptr<Shader> convolutionShader = m_assetManager->loadShaderObject("cubemapConvolution.vert", "cubemapConvolution.frag");
 	auto m_skyboxPtr = std::make_unique<Cubemap>(path, skyboxShader.get(), convolutionShader.get(), *conversionShader);
 
 	setupSkyboxShaderUBOs(skyboxShader.get());
@@ -442,8 +444,8 @@ void Scene::initLightFrustumDebug() {
 	m_lightFrustumVAO.unbind();
 
 	m_frustumShader = m_assetManager->loadShaderObject(
-		"defaultshaders/lightFrustum.vert",
-		"defaultshaders/lightFrustum.frag"
+		"lightFrustum.vert",
+		"lightFrustum.frag"
 	);
 }
 void Scene::drawDirectionalLightFrustums(const glm::mat4& projMat, const glm::mat4& viewMat, const glm::vec4& color, float lineWidth) const {
@@ -742,7 +744,7 @@ void Scene::initDebugAABBDrawing() {
 	m_debugVAO.linkAttrib(m_debugVBO, 0, 3, GL_FLOAT, 3 * sizeof(float), (void*)0);
 	m_debugVAO.unbind();
 
-	m_debugShader = m_assetManager->loadShaderObject("defaultshaders/debug.vert", "defaultshaders/debug.frag");
+	m_debugShader = m_assetManager->loadShaderObject("debug.vert", "debug.frag");
 }
 void Scene::drawDebugAABBs(SceneNode* node) const {
 	if (!m_debugShader) return;

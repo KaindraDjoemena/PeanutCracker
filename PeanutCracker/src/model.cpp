@@ -212,8 +212,6 @@ std::vector<Texture> Model::loadMaterialTextures(aiMaterial* mat, const aiScene*
 			std::cout << "[MODEL] Creating solid color texture: ("
 				<< color.r << ", " << color.g << ", " << color.b << ")" << std::endl;
 
-			// Convert from linear to sRGB (apply gamma encoding)
-			// because shader expects sRGB and will decode it
 			float sR = std::pow(color.r, 1.0f / 2.2f);
 			float sG = std::pow(color.g, 1.0f / 2.2f);
 			float sB = std::pow(color.b, 1.0f / 2.2f);

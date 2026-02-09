@@ -49,7 +49,6 @@ void Cubemap::draw() const {
 
 	glDepthFunc(GL_LEQUAL);
 
-	//std::cout << "[CUBEMAP] drawing cubemap" << std::endl;
 	vao.bind();
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, m_envCubemapTexID);

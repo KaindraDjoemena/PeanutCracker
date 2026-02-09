@@ -36,6 +36,7 @@ public:
 	const Shader& getDirDepthShader() const { return *m_dirDepthShader; }
 	const Shader& getOmniDepthShader() const { return *m_omniDepthShader; }
 	const Shader& getOutlineShader() const { return *m_outlineShader; }
+	const Shader& getPostProcessShader() const { return *m_postProcessShader; }
 
 	const std::vector<std::unique_ptr<DirectionalLight>>& getDirectionalLights() const { return m_directionalLights; }
 	const std::vector<std::unique_ptr<PointLight>>& getPointLights() const { return m_pointLights; }
@@ -193,6 +194,7 @@ private:
 	std::shared_ptr<Shader> m_dirDepthShader;
 	std::shared_ptr<Shader> m_omniDepthShader;
 	std::shared_ptr<Shader> m_outlineShader;
+	std::shared_ptr<Shader> m_postProcessShader;
 
 	VAO m_debugVAO;
 	VBO m_debugVBO;

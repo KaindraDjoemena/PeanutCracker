@@ -12,12 +12,14 @@ public:
 	unsigned int ID;
 
 	Shader(const std::filesystem::path& vertexPath, const std::filesystem::path& fragmentPath);
-	Shader(const std::filesystem::path& vertexPath, const std::filesystem::path& geomPath, const std::filesystem::path& fragmentPath);
+	Shader(const std::filesystem::path& vertexPath, const std::filesystem::path& fragmentPath, const std::filesystem::path& geometryPath);
 
 	~Shader();
 
 	Shader(const Shader&) = delete;
 	Shader& operator = (const Shader&) = delete;
+
+	void Shader::reload(const std::filesystem::path& vPath, const std::filesystem::path& fPath, const std::filesystem::path& gPath = "");
 
 	// Using the program
 	void use() const;
@@ -42,9 +44,7 @@ private:
 	int getUniformLocation(const std::string& name) const;
 
 	// SHADER PROGRAM COMPILATION
-	void compile(const char* vShaderCode, const char* fShaderCode);
-	void compile(const char* vShaderCode, const char* gShaderCode, const char* fShaderCode);
+	unsigned int compile(const char* vShaderCode, const char* fShaderCode, const char* gShaderCode = nullptr);
 
-	void checkCompileErrors(unsigned int shaderOrProgram, std::string type);
-
+	unsigned int checkCompileErrors(unsigned int shaderOrProgram, std::string type);
 };

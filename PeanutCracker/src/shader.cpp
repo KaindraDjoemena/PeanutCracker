@@ -13,39 +13,66 @@
 
 
 Shader::Shader(const std::filesystem::path& vertexPath, const std::filesystem::path& fragmentPath) {
-	std::cout << "[SHADER] opening shader file at: " << vertexPath << '\n';
-	std::cout << "[SHADER] opening shader file at: " << fragmentPath << '\n';
+	std::filesystem::path vPath = std::filesystem::path(SHADER_DIR) / vertexPath;
+	std::filesystem::path fPath = std::filesystem::path(SHADER_DIR) / fragmentPath;
 
-	std::string vertexCode = readFile(vertexPath);
-	std::string fragmentCode = readFile(fragmentPath);
+	std::cout << "[SHADER] opening shader file at: " << vPath.string() << '\n';
+	std::cout << "[SHADER] opening shader file at: " << fPath.string() << '\n';
+
+	std::string vertexCode   = readFile(vPath);
+	std::string fragmentCode = readFile(fPath);
 
 	if (vertexCode.empty() || fragmentCode.empty()) {
 		std::cerr << "ERROR::SHADER::SOURCE_EMPTY" << '\n';
 		throw std::runtime_error("Empty shader source file detected");
 	}
 
-	compile(vertexCode.c_str(), fragmentCode.c_str());
+	ID = compile(vertexCode.c_str(), fragmentCode.c_str());
 }
-Shader::Shader(const std::filesystem::path& vertexPath, const std::filesystem::path& geomPath, const std::filesystem::path& fragmentPath) {
-	std::cout << "[SHADER] opening shader file at: " << vertexPath << '\n';
-	std::cout << "[SHADER] opening shader file at: " << geomPath << '\n';
-	std::cout << "[SHADER] opening shader file at: " << fragmentPath << '\n';
+Shader::Shader(const std::filesystem::path& vertexPath, const std::filesystem::path& fragmentPath, const std::filesystem::path& geometryPath) {
+	std::filesystem::path vPath = std::filesystem::path(SHADER_DIR) / vertexPath;
+	std::filesystem::path fPath = std::filesystem::path(SHADER_DIR) / fragmentPath;
+	std::filesystem::path gPath = std::filesystem::path(SHADER_DIR) / geometryPath;
+	
+	std::cout << "[SHADER] opening shader file at: " << vPath << '\n';
+	std::cout << "[SHADER] opening shader file at: " << fPath << '\n';
+	std::cout << "[SHADER] opening shader file at: " << gPath << '\n';
 
-	std::string vertexCode   = readFile(vertexPath);
-	std::string geomCode	 = readFile(geomPath);
-	std::string fragmentCode = readFile(fragmentPath);
+	std::string vertexCode   = readFile(vPath);
+	std::string fragmentCode = readFile(fPath);
+	std::string geometryCode = readFile(gPath);
 
-	if (vertexCode.empty() || geomCode.empty() || fragmentCode.empty()) {
+	if (vertexCode.empty() || geometryCode.empty() || fragmentCode.empty()) {
 		std::cerr << "ERROR::SHADER::SOURCE_EMPTY" << '\n';
 		throw std::runtime_error("Empty shader source file detected");
 	}
 
-	compile(vertexCode.c_str(), geomCode.c_str(), fragmentCode.c_str());
+	ID = compile(vertexCode.c_str(), fragmentCode.c_str(), geometryCode.c_str());
 }
 
 Shader::~Shader() {
 	if (ID != 0) glDeleteProgram(ID);
 }
+
+void Shader::reload(const std::filesystem::path& vPath, const std::filesystem::path& fPath, const std::filesystem::path& gPath) {
+	std::string vCode = readFile(vPath);
+	std::string fCode = readFile(fPath);
+	std::string gCode = (!gPath.empty()) ? readFile(gPath) : "";
+
+	if (vCode.empty() || fCode.empty()) {
+		std::cerr << "[SHADER] Reload failed: Could not read source files.\n";
+		return;
+	}
+	unsigned int newID = compile(vCode.c_str(), fCode.c_str(), gCode.empty() ? nullptr : gCode.c_str());
+
+	if (newID != 0) {
+		if (ID != 0) glDeleteProgram(ID);
+		ID = newID;
+		m_UniformLocationCache.clear();
+		std::cout << "[SHADER] Live-reload successful for: " << vPath.filename() << "\n";
+	}
+}
+
 
 // Using the program
 void Shader::use() const { glUseProgram(ID); };
@@ -116,55 +143,50 @@ int Shader::getUniformLocation(const std::string& name) const {
 }
 
 // SHADER PROGRAM COMPILATION
-void Shader::compile(const char* vShaderCode, const char* fShaderCode) {
-	unsigned int vertex = glCreateShader(GL_VERTEX_SHADER);
+unsigned int Shader::compile(const char* vShaderCode, const char* fShaderCode, const char* gShaderCode) {
+	unsigned int vertex    = 0;
+	unsigned int geometry  = 0;
+	unsigned int fragment  = 0;
+	unsigned int programID = 0;
+	
+	vertex = glCreateShader(GL_VERTEX_SHADER);
 	glShaderSource(vertex, 1, &vShaderCode, NULL);
 	glCompileShader(vertex);
 	checkCompileErrors(vertex, "VERTEX");
 
-	unsigned int fragment = glCreateShader(GL_FRAGMENT_SHADER);
+	fragment = glCreateShader(GL_FRAGMENT_SHADER);
 	glShaderSource(fragment, 1, &fShaderCode, NULL);
 	glCompileShader(fragment);
 	checkCompileErrors(fragment, "FRAGMENT");
 
-	ID = glCreateProgram();
-	glAttachShader(ID, vertex);
-	glAttachShader(ID, fragment);
-	glLinkProgram(ID);
-	checkCompileErrors(ID, "PROGRAM");
+	if (gShaderCode != nullptr) {
+		geometry = glCreateShader(GL_GEOMETRY_SHADER);
+		glShaderSource(geometry, 1, &gShaderCode, NULL);
+		glCompileShader(geometry);
+		checkCompileErrors(geometry, "GEOMETRY");
+	}
+
+	programID = glCreateProgram();
+	glAttachShader(programID, vertex);
+	glAttachShader(programID, fragment);
+	if (gShaderCode != nullptr) glAttachShader(programID, geometry);
+
+	glLinkProgram(programID);
+	unsigned int linkCode = checkCompileErrors(programID, "PROGRAM");
 
 	glDeleteShader(vertex);
 	glDeleteShader(fragment);
-}
-void Shader::compile(const char* vShaderCode, const char* gShaderCode, const char* fShaderCode) {
-	unsigned int vertex = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(vertex, 1, &vShaderCode, NULL);
-	glCompileShader(vertex);
-	checkCompileErrors(vertex, "VERTEX");
+	if (gShaderCode != nullptr) { glDeleteShader(geometry); }
 
-	unsigned int geometry = glCreateShader(GL_GEOMETRY_SHADER);
-	glShaderSource(geometry, 1, &gShaderCode, NULL);
-	glCompileShader(geometry);
-	checkCompileErrors(geometry, "GEOMETRY");
+	if (linkCode == 0) {
+		glDeleteProgram(programID);
+		return 0;
+	}
 
-	unsigned int fragment = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(fragment, 1, &fShaderCode, NULL);
-	glCompileShader(fragment);
-	checkCompileErrors(fragment, "FRAGMENT");
-
-	ID = glCreateProgram();
-	glAttachShader(ID, vertex);
-	glAttachShader(ID, geometry);
-	glAttachShader(ID, fragment);
-	glLinkProgram(ID);
-	checkCompileErrors(ID, "PROGRAM");
-
-	glDeleteShader(vertex);
-	glDeleteShader(geometry);
-	glDeleteShader(fragment);
+	return programID;
 }
 
-void Shader::checkCompileErrors(unsigned int shaderOrProgram, std::string type) {
+unsigned int Shader::checkCompileErrors(unsigned int shaderOrProgram, std::string type) {
 	int success;
 	char infoLog[1024];
 	if (type != "PROGRAM") {
@@ -173,9 +195,11 @@ void Shader::checkCompileErrors(unsigned int shaderOrProgram, std::string type) 
 		if (!success) {
 			glGetShaderInfoLog(shaderOrProgram, 1024, NULL, infoLog);
 			std::cout << "ERROR::SHADER_COMPILATION_ERROR of type: " << type << "\n" << infoLog << "\n -- --------------------------------------------------- -- " << '\n';
+			return 0;
 		}
 		else {
 			std::cout << "[SHADER] shader compilation successful of type " << type << std::endl;
+			return 1;
 		}
 	}
 	else {
@@ -184,9 +208,11 @@ void Shader::checkCompileErrors(unsigned int shaderOrProgram, std::string type) 
 		if (!success) {
 			glGetProgramInfoLog(shaderOrProgram, 1024, NULL, infoLog);
 			std::cout << "ERROR::PROGRAM_LINKING_ERROR of type: " << type << "\n" << infoLog << "\n -- --------------------------------------------------- -- " << '\n';
+			return 0;
 		}
 		else {
 			std::cout << "[SHADER] program linking successful" << std::endl;
+			return 1;
 		}
 	}
 }

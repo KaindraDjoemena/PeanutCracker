@@ -139,13 +139,7 @@ void main() {
     // Final color
     vec3 color = ambient + directLighting;
 
-    color = color / (color + vec3(1.0f));
-    color = pow(color, vec3(1.0/2.2f)); 
-
     FragColor = vec4(color, 1.0f);
-    //FragColor = vec4(texture(irradianceMap, vec3(0, 1, 0)).rgb, 1.0); 
-    //FragColor = vec4(norm * 0.5 + 0.5, 1.0); 
-    //FragColor = vec4(diffuse, 1.0);
 }
 
 /* ===================== LIGHTING FUNCTIONS ===================== */
@@ -261,7 +255,7 @@ float distributionGGX(vec3 normal, vec3 halfVec, float roughness) {
     float NdotH2 = NdotH * NdotH;
 	
     float num   = a2;
-    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    float denom = (NdotH2 * (a2 - 1.0f) + 1.0f);
     denom = PI * denom * denom;
 	
     return num / denom;
@@ -284,7 +278,7 @@ float geometrySmithGGX(vec3 normal, vec3 viewDir, vec3 lightDir, float roughness
     return ggx1 * ggx2;
 }
 vec3  fresnelSchlick(float hDotV, vec3 F0, float roughness) {
-    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - hDotV, 0.0, 1.0), 5.0);
+    return F0 + (max(vec3(1.0f - roughness), F0) - F0) * pow(clamp(1.0 - hDotV, 0.0f, 1.0f), 5.0f);
 }
 
 float calcDirShadow(bool isLocalLight, vec4 fragPosLightSpace, sampler2DShadow shadowMap, vec3 normal, vec3 lightDir) {

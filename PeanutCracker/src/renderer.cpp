@@ -2,7 +2,10 @@
 
 void Renderer::initScene(Scene& scene) {
 	scene.init();
+	
+	setupPostProcessQuad();
 }
+
 
 void Renderer::update(Scene& scene, Camera& cam, int vWidth, int vHeight) {
 	glClearColor(m_winBgCol.r, m_winBgCol.g, m_winBgCol.b, m_winBgCol.a);
@@ -35,6 +38,9 @@ void Renderer::renderScene(const Scene& scene, const Camera& cam, int vWidth, in
 
 	renderSelectionHightlight(scene);
 	m_viewportFBO.resolve();
+
+	renderPostProcess(scene, vWidth, vHeight);
+
 	m_viewportFBO.unbind();
 }
 
@@ -209,4 +215,43 @@ void Renderer::renderSelectionHightlight(const Scene& scene) const {
 	glEnable(GL_DEPTH_TEST);
 	glDisable(GL_STENCIL_TEST);
 	glStencilMask(0xFF);
+}
+
+void Renderer::setupPostProcessQuad() {
+	float quadVertices[] = {
+		// positions   // texCoords
+		-1.0f,  1.0f,  0.0f, 1.0f,
+		-1.0f, -1.0f,  0.0f, 0.0f,
+		 1.0f, -1.0f,  1.0f, 0.0f,
+
+		-1.0f,  1.0f,  0.0f, 1.0f,
+		 1.0f, -1.0f,  1.0f, 0.0f,
+		 1.0f,  1.0f,  1.0f, 1.0f
+	};
+
+	m_quadVAO.bind();
+	m_quadVBO = VBO(quadVertices, sizeof(quadVertices), GL_STATIC_DRAW);
+	m_quadVAO.linkAttrib(m_quadVBO, 0, 2, GL_FLOAT, 4 * sizeof(float), (void*)0);
+	m_quadVAO.linkAttrib(m_quadVBO, 1, 2, GL_FLOAT, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+	m_quadVAO.unbind();
+}
+
+void Renderer::renderPostProcess(const Scene& scene, int vWidth, int vHeight) const {
+	glBindFramebuffer(GL_FRAMEBUFFER, m_viewportFBO.screenFbo);
+	glViewport(0, 0, vWidth, vHeight);
+	glClear(GL_COLOR_BUFFER_BIT);
+	glDisable(GL_DEPTH_TEST);
+
+	scene.getPostProcessShader().use();
+	scene.getPostProcessShader().setFloat("exposure", m_exposure);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, m_viewportFBO.resolveTexture);
+	scene.getPostProcessShader().setInt("hdrBuffer", 0);
+
+	m_quadVAO.bind();
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+	m_quadVAO.unbind();
+
+	glEnable(GL_DEPTH_TEST);
 }

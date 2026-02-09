@@ -127,13 +127,12 @@ int main() {
 
 	// === OPENGL SETTINGS =====================================
 	// -- Rendering
-	//glEnable(GL_FRAMEBUFFER_SRGB);
 	glEnable(GL_DEPTH_TEST);	 // -> can be put in a method -> [opengl state machine class]
 	glEnable(GL_CULL_FACE);
 	glFrontFace(GL_CCW);
 	glCullFace(GL_BACK);		// Backface culling
 	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);	// blending
+	//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);	// blending
 	glEnable(GL_MULTISAMPLE);	// MSAA
 	glfwSwapInterval(0);		// Disable VSYNC
 
@@ -148,10 +147,11 @@ int main() {
 	Renderer renderer(SCR_WIDTH, SCR_HEIGHT);
 	renderer.initScene(scene);
 
-	WindowContext context = { &gui, &scene };
+	WindowContext context = { &gui, &scene};
 	glfwSetWindowUserPointer(window, &gui);
 	glfwSetWindowUserPointer(window, &context);
 
+	float shaderTimer = 0.0f;
 
 	// === RENDER LOOP ==========================================
 	while (!glfwWindowShouldClose(window)) {
@@ -160,8 +160,8 @@ int main() {
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
 
-		// A. Update UI and get the Viewport size
-		ImVec2 vSize = gui.update(deltaTime, window, cameraObject, scene, renderer, renderer.getViewportFBO()->resolveTexture);
+		// Update UI and viewport size
+		ImVec2 vSize = gui.update(deltaTime, window, cameraObject, scene, renderer, renderer.getViewportFBO()->screenTexture);
 		gui.render();
 
 		// B. Rescale FBO and Update Projection if the UI viewport changed
@@ -171,6 +171,14 @@ int main() {
 		// RENDER TO FBO
 		glBindFramebuffer(GL_FRAMEBUFFER, renderer.getViewportFBO()->fbo);
 		glViewport(0, 0, (int)vSize.x, (int)vSize.y);
+
+		shaderTimer += deltaTime;
+		if (shaderTimer >= 0.5f) { // Every half-second
+			if (glfwGetWindowAttrib(window, GLFW_FOCUSED)) {
+				assetManagerPtr->reloadShaders();
+			}
+			shaderTimer = 0.0f;
+		}
 
 		renderer.update(scene, cameraObject, vSize.x, vSize.y);
 		renderer.renderScene(scene, cameraObject, vSize.x, vSize.y);
