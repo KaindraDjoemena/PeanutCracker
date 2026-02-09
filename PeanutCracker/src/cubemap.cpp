@@ -16,8 +16,9 @@
 #include <filesystem>
 
 
-Cubemap::Cubemap(const std::string& hdrPath, Shader* i_shader, const Shader& i_conversionShader)
+Cubemap::Cubemap(const std::string& hdrPath, Shader* i_shader, Shader* i_convolutionShader, const Shader& i_conversionShader)
 	: shaderPtr(i_shader)
+	, convolutionShaderPtr(i_convolutionShader)
 {
 	setupMesh();	// Bind VAO / VBO
 	unsigned int equirectTex = loadHDRTex(hdrPath);	// Load .hdr as 2d texture
@@ -25,12 +26,16 @@ Cubemap::Cubemap(const std::string& hdrPath, Shader* i_shader, const Shader& i_c
 	hdrEquirectToEnvCubemap(equirectTex, i_conversionShader);	// Make cubemap texture
 
 	glDeleteTextures(1, &equirectTex);
+
+	// Environment map convolution
+	convoluteCubemap();
 }
 
 Cubemap::~Cubemap() {
 	glDeleteFramebuffers(1, &m_fboID);
 	glDeleteRenderbuffers(1, &m_rboID);
 	glDeleteTextures(1, &m_envCubemapTexID);
+	glDeleteTextures(1, &m_irradianceMapID);
 }
 
 void Cubemap::setShaderObject(Shader* i_shader) {
@@ -83,10 +88,9 @@ unsigned int Cubemap::loadHDRTex(const std::string& hdrPath) const {
 
 // Allocate the environment cubemap texture
 void Cubemap::allocateEnvCubemapTex() {
-	std::cout << "[CUBEMAP] Generating Cube Map for: " << m_fboID << '\n';
-
 	glGenFramebuffers(1, &m_fboID);
 	glGenRenderbuffers(1, &m_rboID);
+	std::cout << "[CUBEMAP] Generating Cube Map for: " << m_fboID << '\n';
 
 	// Cubemap texture
 	glGenTextures(1, &m_envCubemapTexID);
@@ -150,6 +154,61 @@ void Cubemap::hdrEquirectToEnvCubemap(unsigned int hdrTexID, const Shader& shade
 		glDrawArrays(GL_TRIANGLES, 0, 36);
 		vao.unbind();
 	}
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void Cubemap::convoluteCubemap() {
+	std::cout << "[CUBEMAP] Convoluting cubemap" << std::endl;
+	glGenTextures(1, &m_irradianceMapID);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, m_irradianceMapID);
+	for (unsigned int i = 0; i < 6; ++i) {
+		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 32, 32, 0, GL_RGB, GL_FLOAT, nullptr);
+	}
+	
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	// 2. Prep the FBO for a smaller size
+	glBindFramebuffer(GL_FRAMEBUFFER, m_fboID);
+	glBindRenderbuffer(GL_RENDERBUFFER, m_rboID);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 32, 32);
+	std::cout << "[CUBEMAP] Irradiance cubemap fbo: " << m_fboID << std::endl;
+
+	// 3. The Bake
+	glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
+	glm::mat4 captureViews[] = {
+	   glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+	   glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+	   glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)),
+	   glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f)),
+	   glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+	   glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
+	};
+	convolutionShaderPtr->use();
+	convolutionShaderPtr->setInt("environmentMap", 0);
+	convolutionShaderPtr->setMat4("projection", captureProjection);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, m_envCubemapTexID); // Sample from the HDR skybox we just made
+
+	glViewport(0, 0, 32, 32);
+	glDisable(GL_CULL_FACE);
+	glDisable(GL_DEPTH_TEST);
+	for (unsigned int i = 0; i < 6; ++i) {
+		convolutionShaderPtr->setMat4("view", captureViews[i]);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, m_irradianceMapID, 0);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		vao.bind();
+		glDrawArrays(GL_TRIANGLES, 0, 36);
+		vao.unbind();
+	}
+	glEnable(GL_CULL_FACE);
+	glEnable(GL_DEPTH_TEST);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }

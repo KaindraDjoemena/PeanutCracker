@@ -99,6 +99,7 @@ void Renderer::renderShadowPass(const Scene& scene, const Camera& cam) const {
 
 void Renderer::renderLightPass(const Scene& scene, const Camera& cam, int vWidth, int vHeight) const {
 	scene.bindDepthMaps();
+	scene.bindIBLMaps();
 
 	glActiveTexture(GL_TEXTURE0);
 	// --Rendering the final scene
@@ -108,6 +109,7 @@ void Renderer::renderLightPass(const Scene& scene, const Camera& cam, int vWidth
 	//scene.getWorldNode()->update(glm::mat4(1.0f), true);
 
 	scene.setNodeShadowMapUniforms(scene.getWorldNode());		// Set fragment shader shadow map uniformms
+	scene.setNodeIBLMapUniforms(scene.getWorldNode());
 
 	if (_renderMode == Render_Mode::WIREFRAME) { glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); }
 	renderObjects(scene, scene.getWorldNode(), cam);

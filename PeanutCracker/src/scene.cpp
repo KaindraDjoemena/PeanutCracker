@@ -137,7 +137,7 @@ void Scene::processLoadQueue() {
 		createAndAddObject(
 			path.string(),
 			"defaultshaders/model.vert",
-			"defaultshaders/tttt.frag"
+			"defaultshaders/colll.frag"
 		);
 	}
 	loadQueue.clear();
@@ -182,9 +182,11 @@ void Scene::createAndAddSpotLight(std::unique_ptr<SpotLight> light) {
 void Scene::createAndAddSkyboxHDR(const std::string& path) {
 	std::shared_ptr<Shader> skyboxShader = m_assetManager->loadShaderObject("defaultshaders/skybox.vert", "defaultshaders/skybox.frag");
 	std::shared_ptr<Shader> conversionShader = m_assetManager->loadShaderObject("defaultshaders/equirectToUnitCube.vert", "defaultshaders/equirectToUnitCube.frag");
-	auto m_skyboxPtr = std::make_unique<Cubemap>(path, skyboxShader.get(), *conversionShader);
+	std::shared_ptr<Shader> convolutionShader = m_assetManager->loadShaderObject("defaultshaders/cubemapConvolution.vert", "defaultshaders/cubemapConvolution.frag");
+	auto m_skyboxPtr = std::make_unique<Cubemap>(path, skyboxShader.get(), convolutionShader.get(), *conversionShader);
 
 	setupSkyboxShaderUBOs(skyboxShader.get());
+	setupSkyboxShaderUBOs(convolutionShader.get());
 	m_skybox = std::move(m_skyboxPtr);
 }
 
@@ -531,6 +533,12 @@ void Scene::bindDepthMaps() const {
 		}
 	}
 }
+void Scene::bindIBLMaps() const {
+	if (m_skybox) {
+		glActiveTexture(GL_TEXTURE0 + 40);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, m_skybox->getIrradianceMapID());
+	}
+}
 
 /* ===== UPDATING UBOs ================================================================= */
 // BINDING NODE SHADERS TO UBOs
@@ -657,6 +665,20 @@ void Scene::setNodeShadowMapUniforms(const SceneNode* node) const {
 
 	for (auto& child : node->children) {
 		setNodeShadowMapUniforms(child.get());
+	}
+}
+
+void Scene::setNodeIBLMapUniforms(const SceneNode* node) const {
+	if (node->object && node->object->shaderPtr && m_skybox) {
+		node->object->shaderPtr->use();
+
+		int irradianceMapTexSlot = 40;		// TODO: ENUMS FOR THE TEXTURE SLOTS
+
+		node->object->shaderPtr->setInt("irradianceMap", irradianceMapTexSlot);
+	}
+
+	for (auto& child : node->children) {
+		setNodeIBLMapUniforms(child.get());
 	}
 }
 

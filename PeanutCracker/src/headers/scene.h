@@ -65,13 +65,14 @@ public:
 	void createAndAddSkyboxHDR(const std::string& path);
 
 
-	/* ===== DDELETING ENTITIES ================================================================= */
+	/* ===== DELETING ENTITIES ================================================================= */
 	void deleteDirLight(int index);
 	void deletePointLight(int index);
 	void deleteSpotLight(int index);
 
-
 	void bindDepthMaps() const;
+	void bindIBLMaps() const;
+
 
 	/* ===== UBOs ============================================================================*/
 	// --ALLOCATION
@@ -92,7 +93,7 @@ public:
 
 	// LOAD EVERY SHADOW MAP TO OBJECT SHADERS
 	void setNodeShadowMapUniforms(const SceneNode* node) const;
-
+	void setNodeIBLMapUniforms(const SceneNode* node) const;
 	void updateShadowMapLSMats() const;
 
 	/* ===== RENDERING ================================================================================== */
