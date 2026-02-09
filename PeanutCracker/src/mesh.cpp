@@ -21,26 +21,30 @@ Mesh::Mesh(std::vector<Vertex> i_vertices, std::vector<unsigned int> i_indices, 
 
 void Mesh::draw(const Shader& shader, bool isShadowPass) const {
 	// Texture Binding
-	unsigned int diffuseNr = 1;
-	unsigned int specularNr = 1;
+	unsigned int albedoNr = 1;
 	unsigned int normalNr = 1;
-	unsigned int heightNr = 1;
+	unsigned int metallicNr = 1;
+	unsigned int roughnessNr = 1;
+	unsigned int aoNr = 1;
 
 	for (unsigned int i = 0; i < textures.size(); i++) {
 		glActiveTexture(GL_TEXTURE0 + i); // Activating the proper texture unit
 		// Example: diffuse_textureN
 		std::string number;
 		std::string name = textures[i].type;
-		if (name == "texture_diffuse")
-			number = std::to_string(diffuseNr++);
-		else if (name == "texture_specular")
-			number = std::to_string(specularNr++);
-		else if (name == "texture_normal")
+		if (name == "albedoMap")
+			number = std::to_string(albedoNr++);
+		else if (name == "normalMap")
 			number = std::to_string(normalNr++);
-		else if (name == "texture_height")
-			number = std::to_string(heightNr++);
+		else if (name == "metallicMap")
+			number = std::to_string(metallicNr++);
+		else if (name == "roughnessMap")
+			number = std::to_string(roughnessNr++);
+		else if (name == "aoMap") {
+			number = std::to_string(aoNr++);
+		}
 
-		shader.setInt(("material." + name + number), i);
+		shader.setInt(("material." + name), i);
 		glBindTexture(GL_TEXTURE_2D, textures[i].id);
 	}
 

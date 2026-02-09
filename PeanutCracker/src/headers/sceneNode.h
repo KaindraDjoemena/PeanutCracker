@@ -18,7 +18,7 @@ class SceneNode {
 public:
 	std::string	name;
 	Transform	localTransform;
-	glm::mat4	worldMatrix;
+	glm::mat4	worldMatrix = glm::mat4(1.0f);
 	bool		isDirty	= true;
 	bool		isSelected = false;
 	SceneNode*								parent = nullptr;
@@ -37,7 +37,7 @@ public:
 	void setPosition(const glm::vec3& pos);
 	void setScale(const glm::vec3& scl, bool uniform = false);
 	void setEulerRotation(const glm::vec3& eulerRotDegrees);
-	void setSphereComponentRadius();
+	void setSphereComponentRadius() const;
 
 	void updateFromMatrix(const glm::mat4& newLocalMatrix);
 

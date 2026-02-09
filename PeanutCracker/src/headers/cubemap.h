@@ -15,29 +15,18 @@
 #include <filesystem>
 
 
-struct Faces {
-	std::array<std::filesystem::path, 6> cubeFaces;
-
-	Faces(const std::filesystem::path& i_right_dir,		// +X
-		  const std::filesystem::path& i_left_dir,		// -X
-		  const std::filesystem::path& i_top_dir,		// +Y
-		  const std::filesystem::path& i_bottom_dir,	// -Y
-		  const std::filesystem::path& i_front_dir,		// +Z
-		  const std::filesystem::path& i_back_dir		// -Z
-	) : cubeFaces{ i_right_dir, i_left_dir, i_top_dir, i_bottom_dir, i_front_dir, i_back_dir } {}
-
-};
-
 class Cubemap {
 public:
 	VAO          vao;
 	VBO          vbo;
 	Shader*      shaderPtr;
-	Faces        faces;
-	unsigned int texture = 0;
+	unsigned int m_texID = 0;
+	unsigned int m_fboID = 0;
+	unsigned int m_rboID = 0;
+	unsigned int m_envCubemapTexID;
 
 
-	Cubemap(const Faces& i_faces, Shader* i_shader);
+	Cubemap(const std::string& hdrPath, Shader* i_shader, const Shader& i_conversionShader);
 
 	~Cubemap();
 
@@ -46,7 +35,9 @@ public:
 	void draw() const;
 
 private:
-	unsigned int loadCubemap() const;
+	unsigned int loadHDRTex(const std::string& hdrPath) const;
+	void allocateEnvCubemapTex();
+	void hdrEquirectToEnvCubemap(unsigned int hdrTexID, const Shader& shader);
 
 	void setupMesh();
 };

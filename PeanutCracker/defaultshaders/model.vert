@@ -2,14 +2,20 @@
 layout (location = 0) in vec3 aPos;
 layout (location = 1) in vec3 aNormal;
 layout (location = 2) in vec2 aTexCoords;
+layout (location = 3) in vec3 aTangent;
+layout (location = 4) in vec3 aBitangent;
 
 #define MAX_LIGHTS 8
 
-out vec3 FragPos;
-out vec3 Normal;
-out vec2 TexCoord;
-out vec4 DirectionalLightSpacePos[MAX_LIGHTS];
-out vec4 SpotLightSpacePos[MAX_LIGHTS];
+out VS_OUT {
+	vec3 FragPos;
+	vec3 Normal;
+	vec2 TexCoord;
+	vec4 DirectionalLightSpacePos[MAX_LIGHTS];
+	vec4 SpotLightSpacePos[MAX_LIGHTS];
+
+	mat3 TBN;
+} vs_out;
 
 // LIGHT STRUCTS
 struct DirectionalLightStruct {
@@ -71,19 +77,23 @@ uniform mat4 model;
 uniform mat4 normalMatrix;
 
 
-void main()
-{
-    FragPos  = vec3(model * vec4(aPos, 1.0f));
-    Normal   = mat3(normalMatrix) * aNormal;
-    TexCoord = aTexCoords;
+void main() {
+    vs_out.FragPos  = vec3(model * vec4(aPos, 1.0f));
+	vec3 T = normalize(mat3(normalMatrix) * aTangent);
+	vec3 N = normalize(mat3(normalMatrix) * aNormal);
+	T = normalize(T - dot(T, N) * N);
+	vec3 B = cross(N, T);
+	vs_out.TBN = mat3(T, B, N);
+	vs_out.Normal = N;
+    vs_out.TexCoord = aTexCoords;
 
     gl_Position = projection * view * model * vec4(aPos, 1.0f);
 
 	for (int i = 0; i < lightingBlock.numDirectionalLights; ++i) {
-		DirectionalLightSpacePos[i] = shadowMatricesBlock.directionalLightSpaceMatrices[i] * model * vec4(aPos, 1.0f);
+		vs_out.DirectionalLightSpacePos[i] = shadowMatricesBlock.directionalLightSpaceMatrices[i] * model * vec4(aPos, 1.0f);
 	}
     
 	for (int i = 0; i < lightingBlock.numSpotLights; ++i) {
-		SpotLightSpacePos[i] = shadowMatricesBlock.spotLightSpaceMatrices[i] * model * vec4(aPos, 1.0f);
+		vs_out.SpotLightSpacePos[i] = shadowMatricesBlock.spotLightSpaceMatrices[i] * model * vec4(aPos, 1.0f);
 	}
 }

@@ -137,9 +137,8 @@ void Scene::processLoadQueue() {
 		createAndAddObject(
 			path.string(),
 			"defaultshaders/model.vert",
-			"defaultshaders/model.frag"
+			"defaultshaders/tttt.frag"
 		);
-
 	}
 	loadQueue.clear();
 }
@@ -158,14 +157,15 @@ void Scene::createAndAddObject(const std::string& modelPath, const std::filesyst
 	newNode->setSphereComponentRadius();
 
 	bindToUBOs(shaderObjectPtr.get());
+	m_selectedEntities.push_back(newNode.get());
 	m_worldNode->addChild(std::move(newNode));
 }
-void Scene::createAndAddSkybox(const Faces& faces, const std::filesystem::path& vertPath, const std::filesystem::path& fragPath) {
+void Scene::createAndAddSkybox(const std::filesystem::path& vertPath, const std::filesystem::path& fragPath) {
 	std::shared_ptr<Shader> shaderObjectPtr = m_assetManager->loadShaderObject(vertPath, fragPath);
-	auto m_skyboxPtr = std::make_unique<Cubemap>(faces, shaderObjectPtr.get());
+	/*auto m_skyboxPtr = std::make_unique<Cubemap>(faces, shaderObjectPtr.get());
 
 	setupSkyboxShaderUBOs(shaderObjectPtr.get());
-	m_skybox = std::move(m_skyboxPtr);
+	m_skybox = std::move(m_skyboxPtr);*/
 }
 void Scene::createAndAddDirectionalLight(std::unique_ptr<DirectionalLight> light) {
 	m_directionalLights.push_back(std::move(light));
@@ -179,57 +179,17 @@ void Scene::createAndAddSpotLight(std::unique_ptr<SpotLight> light) {
 	m_spotLights.push_back(std::move(light));
 	numSpotLights++;
 }
-void Scene::createAndAddSkyboxFromDirectory(const std::string& directory) {
-	namespace fs = std::filesystem;
-	fs::path root(directory);
+void Scene::createAndAddSkyboxHDR(const std::string& path) {
+	std::shared_ptr<Shader> skyboxShader = m_assetManager->loadShaderObject("defaultshaders/skybox.vert", "defaultshaders/skybox.frag");
+	std::shared_ptr<Shader> conversionShader = m_assetManager->loadShaderObject("defaultshaders/equirectToUnitCube.vert", "defaultshaders/equirectToUnitCube.frag");
+	auto m_skyboxPtr = std::make_unique<Cubemap>(path, skyboxShader.get(), *conversionShader);
 
-	static const std::vector<std::array<std::string, 6>> namingSets = {
-		{ "right",  "left",   "top",    "bottom", "front", "back"  },
-		{ "px",     "nx",     "py",     "ny",     "pz",    "nz"    }
-	};
-
-	static const std::vector<std::string> extensions = { ".png", ".jpg", ".jpeg" };
-
-	fs::path finalPaths[6];
-
-	for (const auto& names : namingSets) {
-		bool allFound = true;
-
-		for (int i = 0; i < 6; ++i) {
-			bool faceFound = false;
-
-			for (const auto& ext : extensions) {
-				fs::path fullPath = root / (names[i] + ext);
-				if (fs::exists(fullPath)) {
-					finalPaths[i] = fullPath;
-					faceFound = true;
-					break;
-				}
-			}
-
-			if (!faceFound) {
-				allFound = false;
-				break;
-			}
-		}
-
-		if (allFound) {
-			Faces faces(
-				finalPaths[0], finalPaths[1], finalPaths[3],
-				finalPaths[2], finalPaths[4], finalPaths[5]
-			);
-			createAndAddSkybox(faces, "defaultshaders/skybox.vert", "defaultshaders/skybox.frag");
-			std::cout << "[m_skybox] Successfully loaded environment from: " << directory << '\n';
-			return;
-		}
-	}
-
-	std::cerr << "[m_skybox Error] No recognized naming convention found in: " << directory << '\n';
-	std::cerr << "[m_skybox Error] Supported formats: right/left/top/bottom/front/back, px/nx/py/ny/pz/nz, etc.\n";
+	setupSkyboxShaderUBOs(skyboxShader.get());
+	m_skybox = std::move(m_skyboxPtr);
 }
 
 
-/* ===== DDELETING ENTITIES ================================================================= */
+/* ===== DELETING ENTITIES ================================================================= */
 void Scene::deleteDirLight(int index) {
 	m_directionalLights.erase(m_directionalLights.begin() + index);
 }

@@ -23,8 +23,8 @@
 
 
 struct AABB {
-	glm::vec3 min = glm::vec3(std::numeric_limits<float>::max());
-	glm::vec3 max = glm::vec3(std::numeric_limits<float>::lowest());
+	glm::vec3 min = glm::vec3(FLT_MAX);
+	glm::vec3 max = glm::vec3(-FLT_MAX);
 };
 
 class Model {
@@ -49,14 +49,16 @@ public:
 	int loadModel(std::string const& path);
 
 private:
-	void processNode(aiNode* node, const aiScene* scene, std::map<unsigned int, MeshBucket>& buckets);
+	Mesh processMesh(aiMesh* mesh, const aiScene* scene, const glm::mat4& transform);
+	void processNode(aiNode* node, const aiScene* scene, const glm::mat4& parentTransform);
+	glm::mat4 aiMatrix4x4ToGlm(const aiMatrix4x4& from);
 
 	// High-level material loader
 	std::vector<Texture> loadMaterialTextures(aiMaterial* mat, const aiScene* scene);
 
 	// Helper to handle caching and actual texture type string assignment
-	std::vector<Texture> loadMaterialTexturesByType(aiMaterial* mat, aiTextureType type, std::string typeName);
+	std::vector<Texture> loadMaterialTexturesByType(aiMaterial* mat, aiTextureType type, std::string typeName, bool gamma);
 	
-	unsigned int TextureFromFile(const char* path, const std::string& directory, bool gamma = false);
+	unsigned int TextureFromFile(const char* path, const std::string& directory, bool gamma);
 };
 

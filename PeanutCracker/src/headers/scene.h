@@ -58,11 +58,11 @@ public:
 
 	/* ===== ADDING ENTITIES ================================================================= */
 	void createAndAddObject(const std::string& modelPath, const std::filesystem::path& vertPath, const std::filesystem::path& fragPath);
-	void createAndAddSkybox(const Faces& faces, const std::filesystem::path& vertPath, const std::filesystem::path& fragPath);
+	void createAndAddSkybox(const std::filesystem::path& vertPath, const std::filesystem::path& fragPath);
 	void createAndAddDirectionalLight(std::unique_ptr<DirectionalLight> light);
 	void createAndAddPointLight(std::unique_ptr<PointLight> light);
 	void createAndAddSpotLight(std::unique_ptr<SpotLight> light);
-	void createAndAddSkyboxFromDirectory(const std::string& directory);
+	void createAndAddSkyboxHDR(const std::string& path);
 
 
 	/* ===== DDELETING ENTITIES ================================================================= */

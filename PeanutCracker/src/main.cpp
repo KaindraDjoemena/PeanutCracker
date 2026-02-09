@@ -56,7 +56,7 @@ const unsigned int SCR_WIDTH  = 1200;
 const unsigned int SCR_HEIGHT = 750;
 int scr_width  = SCR_WIDTH;
 int scr_height = SCR_HEIGHT;
-const glm::vec4 WINDOW_BACKGROUND_COLOR(0.6f, 0.6f, 0.6f, 1.0f);
+const glm::vec4 WINDOW_BACKGROUND_COLOR(0.0f, 0.0f, 0.0f, 1.0f);
 
 // MOUSE
 float lastX = SCR_WIDTH / 2.0;
@@ -91,6 +91,7 @@ int main() {
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	//glfwWindowHint(GLFW_SRGB_CAPABLE, GLFW_TRUE);	// Output colors in sRGB
 	glfwWindowHint(GLFW_SAMPLES, MSAA_SAMPLES);
 
 	#ifdef __APPLE__
@@ -130,9 +131,11 @@ int main() {
 	glEnable(GL_DEPTH_TEST);	 // -> can be put in a method -> [opengl state machine class]
 	glEnable(GL_CULL_FACE);
 	glFrontFace(GL_CCW);
-	glCullFace(GL_BACK);
-	glEnable(GL_MULTISAMPLE);
-	glfwSwapInterval(0);	// Disable VSYNC
+	glCullFace(GL_BACK);		// Backface culling
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);	// blending
+	glEnable(GL_MULTISAMPLE);	// MSAA
+	glfwSwapInterval(0);		// Disable VSYNC
 
 
 	// STBI IMAGE FLIPPING FOR TEXTURES
@@ -148,37 +151,6 @@ int main() {
 	WindowContext context = { &gui, &scene };
 	glfwSetWindowUserPointer(window, &gui);
 	glfwSetWindowUserPointer(window, &context);
-
-	auto pointLight = std::make_unique<PointLight>(
-		glm::vec3(0.0f, 0.0f, 0.0f),
-		Light(glm::vec3(0.1f), glm::vec3(0.8f), glm::vec3(1.0f)),
-		Attenuation(1.0f, 0.022f, 0.009f),
-		0.1f, 20.0f
-	);
-	scene.createAndAddPointLight(std::move(pointLight));
-	auto pointLight1 = std::make_unique<PointLight>(
-		glm::vec3(0.0f, 0.0f, 10.0f),
-		Light(glm::vec3(0.1f), glm::vec3(0.8f), glm::vec3(1.0f)),
-		Attenuation(1.0f, 0.022f, 0.009f),
-		0.1f, 20.0f
-	);
-	scene.createAndAddPointLight(std::move(pointLight1));
-	//auto directionalLight = std::make_unique<DirectionalLight>(
-	//	glm::vec3(0.0f, 0.0f, -1.0f),
-	//	Light(glm::vec3(0.1f), glm::vec3(0.8f), glm::vec3(1.0f)),
-	//	0.1f, 100.0f
-	//);
-	//scene.createAndAddDirectionalLight(std::move(directionalLight));
-
-	//auto spotLight = std::make_unique<SpotLight>(
-	//	glm::vec3(0.0f, 0.0f, 10.0f),
-	//	glm::vec3(0.0f, 0.0f, -1.0f),
-	//	Light(glm::vec3(0.1f), glm::vec3(0.8f), glm::vec3(1.0f)),
-	//	Attenuation(),
-	//	cosf(glm::radians(10.0f)),
-	//	cosf(glm::radians(20.0f)),
-	//	0.01f, 10.0f);
-	//scene.createAndAddSpotLight(std::move(spotLight));
 
 
 	// === RENDER LOOP ==========================================
@@ -199,11 +171,6 @@ int main() {
 		// RENDER TO FBO
 		glBindFramebuffer(GL_FRAMEBUFFER, renderer.getViewportFBO()->fbo);
 		glViewport(0, 0, (int)vSize.x, (int)vSize.y);
-
-		// BUFFER STUFF
-		glClearColor(WINDOW_BACKGROUND_COLOR.r, WINDOW_BACKGROUND_COLOR.g, WINDOW_BACKGROUND_COLOR.b, WINDOW_BACKGROUND_COLOR.a);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-
 
 		renderer.update(scene, cameraObject, vSize.x, vSize.y);
 		renderer.renderScene(scene, cameraObject, vSize.x, vSize.y);
@@ -340,10 +307,10 @@ void processInput(GLFWwindow* window) {
 		if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) cameraObject.processInput(Camera_Movement::UP, deltaTime);
 		if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) cameraObject.processInput(Camera_Movement::DOWN, deltaTime);
 	
-		if (glfwGetKey(window, GLFW_KEY_UP)		== GLFW_PRESS) cameraObject.processInput(Camera_Movement::LOOK_UP, deltaTime);
-		if (glfwGetKey(window, GLFW_KEY_DOWN)	== GLFW_PRESS) cameraObject.processInput(Camera_Movement::LOOK_DOWN , deltaTime);
-		if (glfwGetKey(window, GLFW_KEY_LEFT)	== GLFW_PRESS) cameraObject.processInput(Camera_Movement::LOOK_LEFT , deltaTime);
-		if (glfwGetKey(window, GLFW_KEY_RIGHT)	== GLFW_PRESS) cameraObject.processInput(Camera_Movement::LOOK_RIGHT , deltaTime);
+		if (glfwGetKey(window, GLFW_KEY_UP)	   == GLFW_PRESS) cameraObject.processInput(Camera_Movement::LOOK_UP, deltaTime);
+		if (glfwGetKey(window, GLFW_KEY_DOWN)  == GLFW_PRESS) cameraObject.processInput(Camera_Movement::LOOK_DOWN , deltaTime);
+		if (glfwGetKey(window, GLFW_KEY_LEFT)  == GLFW_PRESS) cameraObject.processInput(Camera_Movement::LOOK_LEFT , deltaTime);
+		if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) cameraObject.processInput(Camera_Movement::LOOK_RIGHT , deltaTime);
 	}
 }
 
@@ -357,7 +324,9 @@ void dropCallback(GLFWwindow* window, int count, const char** paths) {
 		std::filesystem::path filePath(paths[i]);
 		std::string ext = filePath.extension().string();
 
-		if (ext == ".gltf" || ext == ".glb" || ext == ".obj") {
+		if (ext == ".gltf" || ext == ".glb" ||
+			ext == ".obj")
+		{
 			ctx->scene->queueModelLoad(filePath);
 		}
 	}

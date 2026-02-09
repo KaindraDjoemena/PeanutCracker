@@ -16,6 +16,7 @@ SceneNode::SceneNode(std::string i_name) : name(i_name) {
 	sphereColliderComponent = std::make_unique<SphereColliderComponent>(localTransform.position, 1.0f);
 }
 
+// --Getters
 glm::vec3 SceneNode::getPosition() const { return localTransform.position; }
 glm::vec3 SceneNode::getScale() const { return localTransform.scale; }
 glm::vec3 SceneNode::getEulerRotation() const { return glm::degrees(glm::eulerAngles(localTransform.quatRotation)); }
@@ -71,7 +72,7 @@ void SceneNode::setEulerRotation(const glm::vec3& eulerRotDegrees) {
 }
 
 
-void SceneNode::setSphereComponentRadius() {
+void SceneNode::setSphereComponentRadius() const {
 	if (object && object->modelPtr) {
 		glm::vec3 maxAABB = object->modelPtr->aabb.max;
 		glm::vec3 minAABB = object->modelPtr->aabb.min;

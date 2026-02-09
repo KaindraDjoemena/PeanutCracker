@@ -8,7 +8,7 @@
 #include "cubemap.h"
 
 enum class Render_Mode {
-	BLINN_PHONG,
+	PBR,
 	WIREFRAME
 };
 
@@ -20,8 +20,10 @@ struct Framebuffer {
 
 	int width = 0, height = 0;
 
-	void bind() const {
+	void bind(int w, int h) const {
 		glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+		glViewport(0, 0, w, h);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	}
 
 	void unbind() const {
@@ -101,12 +103,17 @@ public:
 
 	Framebuffer* getViewportFBO() { return &m_viewportFBO; }
 
+	glm::vec4 getBgCol() { return m_winBgCol; }
+
 	void setRenderMode(Render_Mode renderMode) { _renderMode = renderMode; }
 	void setShadowMode(bool usingShadowMap)    { _usingShadowMap = usingShadowMap; }
+	void setBgCol(const glm::vec4& bgCol) { m_winBgCol = bgCol; }
 
 private:
-	Render_Mode _renderMode     = Render_Mode::BLINN_PHONG;
+	Render_Mode _renderMode     = Render_Mode::PBR;
 	bool        _usingShadowMap = true;
+	
+	glm::vec4  m_winBgCol = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
 
 	Framebuffer m_viewportFBO;
 

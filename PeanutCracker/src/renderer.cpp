@@ -5,6 +5,9 @@ void Renderer::initScene(Scene& scene) {
 }
 
 void Renderer::update(Scene& scene, Camera& cam, int vWidth, int vHeight) {
+	glClearColor(m_winBgCol.r, m_winBgCol.g, m_winBgCol.b, m_winBgCol.a);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
 	if (m_viewportFBO.fbo == 0) {
 		m_viewportFBO.setup(vWidth, vHeight);
 	}
@@ -27,10 +30,10 @@ void Renderer::renderScene(const Scene& scene, const Camera& cam, int vWidth, in
 	}
 
 	// --Objects & skybox
+	m_viewportFBO.bind(vWidth, vHeight);
 	renderLightPass(scene, cam, vWidth, vHeight);
 
 	renderSelectionHightlight(scene);
-
 	m_viewportFBO.resolve();
 	m_viewportFBO.unbind();
 }
@@ -95,10 +98,6 @@ void Renderer::renderShadowPass(const Scene& scene, const Camera& cam) const {
 }
 
 void Renderer::renderLightPass(const Scene& scene, const Camera& cam, int vWidth, int vHeight) const {
-	m_viewportFBO.bind();
-	glViewport(0, 0, vWidth, vHeight);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
 	scene.bindDepthMaps();
 
 	glActiveTexture(GL_TEXTURE0);

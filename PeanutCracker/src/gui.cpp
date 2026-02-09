@@ -69,7 +69,7 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
 	ImGuiWindowFlags inspectorFlags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
 
 	ImGui::Begin("INSPECTOR", NULL, inspectorFlags);
-	panelWidth = ImGui::GetWindowWidth(); // Capture resizing
+	panelWidth = ImGui::GetWindowWidth();
 
 	if (ImGui::BeginTabBar("InspectorTabs")) {
 		if (ImGui::BeginTabItem("Selection")) {
@@ -89,7 +89,6 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
 					strcpy_s(pathBuffer, 256, node->object->modelPtr->path.c_str());
 					if (ImGui::InputText("Path", pathBuffer, IM_ARRAYSIZE(pathBuffer))) {
 						node->object->modelPtr->path = pathBuffer;
-						// Handle model reloading logic here
 					}
 
 					if (pathErrorState) {
@@ -138,7 +137,7 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
 					if (ImGui::CollapsingHeader("Textures", ImGuiTreeNodeFlags_DefaultOpen)) {
 
 						float thumbSize = 64.0f;
-						float padding = 8.0f;
+						float padding   = 8.0f;
 						float windowVisibleX2 = ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x;
 
 						for (int i = 0; i < node->object->modelPtr->textures_loaded.size(); i++) {
@@ -170,7 +169,6 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
 						}
 					}
 				}
-
 				ImGui::PopID();
 				itemID++;
 			}
@@ -288,7 +286,7 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
 						// Frustum
 						ImGui::SeparatorText("Frustum Planes");
 						float nearP = l.shadowCasterComponent->getNearPlane();
-						float farP = l.shadowCasterComponent->getFarPlane();
+						float farP  = l.shadowCasterComponent->getFarPlane();
 						DrawProperty("Near", [&]() { if (ImGui::DragFloat("##n", &nearP, 0.1f, 0.01f, 10.0f)) { l.shadowCasterComponent->setNearPlane(nearP); }});
 						DrawProperty("Far", [&]() { if (ImGui::DragFloat("##f", &farP, 1.0f, 0.1f, 1000.0f)) { l.shadowCasterComponent->setFarPlane(farP); }});
 
@@ -393,14 +391,21 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
 
 	// --Rendering Pipeline
 	if (ImGui::CollapsingHeader("Rendering Pipeline", ImGuiTreeNodeFlags_DefaultOpen)) {
-		const char* modes[] = { "Blinn-Phong", "Wireframe" };
+		const char* modes[] = { "PBR", "Wireframe" };
 		static int renderMode = 0;
 		DrawProperty("Mode", [&]() {
 			ImGui::Combo("##rm", &renderMode, modes, IM_ARRAYSIZE(modes));
 			switch (renderMode) {
-			case 0: renderer.setRenderMode(Render_Mode::BLINN_PHONG); break;
+			case 0: renderer.setRenderMode(Render_Mode::PBR); break;
 			case 1: renderer.setRenderMode(Render_Mode::WIREFRAME); break;
 			default: break;
+			}
+		});
+
+		DrawProperty("BG", [&]() {
+			glm::vec3 newBgCol = glm::vec3(renderer.getBgCol());
+			if (ImGui::ColorEdit3("##bg", glm::value_ptr(newBgCol))) {
+				renderer.setBgCol(glm::vec4(newBgCol, 1.0f));
 			}
 		});
 	}
@@ -418,7 +423,7 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
 			});
 
 		if (ImGui::Button("Load Skybox from Folder", ImVec2(-FLT_MIN, 0))) {
-			scene.createAndAddSkyboxFromDirectory(skyboxDirBuffer);
+			scene.createAndAddSkyboxHDR(skyboxDirBuffer);
 		}
 		ImGui::Separator();
 		ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
@@ -452,7 +457,7 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
 
 	// CAMERA MATRICES
 	glm::mat4 view = camera.getViewMat();
-	float aspect = viewportSize.x / viewportSize.y;
+	float aspect   = viewportSize.x / viewportSize.y;
 	glm::mat4 proj = camera.getProjMat(aspect);
 
 	// === GIZMO ======================================================================
@@ -471,7 +476,7 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
 		ImGuizmo::Manipulate(
 			glm::value_ptr(view),
 			glm::value_ptr(proj),
-			mCurrentGizmoOperation, // Ensure this member exists (TRANSLATE by default)
+			mCurrentGizmoOperation,
 			ImGuizmo::LOCAL,
 			glm::value_ptr(modelMatrix)
 		);
@@ -481,7 +486,7 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
 			if (selectedNode->parent) {
 				glm::mat4 invParent = glm::inverse(selectedNode->parent->worldMatrix);
 				glm::mat4 localMatrix = invParent * modelMatrix;
-				selectedNode->updateFromMatrix(localMatrix); // Decompose into Pos/Rot/Scale
+				selectedNode->updateFromMatrix(localMatrix);
 			}
 			else {
 				selectedNode->updateFromMatrix(modelMatrix);
@@ -503,7 +508,7 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
 
 	// Now draw axis labels
 	ImDrawList* drawList = ImGui::GetWindowDrawList();
-	ImVec2 center = ImVec2(gizmoPos.x + 48, gizmoPos.y + 48); // Center of gizmo
+	ImVec2 center = ImVec2(gizmoPos.x + 48, gizmoPos.y + 48);
 
 	// Extract rotation from view matrix
 	glm::mat3 rotation = glm::mat3(view);
@@ -530,17 +535,14 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
 
 	// Project each axis to screen space
 	for (int i = 0; i < 6; i++) {
-		// Transform axis by view rotation (invert because view matrix)
 		glm::vec3 viewAxis = glm::transpose(rotation) * axes[i];
 
-		// Skip if pointing away from camera (negative Z in view space)
-		if (viewAxis.z > 0) continue; // Facing away
+		if (viewAxis.z > 0) continue;
 
-		// Project to 2D (simple orthographic projection)
-		float scale = 24.0f; // Distance from center
+		float scale = 24.0f;
 		ImVec2 labelPos = ImVec2(
 			center.x + viewAxis.x * scale,
-			center.y - viewAxis.y * scale  // Flip Y for screen coords
+			center.y - viewAxis.y * scale
 		);
 
 		// Draw label
