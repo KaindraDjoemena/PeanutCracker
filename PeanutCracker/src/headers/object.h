@@ -36,14 +36,13 @@ enum Primitive_Type {
 class Object {
 public:
 	Model*		modelPtr;
-	Shader*		shaderPtr;
 	Transform	transform;
 	bool		isSelected = false;
 
 	glm::mat4	modelMatrixCache = glm::mat4(1.0f);
 	glm::mat4	normalMatrixCache = glm::mat4(1.0f);
 
-	Object(Model* i_modelPtr, Shader* i_shaderPtr);
+	Object(Model* i_modelPtr);
 
 	void setPosition(const glm::vec3& pos);
 	void setScale(const glm::vec3& scl);
@@ -54,7 +53,7 @@ public:
 	glm::vec3 getScale() const;
 	glm::vec3 getEulerRotation() const;
 
-	void draw(const glm::mat4& worldMatrix) const;
+	void draw(const Shader& shader, const glm::mat4& worldMatrix) const;
 
 	void drawShadow(const glm::mat4& modelMatrix, const Shader& depthShader) const;
 };

@@ -26,10 +26,26 @@
 Scene::Scene(AssetManager* i_assetManager) : m_assetManager(i_assetManager) {
 	m_worldNode = std::make_unique<SceneNode>("Root");
 
-	m_dirDepthShader = m_assetManager->loadShaderObject("dirDepth.vert", "dirDepth.frag");
-	m_omniDepthShader = m_assetManager->loadShaderObject("omniDepth.vert", "omniDepth.frag", "omniDepth.geom");
-	m_outlineShader = m_assetManager->loadShaderObject("outline.vert", "outline.frag");
+	m_modelShader       = m_assetManager->loadShaderObject("model.vert", "model.frag");
+	m_dirDepthShader    = m_assetManager->loadShaderObject("dirDepth.vert", "dirDepth.frag");
+	m_omniDepthShader   = m_assetManager->loadShaderObject("omniDepth.vert", "omniDepth.frag", "omniDepth.geom");
+	m_outlineShader     = m_assetManager->loadShaderObject("outline.vert", "outline.frag");
 	m_postProcessShader = m_assetManager->loadShaderObject("postprocess.vert", "postprocess.frag");
+
+	m_skyboxShader      = m_assetManager->loadShaderObject("skybox.vert", "skybox.frag");
+	m_conversionShader  = m_assetManager->loadShaderObject("equirectToUnitCube.vert", "equirectToUnitCube.frag");
+	m_convolutionShader = m_assetManager->loadShaderObject("cubemapConvolution.vert", "cubemapConvolution.frag");
+
+	m_prefilterShader = m_assetManager->loadShaderObject("prefilter.vert", "prefilter.frag");
+	m_brdfShader      = m_assetManager->loadShaderObject("brdfLut.vert", "brdfLut.frag");
+
+	setupUBOBindings();
+
+	bindToUBOs(*m_modelShader);
+	bindToUBOs(*m_dirDepthShader);
+	bindToUBOs(*m_omniDepthShader);
+	bindToUBOs(*m_outlineShader);
+	bindToUBOs(*m_postProcessShader);
 }
 //Scene::Scene(const Scene&) = delete;
 //Scene::Scene& operator = (const Scene&) = delete;
@@ -136,29 +152,23 @@ void Scene::processLoadQueue() {
 	if (loadQueue.empty()) return;
 
 	for (const auto& path : loadQueue) {
-		createAndAddObject(
-			path.string(),
-			"model.vert",
-			"model.frag"
-		);
+		createAndAddObject(path.string());
 	}
 	loadQueue.clear();
 }
 
 
 /* ===== ADDING ENTITIES ================================================================= */
-void Scene::createAndAddObject(const std::string& modelPath, const std::filesystem::path& vertPath, const std::filesystem::path& fragPath) {
-	std::shared_ptr<Model> modelPtr = m_assetManager->loadModel(modelPath);
-	std::shared_ptr<Shader> shaderObjectPtr = m_assetManager->loadShaderObject(vertPath, fragPath);
+void Scene::createAndAddObject(const std::string& modelPath) {
+	std::shared_ptr<Model> modelPtr = m_assetManager->loadModel(modelPath);		// reads from the cache first
 
 	// Instantiate new node
 	std::string name = std::filesystem::path(modelPath).filename().string();
 	auto newNode = std::make_unique<SceneNode>(name);
-	newNode->object = std::make_unique<Object>(modelPtr.get(), shaderObjectPtr.get());
+	newNode->object = std::make_unique<Object>(modelPtr.get());
 
 	newNode->setSphereComponentRadius();
 
-	bindToUBOs(shaderObjectPtr.get());
 	m_selectedEntities.push_back(newNode.get());
 	m_worldNode->addChild(std::move(newNode));
 }
@@ -182,13 +192,11 @@ void Scene::createAndAddSpotLight(std::unique_ptr<SpotLight> light) {
 	numSpotLights++;
 }
 void Scene::createAndAddSkyboxHDR(const std::string& path) {
-	std::shared_ptr<Shader> skyboxShader = m_assetManager->loadShaderObject("skybox.vert", "skybox.frag");
-	std::shared_ptr<Shader> conversionShader = m_assetManager->loadShaderObject("equirectToUnitCube.vert", "equirectToUnitCube.frag");
-	std::shared_ptr<Shader> convolutionShader = m_assetManager->loadShaderObject("cubemapConvolution.vert", "cubemapConvolution.frag");
-	auto m_skyboxPtr = std::make_unique<Cubemap>(path, skyboxShader.get(), convolutionShader.get(), *conversionShader);
 
-	setupSkyboxShaderUBOs(skyboxShader.get());
-	setupSkyboxShaderUBOs(convolutionShader.get());
+	auto m_skyboxPtr = std::make_unique<Cubemap>(path, *m_convolutionShader, *m_conversionShader, *m_prefilterShader, *m_brdfShader);
+
+	setupSkyboxShaderUBOs(*m_skyboxShader);
+	setupSkyboxShaderUBOs(*m_convolutionShader);
 	m_skybox = std::move(m_skyboxPtr);
 }
 
@@ -207,6 +215,7 @@ void Scene::deleteSpotLight(int index) {
 
 /* ===== UBOs ============================================================================*/
 // --ALLOCATION
+// gets called once in to set the binding points
 void Scene::setupUBOBindings() {
 	// Setup Camera UBO
 	glGenBuffers(1, &cameraMatricesUBO);
@@ -228,34 +237,32 @@ void Scene::setupUBOBindings() {
 
 	glBindBuffer(GL_UNIFORM_BUFFER, 0);
 }
-// --SHADER BINDING
-void Scene::bindToUBOs(const Shader* shader) const {
-	if (!shader) return;
 
+// --SHADER BINDING
+// gets called for every shader
+void Scene::bindToUBOs(const Shader& shader) const {
 	// Camera
-	unsigned int camIndex = glGetUniformBlockIndex(shader->ID, "CameraMatricesUBOData");
+	unsigned int camIndex = glGetUniformBlockIndex(shader.ID, "CameraMatricesUBOData");
 	if (camIndex != GL_INVALID_INDEX) {
-		glUniformBlockBinding(shader->ID, camIndex, CAMERA_BINDING_POINT);
+		glUniformBlockBinding(shader.ID, camIndex, CAMERA_BINDING_POINT);
 	}
 
 	// Lighting
-	unsigned int lightIndex = glGetUniformBlockIndex(shader->ID, "LightingUBOData");
+	unsigned int lightIndex = glGetUniformBlockIndex(shader.ID, "LightingUBOData");
 	if (lightIndex != GL_INVALID_INDEX) {
-		glUniformBlockBinding(shader->ID, lightIndex, LIGHTS_BINDING_POINT);
+		glUniformBlockBinding(shader.ID, lightIndex, LIGHTS_BINDING_POINT);
 	}
 
 	// Shadow
-	unsigned int shadowIndex = glGetUniformBlockIndex(shader->ID, "ShadowMatricesUBOData");
+	unsigned int shadowIndex = glGetUniformBlockIndex(shader.ID, "ShadowMatricesUBOData");
 	if (shadowIndex != GL_INVALID_INDEX) {
-		glUniformBlockBinding(shader->ID, shadowIndex, SHADOW_BINDING_POINT);
+		glUniformBlockBinding(shader.ID, shadowIndex, SHADOW_BINDING_POINT);
 	}
 }
-void Scene::setupSkyboxShaderUBOs(const Shader* shader) const {
-	if (!m_skybox || !shader) return;
-
-	unsigned int camIndex = glGetUniformBlockIndex(shader->ID, "CameraMatricesUBOData");
+void Scene::setupSkyboxShaderUBOs(const Shader& shader) const {
+	unsigned int camIndex = glGetUniformBlockIndex(shader.ID, "CameraMatricesUBOData");
 	if (camIndex != GL_INVALID_INDEX) {
-		glUniformBlockBinding(shader->ID, camIndex, CAMERA_BINDING_POINT);
+		glUniformBlockBinding(shader.ID, camIndex, CAMERA_BINDING_POINT);
 	}
 }
 
@@ -313,56 +320,17 @@ void Scene::updateShadowMapLSMats() const {
 	}
 }
 
-
-/* ===== RENDERING ================================================================================== */
-// --For objects
-void Scene::renderRecursive(const Camera& camera, SceneNode* node) const {
-	// Camera Frustum Culling
-	bool isVisible = true;
-	if (node->sphereColliderComponent && node != m_worldNode.get()) {
-		BoundingSphere boundingSphere = { node->sphereColliderComponent->worldCenter, node->sphereColliderComponent->worldRadius };
-		if (!camera.getFrustum().isInFrustum(boundingSphere)) {
-			isVisible = false;
-		}
-	}
-
-	if (isVisible) {
-		if (node->object) {
-			node->object->draw(node->worldMatrix);
-		}
-
-		for (auto& child : node->children) {
-			renderRecursive(camera, child.get());
-		}
-	}
-}
-// --For the shadow map
-void Scene::renderShadowRecursive(const SceneNode* node, const Shader& depthShader) const {
-	if (!node) return;
-
-	if (node->object) {
-		node->object->drawShadow(node->worldMatrix, depthShader);
-	}
-
-	for (auto& child : node->children) {
-		renderShadowRecursive(child.get(), depthShader);
-	}
-}
-
 void Scene::init() {
-	setupUBOBindings();				// Camera, Lighting, Shadow
 
 	initLightFrustumDebug();
 	initDebugAABBDrawing();
 
 	//initSelectionOutline();
-	bindToUBOs(m_outlineShader.get());
+	bindToUBOs(*m_outlineShader);
 
-	setupNodeUBOs(m_worldNode.get());
-
-	if (m_skybox && m_skybox->shaderPtr) {
-		setupSkyboxShaderUBOs(m_skybox->shaderPtr);
-	}
+	//if (m_skybox && m_skybox->shaderPtr) {
+	//	setupSkyboxShaderUBOs(m_skybox->shaderPtr);
+	//}
 }
 
 /* ===== PICKING OPERATIONS ================================================================= */
@@ -518,6 +486,7 @@ void Scene::bindDepthMaps() const {
 		if (m_directionalLights[i]->shadowCasterComponent) {
 			glActiveTexture(GL_TEXTURE0 + DIR_SHADOW_MAP_SLOT + i);
 			glBindTexture(GL_TEXTURE_2D, m_directionalLights[i]->shadowCasterComponent->getDepthMapTexID());
+			std::cout << "dir light " << i << " " << DIR_SHADOW_MAP_SLOT + i << std::endl;
 		}
 	}
 	// --Point lights
@@ -530,29 +499,29 @@ void Scene::bindDepthMaps() const {
 	// --Spot lights
 	for (size_t i = 0; i < m_spotLights.size() && i < MAX_LIGHTS; ++i) {
 		if (m_spotLights[i]->shadowCasterComponent) {
-			glActiveTexture(GL_TEXTURE0 + POINT_SHADOW_MAP_SLOT + i);
+			glActiveTexture(GL_TEXTURE0 + SPOT_SHADOW_MAP_SLOT + i);
 			glBindTexture(GL_TEXTURE_2D, m_spotLights[i]->shadowCasterComponent->getDepthMapTexID());
 		}
 	}
+
+	glActiveTexture(GL_TEXTURE0);
 }
 void Scene::bindIBLMaps() const {
 	if (m_skybox) {
 		glActiveTexture(GL_TEXTURE0 + IRRADIANCE_MAP_SLOT);
 		glBindTexture(GL_TEXTURE_CUBE_MAP, m_skybox->getIrradianceMapID());
+
+		glActiveTexture(GL_TEXTURE0 + PREFILTER_MAP_SLOT);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, m_skybox->getPreFilterMapID());
+
+		glActiveTexture(GL_TEXTURE0 + BRDF_LUT_SLOT);
+		glBindTexture(GL_TEXTURE_2D, m_skybox->getBRDFLutTexID());
+
+		glActiveTexture(GL_TEXTURE0);
 	}
 }
 
 /* ===== UPDATING UBOs ================================================================= */
-// BINDING NODE SHADERS TO UBOs
-void Scene::setupNodeUBOs(SceneNode* node) {
-	// Setting the model UBOs
-	if (node->object && node->object->shaderPtr) {
-		bindToUBOs(node->object->shaderPtr);
-	}
-	for (auto& child : node->children) {
-		setupNodeUBOs(child.get());
-	}
-}
 // CAMERA UBO
 void Scene::updateCameraUBO(const glm::mat4& projection, const glm::mat4& view, const glm::vec3& cameraPos) const {
 	CameraMatricesUBOData data = { projection, view, glm::vec4(cameraPos, 1.0f) };
@@ -565,44 +534,44 @@ void Scene::updateCameraUBO(const glm::mat4& projection, const glm::mat4& view, 
 void Scene::updateLightingUBO() const {
 	LightingUBOData data = {};
 
-	data.numDirLights = static_cast<int>(m_directionalLights.size());
+	data.numDirLights   = static_cast<int>(m_directionalLights.size());
 	data.numPointLights = static_cast<int>(m_pointLights.size());
-	data.numSpotLights = static_cast<int>(m_spotLights.size());
+	data.numSpotLights  = static_cast<int>(m_spotLights.size());
 
 	// --Directional
 	for (size_t i = 0; i < m_directionalLights.size() && i < MAX_LIGHTS; ++i) {
 		auto& src = m_directionalLights[i];
 		auto& dst = data.directionalLight[i];
 		dst.direction = glm::vec4(src->direction, 0.0f);
-		dst.ambient = glm::vec4(src->light.ambient, 1.0f);
-		dst.diffuse = glm::vec4(src->light.diffuse, 1.0f);
-		dst.specular = glm::vec4(src->light.specular, 1.0f);
+		dst.ambient   = glm::vec4(src->light.ambient, 1.0f);
+		dst.diffuse   = glm::vec4(src->light.diffuse, 1.0f);
+		dst.specular  = glm::vec4(src->light.specular, 1.0f);
 	}
 	// --Point
 	for (size_t i = 0; i < m_pointLights.size() && i < MAX_LIGHTS; ++i) {
 		auto& src = m_pointLights[i];
 		auto& dst = data.pointLight[i];
-		dst.position = glm::vec4(src->position, 1.0f);
-		dst.ambient = glm::vec4(src->light.ambient, 1.0f);
-		dst.diffuse = glm::vec4(src->light.diffuse, 1.0f);
-		dst.specular = glm::vec4(src->light.specular, 1.0f);
-		dst.constant = src->attenuation.constant;
-		dst.linear = src->attenuation.linear;
+		dst.position  = glm::vec4(src->position, 1.0f);
+		dst.ambient   = glm::vec4(src->light.ambient, 1.0f);
+		dst.diffuse   = glm::vec4(src->light.diffuse, 1.0f);
+		dst.specular  = glm::vec4(src->light.specular, 1.0f);
+		dst.constant  = src->attenuation.constant;
+		dst.linear    = src->attenuation.linear;
 		dst.quadratic = src->attenuation.quadratic;
 	}
 	// --Spot
 	for (size_t i = 0; i < m_spotLights.size() && i < MAX_LIGHTS; ++i) {
 		auto& src = m_spotLights[i];
 		auto& dst = data.spotLight[i];
-		dst.position = glm::vec4(src->position, 1.0f);
-		dst.direction = glm::vec4(src->direction, 0.0f);
-		dst.ambient = glm::vec4(src->light.ambient, 1.0f);
-		dst.diffuse = glm::vec4(src->light.diffuse, 1.0f);
-		dst.specular = glm::vec4(src->light.specular, 1.0f);
-		dst.constant = src->attenuation.constant;
-		dst.linear = src->attenuation.linear;
-		dst.quadratic = src->attenuation.quadratic;
-		dst.inCosCutoff = src->inCosCutoff;
+		dst.position     = glm::vec4(src->position, 1.0f);
+		dst.direction    = glm::vec4(src->direction, 0.0f);
+		dst.ambient      = glm::vec4(src->light.ambient, 1.0f);
+		dst.diffuse      = glm::vec4(src->light.diffuse, 1.0f);
+		dst.specular     = glm::vec4(src->light.specular, 1.0f);
+		dst.constant     = src->attenuation.constant;
+		dst.linear       = src->attenuation.linear;
+		dst.quadratic    = src->attenuation.quadratic;
+		dst.inCosCutoff  = src->inCosCutoff;
 		dst.outCosCutoff = src->outCosCutoff;
 	}
 
@@ -623,12 +592,6 @@ void Scene::updateShadowUBO() const {
 			data.directionalLightSpaceMatrices[i] = glm::mat4(1.0f);
 		}
 	}
-	// --Point lights
-	//for (size_t i = 0; i < pointLights.size(); ++i) {
-	//	if (pointLights[i]->shadowCasterComponent) {
-	//		data.pointLightSpaceMatrices[i] = pointLights[i]->shadowCasterComponent->getLightSpaceMatrix();
-	//	}
-	//}
 	// --Spot lights
 	for (size_t i = 0; i < m_spotLights.size(); ++i) {
 		if (m_spotLights[i]->shadowCasterComponent) {
@@ -642,44 +605,37 @@ void Scene::updateShadowUBO() const {
 }
 
 // LOAD EVERY SHADOW MAP TO OBJECT SHADERS
-void Scene::setNodeShadowMapUniforms(const SceneNode* node) const {
-	if (node->object && node->object->shaderPtr) {
-		node->object->shaderPtr->use();
-		for (size_t i = 0; i < m_directionalLights.size(); ++i) {
-			std::string uniformName = "DirectionalShadowMap[" + std::to_string(i) + "]";
-			node->object->shaderPtr->setInt(uniformName, DIR_SHADOW_MAP_SLOT + i);
-		}
-		for (size_t i = 0; i < m_pointLights.size(); ++i) {
-			std::string uniformName = "PointShadowMap[" + std::to_string(i) + "]";
-			node->object->shaderPtr->setInt(uniformName, POINT_SHADOW_MAP_SLOT + i);
+void Scene::setNodeShadowMapUniforms() const {
+	m_modelShader->use();
 
-			float farPlane = m_pointLights[i]->shadowCasterComponent->getFarPlane();
-			if (farPlane <= 0.0f) {
-				std::cerr << "ERROR: Far plane is zero/negative for point light " << i << std::endl;
-			}
-			node->object->shaderPtr->setFloat("omniShadowMapFarPlanes[" + std::to_string(i) + "]", farPlane);
-		}
-		for (size_t i = 0; i < m_spotLights.size(); ++i) {
-			std::string uniformName = "SpotShadowMap[" + std::to_string(i) + "]";
-			node->object->shaderPtr->setInt(uniformName, SPOT_SHADOW_MAP_SLOT + i);
-		}
+	for (size_t i = 0; i < MAX_LIGHTS; ++i) {
+		std::string uniformName = "DirectionalShadowMap[" + std::to_string(i) + "]";
+		m_modelShader->setInt(uniformName, DIR_SHADOW_MAP_SLOT + i);
+		//std::cout << "[SET_NODE_SMUs] " << uniformName << " : " << DIR_SHADOW_MAP_SLOT + i << std::endl;
 	}
+	for (size_t i = 0; i < MAX_LIGHTS; ++i) {
+		std::string uniformName = "PointShadowMap[" + std::to_string(i) + "]";
+		m_modelShader->setInt(uniformName, POINT_SHADOW_MAP_SLOT + i);
 
-	for (auto& child : node->children) {
-		setNodeShadowMapUniforms(child.get());
+		float farPlane = (i < m_pointLights.size() && m_pointLights[i]->shadowCasterComponent)
+			? m_pointLights[i]->shadowCasterComponent->getFarPlane()
+			: 25.0f;
+		m_modelShader->setFloat("omniShadowMapFarPlanes[" + std::to_string(i) + "]", farPlane);
+
+		//std::cout << "[SET_NODE_SMUs] " << uniformName << " : " << POINT_SHADOW_MAP_SLOT + i << std::endl;
+	}
+	for (size_t i = 0; i < MAX_LIGHTS; ++i) {
+		std::string uniformName = "SpotShadowMap[" + std::to_string(i) + "]";
+		m_modelShader->setInt(uniformName, SPOT_SHADOW_MAP_SLOT + i);
+		//std::cout << "[SET_NODE_SMUs] " << uniformName << " : " << SPOT_SHADOW_MAP_SLOT + i << std::endl;
 	}
 }
 
-void Scene::setNodeIBLMapUniforms(const SceneNode* node) const {
-	if (node->object && node->object->shaderPtr && m_skybox) {
-		node->object->shaderPtr->use();
-
-		node->object->shaderPtr->setInt("irradianceMap", IRRADIANCE_MAP_SLOT);
-	}
-
-	for (auto& child : node->children) {
-		setNodeIBLMapUniforms(child.get());
-	}
+void Scene::setNodeIBLMapUniforms() const {
+	m_modelShader->use();
+	m_modelShader->setInt("irradianceMap", IRRADIANCE_MAP_SLOT);
+	m_modelShader->setInt("prefilterMap", PREFILTER_MAP_SLOT);
+	m_modelShader->setInt("brdfLUT", BRDF_LUT_SLOT);
 }
 
 /* ===== SELECTION DRAWING ================================================================= */

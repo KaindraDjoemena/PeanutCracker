@@ -32,6 +32,8 @@ public:
 	const SceneNode* getWorldNode() const { return m_worldNode.get(); }
 	SceneNode* getWorldNode() { return m_worldNode.get(); }
 	const Cubemap* getSkybox() const { return m_skybox.get(); }
+	const Shader& getSkyboxShader() const { return *m_skyboxShader; }
+	const Shader& getModelShader() const { return *m_modelShader; }
 	const Shader& getDirDepthShader() const { return *m_dirDepthShader; }
 	const Shader& getOmniDepthShader() const { return *m_omniDepthShader; }
 	const Shader& getOutlineShader() const { return *m_outlineShader; }
@@ -57,7 +59,7 @@ public:
 
 
 	/* ===== ADDING ENTITIES ================================================================= */
-	void createAndAddObject(const std::string& modelPath, const std::filesystem::path& vertPath, const std::filesystem::path& fragPath);
+	void createAndAddObject(const std::string& modelPath);
 	void createAndAddSkybox(const std::filesystem::path& vertPath, const std::filesystem::path& fragPath);
 	void createAndAddDirectionalLight(std::unique_ptr<DirectionalLight> light);
 	void createAndAddPointLight(std::unique_ptr<PointLight> light);
@@ -78,12 +80,10 @@ public:
 	// --ALLOCATION
 	void setupUBOBindings();
 	// --SHADER BINDING
-	void bindToUBOs(const Shader* shader) const;
-	void setupSkyboxShaderUBOs(const Shader* shader) const;
+	void bindToUBOs(const Shader& shader) const;
+	void setupSkyboxShaderUBOs(const Shader& shader) const;
 
 	/* ===== UPDATING UBOs ================================================================= */
-	// BINDING NODE SHADERS TO UBOs
-	void setupNodeUBOs(SceneNode* node);
 	// CAMERA UBO
 	void updateCameraUBO(const glm::mat4& projection, const glm::mat4& view, const glm::vec3& cameraPos) const;
 	// LIGHTING UBO
@@ -92,15 +92,9 @@ public:
 	void updateShadowUBO() const;
 
 	// LOAD EVERY SHADOW MAP TO OBJECT SHADERS
-	void setNodeShadowMapUniforms(const SceneNode* node) const;
-	void setNodeIBLMapUniforms(const SceneNode* node) const;
+	void setNodeShadowMapUniforms() const;
+	void setNodeIBLMapUniforms() const;
 	void updateShadowMapLSMats() const;
-
-	/* ===== RENDERING ================================================================================== */
-	// --For objects
-	void renderRecursive(const Camera& camera, SceneNode* node) const;
-	// --For the shadow map
-	void renderShadowRecursive(const SceneNode* node, const Shader& depthShader) const;
 
 	void init();
 
@@ -108,17 +102,19 @@ private:
 	AssetManager* m_assetManager;
 
 	enum Texture_Slot {
-		DIR_SHADOW_MAP_SLOT = 10,
-		POINT_SHADOW_MAP_SLOT = 20,
-		SPOT_SHADOW_MAP_SLOT = 30,
-		IRRADIANCE_MAP_SLOT = 40
+		DIR_SHADOW_MAP_SLOT   = 20,
+		POINT_SHADOW_MAP_SLOT = 30,
+		SPOT_SHADOW_MAP_SLOT  = 40,
+		IRRADIANCE_MAP_SLOT   = 50,
+		PREFILTER_MAP_SLOT    = 60,
+		BRDF_LUT_SLOT         = 70
 	};
 
 	// BINDING POINT ENUM
 	enum Binding_Point {
-		CAMERA_BINDING_POINT,	// 0
-		LIGHTS_BINDING_POINT,	// 1
-		SHADOW_BINDING_POINT	// 2
+		CAMERA_BINDING_POINT = 0,	// 0
+		LIGHTS_BINDING_POINT = 1,	// 1
+		SHADOW_BINDING_POINT = 2	// 2
 	};
 
 	// UBO DATA
@@ -197,10 +193,18 @@ private:
 	unsigned int lightingUBO       = 0;
 	unsigned int shadowUBO         = 0;
 
+	std::shared_ptr<Shader> m_modelShader;
 	std::shared_ptr<Shader> m_dirDepthShader;
 	std::shared_ptr<Shader> m_omniDepthShader;
 	std::shared_ptr<Shader> m_outlineShader;
 	std::shared_ptr<Shader> m_postProcessShader;
+
+	std::shared_ptr<Shader> m_skyboxShader;
+	std::shared_ptr<Shader> m_conversionShader;
+	std::shared_ptr<Shader> m_convolutionShader;
+
+	std::shared_ptr<Shader> m_prefilterShader;
+	std::shared_ptr<Shader> m_brdfShader;
 
 	VAO m_debugVAO;
 	VBO m_debugVBO;

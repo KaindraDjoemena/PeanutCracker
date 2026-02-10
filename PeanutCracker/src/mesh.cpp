@@ -5,6 +5,7 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <iostream>
 
 #include <string>
 #include <vector>
@@ -27,8 +28,9 @@ void Mesh::draw(const Shader& shader, bool isShadowPass) const {
 	unsigned int roughnessNr = 1;
 	unsigned int aoNr = 1;
 
+	const int OBJECT_TEX_SLOT = 10;
 	for (unsigned int i = 0; i < textures.size(); i++) {
-		glActiveTexture(GL_TEXTURE0 + i); // Activating the proper texture unit
+		glActiveTexture(GL_TEXTURE0 + OBJECT_TEX_SLOT + i); // Activating the proper texture unit
 		// Example: diffuse_textureN
 		std::string number;
 		std::string name = textures[i].type;
@@ -44,8 +46,10 @@ void Mesh::draw(const Shader& shader, bool isShadowPass) const {
 			number = std::to_string(aoNr++);
 		}
 
-		shader.setInt(("material." + name), i);
+		shader.setInt(("material." + name), OBJECT_TEX_SLOT + i);
 		glBindTexture(GL_TEXTURE_2D, textures[i].id);
+		// TODO: DELETE THIS
+		//std::cout << "[MESH] Binding material." << name << " to: " << OBJECT_TEX_SLOT + i << std::endl;
 	}
 
 	// draw mesh

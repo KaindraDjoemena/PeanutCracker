@@ -141,7 +141,7 @@ private:
 	void renderLightPass(const Scene& scene, const Camera& cam, int vWidth, int vHeight) const;
 	void renderObjects(const Scene& scene, const SceneNode* node, const Camera& cam) const;
 	void renderShadowMap(const SceneNode* node, const Shader& depthShader) const;
-	void renderSkybox(const Cubemap* skybox) const;
+	void renderSkybox(const Scene& scena) const;
 
 	void renderSelectionHightlight(const Scene& scene) const;
 };

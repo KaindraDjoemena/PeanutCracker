@@ -68,6 +68,8 @@ uniform sampler2DShadow SpotShadowMap[MAX_LIGHTS];
 
 // IBL
 uniform samplerCube irradianceMap;
+uniform samplerCube prefilterMap;
+uniform sampler2D   brdfLUT;
 
 layout (std140) uniform CameraMatricesUBOData {
     mat4 projection;
@@ -91,7 +93,8 @@ vec3  getNormal();
 float distributionGGX(vec3 normal, vec3 halfVec, float roughness);
 float geometryShlickGGX(float nDotv, float roughness);
 float geometrySmithGGX(vec3 normal, vec3 viewDir, vec3 lightDir, float roughness);
-vec3  fresnelSchlick(float hDotV, vec3 F0, float roughness);
+vec3  fresnelSchlick(float hDotV, vec3 F0);
+vec3  fresnelSchlickRoughness(float hDotV, vec3 F0, float roughness);
 
 float calcDirShadow(bool isLocalLight, vec4 fragPosLightSpace, sampler2DShadow shadowMap, vec3 normal, vec3 lightDir);
 float calcOmniShadow(vec3 lightPos, samplerCube shadowMap, float farPlane, vec3 normal);
@@ -116,6 +119,7 @@ void main() {
 
     vec3 directLighting = vec3(0.0f);   // Lighting from light sources
 
+	//--Direct lighting
     for (int i = 0; i < lightingBlock.numDirectionalLights; ++i) {
         directLighting += calcPBRDir(lightingBlock.directionalLight[i], norm, viewDir, F0, albedo, metallic, roughness, i);
     }
@@ -126,19 +130,24 @@ void main() {
         directLighting += calcPBRSpot(lightingBlock.spotLight[i], norm, viewDir, F0, albedo, metallic, roughness, i);
     }
 
-    // Diffuse IBL
-    vec3 F = fresnelSchlick(max(dot(norm, viewDir), 0.0f), F0, roughness);
-    vec3 kS = F;
-    vec3 kD = 1.0f - kS;
-    kD *= 1.0f - metallic;	  
-    
-    vec3 irradiance = texture(irradianceMap, norm).rgb;
-    vec3 diffuse    = irradiance * albedo;
-    vec3 ambient    = (kD * diffuse) * ao;
-
-    // Final color
-    vec3 color = ambient + directLighting;
-
+    // IBL
+	vec3 R  = reflect(-viewDir, norm);
+	vec3 F  = fresnelSchlickRoughness(max(dot(norm, viewDir), 0.0f), F0, roughness);
+	vec3 kS = F;
+	vec3 kD = 1.0f - kS;
+	kD *= 1.0f - metallic;
+	//--Diffuse IBL
+	vec3 irradiance = texture(irradianceMap, norm).rgb;
+	vec3 diffuse    = irradiance * albedo;
+	//--Specular IBL
+	const float MAX_REFLECTION_LOD = 4.0f;
+	vec3 prefilteredCol = textureLod(prefilterMap, R, roughness * MAX_REFLECTION_LOD).rgb;
+	vec2 brdf           = texture(brdfLUT, vec2(max(dot(norm, viewDir), 0.0f), roughness)).rg;
+	vec3 specular       = prefilteredCol * (F * brdf.x + brdf.y);
+	
+	vec3 ambient = (kD * diffuse + specular) * ao;
+	
+	vec3 color = ambient + directLighting;
     FragColor = vec4(color, 1.0f);
 }
 
@@ -152,7 +161,7 @@ vec3 calcPBRDir(DirectionalLightStruct light, vec3 normal, vec3 viewDir, vec3 F0
     // --Cook-Torrance BRDF
     float D = distributionGGX(normal, halfVec, roughness);             // Normal Distribution Func
     float G = geometrySmithGGX(normal, viewDir, lightDir, roughness);  // Geometry Func
-    vec3  F = fresnelSchlick(max(dot(normal, viewDir), 0.0f), F0, roughness);    // fresnelShlick
+    vec3  F = fresnelSchlick(max(dot(normal, viewDir), 0.0f), F0);    // fresnelShlick
 
     vec3  num   = D * G * F;
     float denom = 4.0f * max(dot(viewDir, normal), 0.0f) * max(dot(lightDir, normal), 0.0f) + 0.0001f;
@@ -180,7 +189,7 @@ vec3 calcPBRPoint(PointLightStruct light, vec3 normal, vec3 viewDir, vec3 F0, ve
     // --Cook-Torrance BDRF
     float D = distributionGGX(normal, H, roughness);          
     float G = geometrySmithGGX(normal, viewDir, L, roughness);  
-    vec3  F = fresnelSchlick(max(dot(normal, viewDir), 0.0f), F0, roughness);
+    vec3  F = fresnelSchlick(max(dot(normal, viewDir), 0.0f), F0);
 
     vec3  numerator   = D * G * F;
     float denominator = 4.0f * max(dot(viewDir, normal), 0.0f) * max(dot(L, normal), 0.0f) + 0.0001f;
@@ -221,7 +230,7 @@ vec3 calcPBRSpot(SpotLightStruct light, vec3 normal, vec3 viewDir, vec3 F0, vec3
     // --Cook-Torrance BRDF
     float D = distributionGGX(normal, H, roughness);          
     float G = geometrySmithGGX(normal, viewDir, L, roughness);  
-    vec3  F = fresnelSchlick(max(dot(normal, viewDir), 0.0f), F0, roughness);
+    vec3  F = fresnelSchlick(max(dot(normal, viewDir), 0.0f), F0);
 
     vec3  num   = D * G * F;
     float denom = 4.0f * max(dot(viewDir, normal), 0.0) * max(dot(L, normal), 0.0f) + 0.0001f;
@@ -277,8 +286,11 @@ float geometrySmithGGX(vec3 normal, vec3 viewDir, vec3 lightDir, float roughness
 	
     return ggx1 * ggx2;
 }
-vec3  fresnelSchlick(float hDotV, vec3 F0, float roughness) {
-    return F0 + (max(vec3(1.0f - roughness), F0) - F0) * pow(clamp(1.0 - hDotV, 0.0f, 1.0f), 5.0f);
+vec3  fresnelSchlick(float hDotV, vec3 F0) {
+	return F0 + (1.0f - F0) * pow(clamp(1.0f - hDotV, 0.0f, 1.0f), 5.0f);
+}
+vec3  fresnelSchlickRoughness(float hDotV, vec3 F0, float roughness) {
+	return F0 + (max(vec3(1.0f - roughness), F0) - F0) * pow(clamp(1.0f - hDotV, 0.0f, 1.0f), 5.0f);
 }
 
 float calcDirShadow(bool isLocalLight, vec4 fragPosLightSpace, sampler2DShadow shadowMap, vec3 normal, vec3 lightDir) {

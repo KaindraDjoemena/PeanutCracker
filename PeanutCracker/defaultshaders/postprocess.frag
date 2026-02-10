@@ -24,5 +24,5 @@ void main() {
     vec3 mapped = ACESFilm(hdrColor);        // Tone mapping
     mapped = pow(mapped, vec3(1.0f / 2.2f)); // Gamma correction
   
-    FragColor = vec4(mapped, 1.0f);
+    FragColor = vec4(hdrColor, 1.0f);
 }

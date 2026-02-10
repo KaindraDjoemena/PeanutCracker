@@ -150,7 +150,7 @@ std::unique_ptr<SceneNode> SceneNode::clone() const {
 
 	// Copy the visual object (assuming Object has a simple constructor)
 	if (this->object) {
-		newNode->object = std::make_unique<Object>(this->object->modelPtr, this->object->shaderPtr);
+		newNode->object = std::make_unique<Object>(this->object->modelPtr);
 	}
 
 	// Recursively clone all children (The "Deep Copy")

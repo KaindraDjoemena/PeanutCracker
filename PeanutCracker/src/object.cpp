@@ -18,9 +18,8 @@
 #include <imgui_impl_glfw.h>
 
 
-Object::Object(Model* i_modelPtr, Shader* i_shaderPtr)
+Object::Object(Model* i_modelPtr)
 	: modelPtr(i_modelPtr)
-	, shaderPtr(i_shaderPtr)
 	, transform() {
 }
 
@@ -50,15 +49,13 @@ glm::vec3 Object::getEulerRotation() const {
 	return glm::degrees(glm::eulerAngles(transform.quatRotation));
 }
 
-void Object::draw(const glm::mat4& worldMatrix) const {
-	if (!shaderPtr) return;
-
-	shaderPtr->use();
-	shaderPtr->setMat4("model", worldMatrix);
+void Object::draw(const Shader& shader, const glm::mat4& worldMatrix) const {
+	shader.use();
+	shader.setMat4("model", worldMatrix);
 	glm::mat4 normalMatrix = glm::transpose(glm::inverse(worldMatrix));
-	shaderPtr->setMat4("normalMatrix", normalMatrix);
-	shaderPtr->setFloat("material.shininess", 32.0f);
-	modelPtr->draw(*shaderPtr);
+	shader.setMat4("normalMatrix", normalMatrix);
+	shader.setFloat("material.shininess", 32.0f);
+	modelPtr->draw(shader);
 }
 
 void Object::drawShadow(const glm::mat4& modelMatrix, const Shader& depthShader) const {
