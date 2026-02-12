@@ -118,57 +118,51 @@ private:
 	};
 
 	// UBO DATA
-	struct DirectionalLightStruct {
+	struct alignas(16) DirectionalLightStruct {
 		glm::vec4 direction;	// 16
-		glm::vec4 ambient;		// 16
-		glm::vec4 diffuse;		// 16
-		glm::vec4 specular;		// 16
+		glm::vec4 color;        // 16
+		float     power;        // 4
+		float     shadowDist;   // 4
+		float     p0;           // 4
+		float     p1;           // 4
+	};							// 48 Bytes
+
+	struct alignas(16) PointLightStruct {
+		glm::vec4 position; // 16
+		glm::vec4 color;    // 16
+		float     power;    // 4
+		float     radius;   // 4
+		float     p0;       // 4
+		float     p1;       //4 
+	};						// 48 Bytes
+
+	struct alignas(16) SpotLightStruct {
+		glm::vec4 position;		// 16
+		glm::vec4 direction;	// 16
+		glm::vec4 color;        // 16
+		float     power;        // 4
+		float     radius;		// 4
+		float     inCosCutoff;	// 4
+		float     outCosCutoff;	// 4
 	};							// 64 Bytes
 
-	struct PointLightStruct {
-		glm::vec4 position;		// 16
-		glm::vec4 ambient;		// 16
-		glm::vec4 diffuse;		// 16
-		glm::vec4 specular;		// 16
-		float constant;			// 4
-		float linear;			// 4
-		float quadratic;		// 4
-		float _padding;			// 4
-	};							// 80 Bytes
-
-	struct SpotLightStruct {
-		glm::vec4 position;		// 16
-		glm::vec4 direction;	// 16
-		glm::vec4 ambient;		// 16
-		glm::vec4 diffuse;		// 16
-		glm::vec4 specular;		// 16
-		float constant;			// 4
-		float linear;			// 4
-		float quadratic;		// 4
-		float inCosCutoff;		// 4
-		float outCosCutoff;		// 4
-		float _padding0;		// 4
-		float _padding1;		// 4
-		float _padding2;		// 4
-	};							// 112 Bytes
-
 	// UBO DATA
-	struct LightingUBOData {									// 2064 Bytes
-		DirectionalLightStruct directionalLight[MAX_LIGHTS];	// 64 * 8  = 512
-		PointLightStruct       pointLight[MAX_LIGHTS];			// 80 * 8  = 640
-		SpotLightStruct        spotLight[MAX_LIGHTS];			// 112 * 8 = 896
+	struct alignas(16) LightingUBOData {						// 1296 Bytes
+		DirectionalLightStruct directionalLight[MAX_LIGHTS];	// 48 * 8  = 384
+		PointLightStruct       pointLight[MAX_LIGHTS];			// 48 * 8  = 384
+		SpotLightStruct        spotLight[MAX_LIGHTS];			// 64 * 8 = 512
 		int numDirLights;										// 4
 		int numPointLights;										// 4
 		int numSpotLights;										// 4
 		int padding;											// 4
 	};
 
-	struct ShadowMatricesUBOData {								// 1024 Bytes
+	struct alignas(16) ShadowMatricesUBOData {								// 1024 Bytes
 		glm::mat4 directionalLightSpaceMatrices[MAX_LIGHTS];	// 64 * 8  = 512
 		glm::mat4 spotLightSpaceMatrices[MAX_LIGHTS];			// 64 * 8  = 512
 	};
 
-	struct CameraMatricesUBOData {	// 144 Bytes
+	struct alignas(16) CameraMatricesUBOData {	// 144 Bytes
 		glm::mat4 projection;		// 64
 		glm::mat4 view;				// 64
 		glm::vec4 cameraPos;		// 16

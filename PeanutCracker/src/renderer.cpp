@@ -52,27 +52,24 @@ void Renderer::renderShadowPass(const Scene& scene, const Camera& cam) const {
 	// -- Directional lights
 	scene.getDirDepthShader().use();
 	for (auto& dirLight : scene.getDirectionalLights()) {
-		if (!dirLight->shadowCasterComponent) continue;
-
-		const glm::vec2 res = dirLight->shadowCasterComponent->getShadowMapRes();
+		const glm::vec2 res = dirLight->shadowCasterComponent.getShadowMapRes();
 		glViewport(0, 0, res.x, res.y);
-		glBindFramebuffer(GL_FRAMEBUFFER, dirLight->shadowCasterComponent->getFboID());
+		glBindFramebuffer(GL_FRAMEBUFFER, dirLight->shadowCasterComponent.getFboID());
+
 		glClear(GL_DEPTH_BUFFER_BIT);
 
-		scene.getDirDepthShader().setMat4("lightSpaceMatrix", dirLight->shadowCasterComponent->getLightSpaceMatrix());
+		scene.getDirDepthShader().setMat4("lightSpaceMatrix", dirLight->shadowCasterComponent.getLightSpaceMatrix());
 		renderShadowMap(scene.getWorldNode(), scene.getDirDepthShader());
 	}
 	// -- Point lights
 	scene.getOmniDepthShader().use();
 	for (auto& pointLight : scene.getPointLights()) {
-		if (!pointLight->shadowCasterComponent) continue;
-
-		const glm::vec2 res = pointLight->shadowCasterComponent->getShadowMapRes();
+		const glm::vec2 res = pointLight->shadowCasterComponent.getShadowMapRes();
 		glViewport(0, 0, res.x, res.y);
-		glBindFramebuffer(GL_FRAMEBUFFER, pointLight->shadowCasterComponent->getFboID());
+		glBindFramebuffer(GL_FRAMEBUFFER, pointLight->shadowCasterComponent.getFboID());
 		glClear(GL_DEPTH_BUFFER_BIT);
 
-		std::array<glm::mat4, 6> lightSpaceMats = pointLight->shadowCasterComponent->getLightSpaceMats();
+		std::array<glm::mat4, 6> lightSpaceMats = pointLight->shadowCasterComponent.getLightSpaceMats();
 		scene.getOmniDepthShader().setMat4("shadowMatrices[0]", lightSpaceMats[0]);
 		scene.getOmniDepthShader().setMat4("shadowMatrices[1]", lightSpaceMats[1]);
 		scene.getOmniDepthShader().setMat4("shadowMatrices[2]", lightSpaceMats[2]);
@@ -80,20 +77,18 @@ void Renderer::renderShadowPass(const Scene& scene, const Camera& cam) const {
 		scene.getOmniDepthShader().setMat4("shadowMatrices[4]", lightSpaceMats[4]);
 		scene.getOmniDepthShader().setMat4("shadowMatrices[5]", lightSpaceMats[5]);
 		scene.getOmniDepthShader().setVec3("lightPos", pointLight->position);
-		scene.getOmniDepthShader().setFloat("farPlane", pointLight->shadowCasterComponent->getFarPlane());
+		scene.getOmniDepthShader().setFloat("farPlane", pointLight->shadowCasterComponent.getFarPlane());
 		renderShadowMap(scene.getWorldNode(), scene.getOmniDepthShader());
 	}
 	// -- Spot lights
 	scene.getDirDepthShader().use();
 	for (auto& spotLight : scene.getSpotLights()) {
-		if (!spotLight->shadowCasterComponent) continue;
-
-		const glm::vec2 res = spotLight->shadowCasterComponent->getShadowMapRes();
+		const glm::vec2 res = spotLight->shadowCasterComponent.getShadowMapRes();
 		glViewport(0, 0, res.x, res.y);
-		glBindFramebuffer(GL_FRAMEBUFFER, spotLight->shadowCasterComponent->getFboID());
+		glBindFramebuffer(GL_FRAMEBUFFER, spotLight->shadowCasterComponent.getFboID());
 		glClear(GL_DEPTH_BUFFER_BIT);
 
-		scene.getDirDepthShader().setMat4("lightSpaceMatrix", spotLight->shadowCasterComponent->getLightSpaceMatrix());
+		scene.getDirDepthShader().setMat4("lightSpaceMatrix", spotLight->shadowCasterComponent.getLightSpaceMatrix());
 		renderShadowMap(scene.getWorldNode(), scene.getDirDepthShader());
 	}
 

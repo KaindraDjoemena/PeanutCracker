@@ -193,7 +193,7 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
 					bool isEmptyDir = (scene.getDirectionalLights().empty());
 					if (isMaxDir) { ImGui::BeginDisabled(); }
 					if (ImGui::Button("(+)", ImVec2(130, 0))) {
-						scene.createAndAddDirectionalLight(std::make_unique<DirectionalLight>(glm::vec3(0, -1, 0), Light(), 0.1f, 100.f));
+						scene.createAndAddDirectionalLight(std::make_unique<DirectionalLight>());
 						selectedDir = (int)scene.getDirectionalLights().size() - 1;
 					}
 					if (isMaxDir) { ImGui::EndDisabled(); }
@@ -215,14 +215,17 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
 
 						// Transform
 						ImGui::SeparatorText("Transform");
-						DrawProperty("Dir", [&]() { ImGui::DragFloat3("##d", &l.direction.x, 0.01f); });
+						DrawProperty("Dir", [&]() { if (ImGui::DragFloat3("##d", &l.direction.x, 0.01f)) { l.direction = glm::normalize(l.direction); } });
 
-						// Colors
-						ImGui::SeparatorText("Colors");
-						DrawProperty("Amb",  [&]() { ImGui::ColorEdit3("##a", &l.light.ambient.x); });
-						DrawProperty("Diff", [&]() { ImGui::ColorEdit3("##d", &l.light.diffuse.x); });
-						DrawProperty("Spec", [&]() { ImGui::ColorEdit3("##s", &l.light.specular.x); });
+						// Properties
+						ImGui::SeparatorText("Properties");
+						DrawProperty("Col", [&]() { ImGui::ColorEdit3("##c", &l.light.color.x); });
+						DrawProperty("Pow", [&]() {ImGui::DragFloat("##pow", &l.light.power); });
 
+						// ShadowDist
+						ImGui::SeparatorText("Max Shadow Dist");
+						DrawProperty("Dist", [&]() { if (ImGui::DragFloat("##rad", &l.shadowDist, 0.01f)) { l.shadowCasterComponent.setFarPlane(l.shadowDist); } });
+										
 						ImGui::Spacing();
 					}
 					ImGui::EndChild();
@@ -244,7 +247,7 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
 					bool isEmptyPoint = (scene.getPointLights().empty());
 					if (isMaxPoint) { ImGui::BeginDisabled(); }
 					if (ImGui::Button("(+)", ImVec2(130, 0))) {
-						scene.createAndAddPointLight(std::make_unique<PointLight>(glm::vec3(0.0f), Light(), Attenuation(), 0.01f, 20.0f));
+						scene.createAndAddPointLight(std::make_unique<PointLight>());
 						selectedPoint = (int)scene.getPointLights().size() - 1;
 					}
 					if (isMaxPoint) { ImGui::EndDisabled(); }
@@ -268,31 +271,28 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
 						ImGui::SeparatorText("Transform");
 						DrawProperty("Pos", [&]() { ImGui::DragFloat3("##p", &l.position.x, 0.01f); });
 
-						// Colors
-						ImGui::SeparatorText("Colors");
-						DrawProperty("Amb",  [&]() { ImGui::ColorEdit3("##a", &l.light.ambient.x); });
-						DrawProperty("Diff", [&]() { ImGui::ColorEdit3("##d", &l.light.diffuse.x); });
-						DrawProperty("Spec", [&]() { ImGui::ColorEdit3("##s", &l.light.specular.x); });
+						// Properties
+						ImGui::SeparatorText("Properties");
+						DrawProperty("Col", [&]() { ImGui::ColorEdit3("##a", &l.light.color.x); });
+						DrawProperty("Pow", [&]() {ImGui::DragFloat("##pow", &l.light.power); });
 
 						// Attenuation
 						ImGui::Spacing();
 						ImGui::Separator();
 						ImGui::Spacing();
-						ImGui::SeparatorText("Attenuation");
-						DrawProperty("Kc", [&]() { ImGui::DragFloat("##c", &l.attenuation.constant, 0.01f); });
-						DrawProperty("Kl", [&]() { ImGui::DragFloat("##l", &l.attenuation.linear, 0.001f); });
-						DrawProperty("Kq", [&]() { ImGui::DragFloat("##q", &l.attenuation.quadratic, 0.0001f); });
+						ImGui::SeparatorText("Radius");
+						DrawProperty("Rad", [&]() { if (ImGui::DragFloat("##rad", &l.radius, 0.01f)) { l.shadowCasterComponent.setFarPlane(l.radius); } });
 
 						// Frustum
-						ImGui::SeparatorText("Frustum Planes");
-						float nearP = l.shadowCasterComponent->getNearPlane();
-						float farP  = l.shadowCasterComponent->getFarPlane();
-						DrawProperty("Near", [&]() { if (ImGui::DragFloat("##n", &nearP, 0.1f, 0.01f, 10.0f)) { l.shadowCasterComponent->setNearPlane(nearP); }});
-						DrawProperty("Far", [&]() { if (ImGui::DragFloat("##f", &farP, 1.0f, 0.1f, 1000.0f)) { l.shadowCasterComponent->setFarPlane(farP); }});
+						//float nearP = l.shadowCasterComponent.getNearPlane();
+						//float farP  = l.shadowCasterComponent.getFarPlane();
+						//ImGui::SeparatorText("Frustum Planes");
+						//DrawProperty("Near", [&]() { if (ImGui::DragFloat("##n", &nearP, 0.1f, 0.01f, 10.0f)) { l.shadowCasterComponent->setNearPlane(nearP); }});
+						//DrawProperty("Far", [&]() { if (ImGui::DragFloat("##f", &farP, 1.0f, 0.1f, 1000.0f)) { l.shadowCasterComponent->setFarPlane(farP); }});
 
-						ImGui::Spacing();
-						DrawAttenuationGraph(nearP, farP, l.attenuation);
-						ImGui::Spacing();
+						//ImGui::Spacing();
+						//DrawAttenuationGraph(nearP, farP, l.attenuation);
+						//ImGui::Spacing();
 					}
 					ImGui::EndChild();
 					ImGui::EndTabItem();
@@ -313,7 +313,7 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
 					bool isEmptySpot = (scene.getSpotLights().empty());
 					if (isMaxSpot) { ImGui::BeginDisabled(); }
 					if (ImGui::Button("(+)", ImVec2(130, 0))) {
-						scene.createAndAddSpotLight(std::make_unique<SpotLight>(glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, -1.0f), Light(), Attenuation(), cosf(glm::radians(10.0f)), cosf(glm::radians(12.5f)), 0.01f, 20.0f));
+						scene.createAndAddSpotLight(std::make_unique<SpotLight>());
 						selectedSpot = (int)scene.getSpotLights().size() - 1;
 					}
 					if (isMaxSpot) { ImGui::EndDisabled(); }
@@ -336,40 +336,40 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
 						// Transform
 						ImGui::SeparatorText("Transform");
 						DrawProperty("Pos", [&]() { ImGui::DragFloat3("##p", &l.position.x, 0.01f); });
-						DrawProperty("Dir", [&]() { ImGui::DragFloat3("##d", &l.direction.x, 0.01f); });
+						DrawProperty("Dir", [&]() { if (ImGui::DragFloat3("##d", &l.direction.x, 0.01f)) { l.direction = glm::normalize(l.direction); } });
 
 						// Angles
 						ImGui::SeparatorText("Light Cone Angles");
 						float iDeg = glm::degrees(acos(l.inCosCutoff));
 						float oDeg = glm::degrees(acos(l.outCosCutoff));
 						DrawProperty("Inner", [&]() { if (ImGui::DragFloat("##i", &iDeg, 0.01f, 0.0f, oDeg,  "%.1f deg")) { l.inCosCutoff  = cosf(glm::radians(iDeg)); } });
-						DrawProperty("Outer", [&]() { if (ImGui::DragFloat("##o", &oDeg, 0.01f, iDeg, 90.0f, "%.1f deg")) { l.outCosCutoff = cosf(glm::radians(oDeg)); l.shadowCasterComponent->setFOVDeg(oDeg); } });
+						DrawProperty("Outer", [&]() { if (ImGui::DragFloat("##o", &oDeg, 0.01f, iDeg, 90.0f, "%.1f deg")) { l.outCosCutoff = cosf(glm::radians(oDeg)); l.shadowCasterComponent.setFOVDeg(oDeg); } });
 
 						// Colors
 						ImGui::SeparatorText("Colors");
-						DrawProperty("Amb",  [&]() { ImGui::ColorEdit3("##a", &l.light.ambient.x); });
-						DrawProperty("Diff", [&]() { ImGui::ColorEdit3("##d", &l.light.diffuse.x); });
-						DrawProperty("Spec", [&]() { ImGui::ColorEdit3("##s", &l.light.specular.x); });
+						DrawProperty("Col", [&]() { ImGui::ColorEdit3("##a", &l.light.color.x); });
+						DrawProperty("Pow", [&]() {ImGui::DragFloat("##pow", &l.light.power); });
 
 						// Attenuation
 						ImGui::Spacing();
 						ImGui::Separator();
 						ImGui::Spacing();
-						ImGui::SeparatorText("Attenuation");
-						DrawProperty("Kc", [&]() { ImGui::DragFloat("##c", &l.attenuation.constant, 0.01f); });
+						ImGui::SeparatorText("Radius");
+						/*DrawProperty("Kc", [&]() { ImGui::DragFloat("##c", &l.attenuation.constant, 0.01f); });
 						DrawProperty("Kl", [&]() { ImGui::DragFloat("##l", &l.attenuation.linear, 0.001f); });
-						DrawProperty("Kq", [&]() { ImGui::DragFloat("##q", &l.attenuation.quadratic, 0.0001f); });
+						DrawProperty("Kq", [&]() { ImGui::DragFloat("##q", &l.attenuation.quadratic, 0.0001f); });*/
+						DrawProperty("Rad", [&]() { if (ImGui::DragFloat("##rad", &l.radius, 0.01f)) { l.shadowCasterComponent.setFarPlane(l.radius); } });
 
 						// Frustum
-						ImGui::SeparatorText("Frustum Planes");
-						float nearP = l.shadowCasterComponent->getNearPlane();
-						float farP  = l.shadowCasterComponent->getFarPlane();
-						DrawProperty("Near", [&]() { if (ImGui::DragFloat("##n", &nearP, 0.1f, 0.01f, 10.0f)) { l.shadowCasterComponent->setNearPlane(nearP); }});
-						DrawProperty("Far",  [&]() { if (ImGui::DragFloat("##f", &farP, 1.0f, 0.1f, 1000.0f)) { l.shadowCasterComponent->setFarPlane(farP); }});
+						//ImGui::SeparatorText("Frustum Planes");
+						//float nearP = l.shadowCasterComponent->getNearPlane();
+						//float farP  = l.shadowCasterComponent->getFarPlane();
+						//DrawProperty("Near", [&]() { if (ImGui::DragFloat("##n", &nearP, 0.1f, 0.01f, 10.0f)) { l.shadowCasterComponent->setNearPlane(nearP); }});
+						//DrawProperty("Far",  [&]() { if (ImGui::DragFloat("##f", &farP, 1.0f, 0.1f, 1000.0f)) { l.shadowCasterComponent->setFarPlane(farP); }});
 
-						ImGui::Spacing();
-						DrawAttenuationGraph(nearP, farP, l.attenuation);
-						ImGui::Spacing();
+						//ImGui::Spacing();
+						//DrawAttenuationGraph(nearP, farP, l.attenuation);
+						//ImGui::Spacing();
 					}
 					ImGui::EndChild();
 					ImGui::EndTabItem();
@@ -629,6 +629,7 @@ void GUI::DrawProperty(const char* label, std::function<void()> widget, float la
 	widget();
 }
 
+/*
 void GUI::DrawAttenuationGraph(float nearP, float farP, const Attenuation& atten) {
 	ImGui::Spacing();
 	ImGui::TextDisabled("Intensity / Distance");
@@ -671,6 +672,7 @@ void GUI::DrawAttenuationGraph(float nearP, float farP, const Attenuation& atten
 	ImGui::TextDisabled("%.1f", farP);
 	ImGui::EndGroup();
 }
+*/
 
 void GUI::setPurpleTheme() const {
 	auto& style = ImGui::GetStyle();

@@ -69,7 +69,7 @@ void Shader::reload(const std::filesystem::path& vPath, const std::filesystem::p
 		if (ID != 0) glDeleteProgram(ID);
 		ID = newID;
 		m_UniformLocationCache.clear();
-		std::cout << "[SHADER] Live-reload successful for: " << vPath.filename() << "\n";
+		std::cout << "[SHADER] Live-reload successful for program: " << ID << "\n";
 	}
 }
 

@@ -58,6 +58,8 @@ private:
 	
 	// HELPERS
 	void DrawProperty(const char* label, std::function<void()> widget, float labelWidth = 0.2f);
+	/*
 	void DrawAttenuationGraph(float nearP, float farP, const Attenuation& atten);
+	*/
 	void setPurpleTheme() const;
 };

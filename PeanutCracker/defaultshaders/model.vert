@@ -18,38 +18,32 @@ out VS_OUT {
 } vs_out;
 
 // LIGHT STRUCTS
-struct DirectionalLightStruct {
-	vec4 direction;
-	vec4 ambient;
-	vec4 diffuse;
-	vec4 specular;
-}; 
-
-struct PointLightStruct {
-	vec4 position;
-	vec4 ambient;
-	vec4 diffuse;
-	vec4 specular;
-	float constant;
-	float linear;
-	float quadratic;
-	float _padding;
+struct DirectionalLightStruct {  // 48 Bytes
+	vec4  direction;
+	vec4  color;
+	float power;
+	float shadowDist;
+	float p0;
+	float p1;
 };
 
-struct SpotLightStruct {
-	vec4 position;
-	vec4 direction;
-	vec4 ambient;
-	vec4 diffuse;
-	vec4 specular;
-	float constant;
-	float linear;
-	float quadratic;
+struct PointLightStruct {  // 48 Bytes
+	vec4  position;
+	vec4  color;
+	float power;
+	float radius;
+	float p0;
+	float p1;
+};
+
+struct SpotLightStruct {  // 64 Bytes
+	vec4  position;
+	vec4  direction;
+	vec4  color;
+	float power;
+	float radius;
 	float inCosCutoff;
 	float outCosCutoff;
-	float _padding0;
-	float _padding1;
-	float _padding2;
 };
 
 layout (std140) uniform CameraMatricesUBOData {
@@ -79,11 +73,14 @@ uniform mat4 normalMatrix;
 
 void main() {
     vs_out.FragPos  = vec3(model * vec4(aPos, 1.0f));
+	
+	// Tangent space matrix
 	vec3 T = normalize(mat3(normalMatrix) * aTangent);
 	vec3 N = normalize(mat3(normalMatrix) * aNormal);
-	T = normalize(T - dot(T, N) * N);
+	T      = normalize(T - dot(T, N) * N);
 	vec3 B = cross(N, T);
 	vs_out.TBN = mat3(T, B, N);
+
 	vs_out.Normal = N;
     vs_out.TexCoord = aTexCoords;
 

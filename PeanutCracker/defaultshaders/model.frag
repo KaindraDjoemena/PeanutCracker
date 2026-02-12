@@ -25,45 +25,38 @@ struct Material {
 
 // === LIGHT STRUCTS ========================================================
 struct DirectionalLightStruct {
-    vec4 direction;
-    vec4 ambient;
-    vec4 diffuse;
-    vec4 specular;
-}; 
+	vec4  direction;  // 16
+	vec4  color;      // 16
+	float power;      // 4
+	float shadowDist; // 4
+	float p0;
+	float p1;     // 8
+};					  // 48 Bytes
 
 struct PointLightStruct {
-    vec4 position;
-    vec4 ambient;
-    vec4 diffuse;
-    vec4 specular;
-    float constant;
-    float linear;
-    float quadratic;
-    float _padding;
-};
+	vec4  position;	// 16
+	vec4  color;    // 16
+	float power;    // 4
+	float radius;   // 4
+	float p0;
+	float p1;   // 8
+};					// 48 Bytes
 
 struct SpotLightStruct {
-    vec4 position;
-    vec4 direction;
-    vec4 ambient;
-    vec4 diffuse;
-    vec4 specular;
-    float constant;
-    float linear;
-    float quadratic;
-    float inCosCutoff;
-    float outCosCutoff;
-    float _padding0;
-    float _padding1;
-    float _padding2;
-};
+	vec4  position;		// 16
+	vec4  direction;	// 16
+	vec4  color;        // 16
+	float power;        // 4
+	float radius;		// 4
+	float inCosCutoff;	// 4
+	float outCosCutoff;	// 4
+};						// 64 Bytes
 
 uniform Material material;
 
 // SHADOWS
 uniform sampler2DShadow DirectionalShadowMap[MAX_LIGHTS];
 uniform samplerCube     PointShadowMap[MAX_LIGHTS];
-uniform float           omniShadowMapFarPlanes[MAX_LIGHTS];
 uniform sampler2DShadow SpotShadowMap[MAX_LIGHTS];
 
 // IBL
@@ -103,6 +96,31 @@ vec3 calcPBRDir(DirectionalLightStruct light, vec3 normal, vec3 viewDir, vec3 F0
 vec3 calcPBRPoint(PointLightStruct light, vec3 normal, vec3 viewDir, vec3 F0, vec3 albedo, float metallic, float roughness, int lightIndex);
 vec3 calcPBRSpot(SpotLightStruct light, vec3 normal, vec3 viewDir, vec3 F0, vec3 albedo, float metallic, float roughness, int lightIndex);
 
+/*
+void main() {
+    // Are we receiving ANY lights?
+    if (lightingBlock.numDirectionalLights == 0) {
+        FragColor = vec4(1.0, 0.0, 0.0, 1.0);  // RED = NO LIGHTS
+        return;
+    }
+    
+    // We have lights! Show the count as brightness
+    float brightness = float(lightingBlock.numDirectionalLights) / 8.0;
+    FragColor = vec4(vec3(brightness), 1.0);
+}
+*/
+
+/*
+void main() {
+    if (lightingBlock.numDirectionalLights > 0) {
+        // Show light power as brightness
+        float power = lightingBlock.directionalLight[0].power;
+        FragColor = vec4(vec3(power / 20.0), 1.0);
+        return;
+    }
+    FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+}
+*/
 
 /* ======================================================== MAIN === */
 void main() {
@@ -146,17 +164,18 @@ void main() {
 	vec3 specular       = prefilteredCol * (F * brdf.x + brdf.y);
 	
 	vec3 ambient = (kD * diffuse + specular) * ao;
-	
 	vec3 color = ambient + directLighting;
+
     FragColor = vec4(color, 1.0f);
 }
 
 /* ===================== LIGHTING FUNCTIONS ===================== */
+// DIRECTIONAL
 vec3 calcPBRDir(DirectionalLightStruct light, vec3 normal, vec3 viewDir, vec3 F0, vec3 albedo, float metallic, float roughness, int lightIndex) {
     vec3 lightDir = normalize(-light.direction.xyz);
     vec3 halfVec  = normalize(viewDir + lightDir);
     
-    vec3 radiance = light.diffuse.rgb;
+    vec3 radiance = light.color.rgb * light.power;
 
     // --Cook-Torrance BRDF
     float D = distributionGGX(normal, halfVec, roughness);             // Normal Distribution Func
@@ -176,74 +195,81 @@ vec3 calcPBRDir(DirectionalLightStruct light, vec3 normal, vec3 viewDir, vec3 F0
     // --Shadow
     float shadowFactor = calcDirShadow(false, fs_in.DirectionalLightSpacePos[lightIndex], DirectionalShadowMap[lightIndex], normal, lightDir);
 
-    return (kD * albedo / PI + specular) * radiance * nDotL * (1.0f - shadowFactor);
+	return (kD * albedo / PI + specular) * radiance * nDotL * (1.0f - shadowFactor);
 }
+// POINT
 vec3 calcPBRPoint(PointLightStruct light, vec3 normal, vec3 viewDir, vec3 F0, vec3 albedo, float metallic, float roughness, int lightIndex) {
-    vec3 L = normalize(light.position.xyz - fs_in.FragPos);
-    vec3 H = normalize(viewDir + L);
+    vec3 lightDir = normalize(light.position.xyz - fs_in.FragPos);
+    vec3 halfVec  = normalize(viewDir + lightDir);
     
     float dist = length(light.position.xyz - fs_in.FragPos);
     float attenuationFactor = 1.0f / (dist * dist);
-    vec3  radiance = light.diffuse.rgb * attenuationFactor * 50.0f; 
+	
+	float window = pow(clamp(1.0f - pow(dist / light.radius, 4.0f), 0.0f, 1.0f), 2.0f);
+	
+    vec3  radiance = light.color.rgb * attenuationFactor * window * light.power; 
 
     // --Cook-Torrance BDRF
-    float D = distributionGGX(normal, H, roughness);          
-    float G = geometrySmithGGX(normal, viewDir, L, roughness);  
-    vec3  F = fresnelSchlick(max(dot(normal, viewDir), 0.0f), F0);
+    float D = distributionGGX(normal, halfVec, roughness);             // Normal Distribution Func
+    float G = geometrySmithGGX(normal, viewDir, lightDir, roughness);  // Geometry Func
+    vec3  F = fresnelSchlick(max(dot(halfVec, viewDir), 0.0f), F0);    // fresnelShlick
 
     vec3  numerator   = D * G * F;
-    float denominator = 4.0f * max(dot(viewDir, normal), 0.0f) * max(dot(L, normal), 0.0f) + 0.0001f;
+    float denominator = 4.0f * max(dot(viewDir, normal), 0.0f) * max(dot(lightDir, normal), 0.0f) + 0.0001f;
     vec3  specular    = numerator / denominator;
 
     vec3 kS = F;
     vec3 kD = vec3(1.0f) - kS;
     kD *= 1.0 - metallic;
 
-    float nDotL = max(dot(normal, L), 0.0f);
+    float nDotL = max(dot(normal, lightDir), 0.0f);
     
     // --Shadow
     float shadowFactor = 0.0f;
     switch (lightIndex) {
-        case 0: shadowFactor = calcOmniShadow(light.position.xyz, PointShadowMap[0], omniShadowMapFarPlanes[0], normal); break;
-        case 1: shadowFactor = calcOmniShadow(light.position.xyz, PointShadowMap[1], omniShadowMapFarPlanes[1], normal); break;
-        case 2: shadowFactor = calcOmniShadow(light.position.xyz, PointShadowMap[2], omniShadowMapFarPlanes[2], normal); break;
-        case 3: shadowFactor = calcOmniShadow(light.position.xyz, PointShadowMap[3], omniShadowMapFarPlanes[3], normal); break;
-        case 4: shadowFactor = calcOmniShadow(light.position.xyz, PointShadowMap[4], omniShadowMapFarPlanes[4], normal); break;
-        case 5: shadowFactor = calcOmniShadow(light.position.xyz, PointShadowMap[5], omniShadowMapFarPlanes[5], normal); break;
+        case 0: shadowFactor = calcOmniShadow(light.position.xyz, PointShadowMap[0], light.radius, normal); break;
+        case 1: shadowFactor = calcOmniShadow(light.position.xyz, PointShadowMap[1], light.radius, normal); break;
+        case 2: shadowFactor = calcOmniShadow(light.position.xyz, PointShadowMap[2], light.radius, normal); break;
+        case 3: shadowFactor = calcOmniShadow(light.position.xyz, PointShadowMap[3], light.radius, normal); break;
+        case 4: shadowFactor = calcOmniShadow(light.position.xyz, PointShadowMap[4], light.radius, normal); break;
+        case 5: shadowFactor = calcOmniShadow(light.position.xyz, PointShadowMap[5], light.radius, normal); break;
     }
     
     return (kD * albedo / PI + specular) * radiance * nDotL * (1.0f - shadowFactor);
 }
+// SPOT
 vec3 calcPBRSpot(SpotLightStruct light, vec3 normal, vec3 viewDir, vec3 F0, vec3 albedo, float metallic, float roughness, int lightIndex) {
-    vec3 L = normalize(light.position.xyz - fs_in.FragPos);
-    vec3 H = normalize(viewDir + L);
+    vec3 lightDir = normalize(light.position.xyz - fs_in.FragPos);
+    vec3 halfVec  = normalize(viewDir + lightDir);
     
-    float distance = length(light.position.xyz - fs_in.FragPos);
-    float attenuation = 1.0f / (distance * distance); 
+    float dist = length(light.position.xyz - fs_in.FragPos);
+    float attenuation = 1.0f / (dist * dist); 
+	
+	float window = pow(clamp(1.0f - pow(dist / light.radius, 4.0f), 0.0f, 1.0f), 2.0f);
 
-    float theta     = dot(L, normalize(-light.direction.xyz));
+    float theta     = dot(lightDir, normalize(-light.direction.xyz));
     float epsilon   = light.inCosCutoff - light.outCosCutoff;
-    float intensity = clamp((theta - light.outCosCutoff) / epsilon, 0.0f, 1.0f) * 50.0f;
+    float intensity = clamp((theta - light.outCosCutoff) / epsilon, 0.0f, 1.0f) * window * light.power;
 
-    vec3 radiance = light.diffuse.rgb * attenuation * intensity; 
+    vec3 radiance = light.color.rgb * attenuation * intensity; 
 
     // --Cook-Torrance BRDF
-    float D = distributionGGX(normal, H, roughness);          
-    float G = geometrySmithGGX(normal, viewDir, L, roughness);  
-    vec3  F = fresnelSchlick(max(dot(normal, viewDir), 0.0f), F0);
+    float D = distributionGGX(normal, halfVec, roughness);             // Normal Distribution Func
+    float G = geometrySmithGGX(normal, viewDir, lightDir, roughness);  // Geometry Func
+    vec3  F = fresnelSchlick(max(dot(halfVec, viewDir), 0.0f), F0);    // fresnelShlick
 
     vec3  num   = D * G * F;
-    float denom = 4.0f * max(dot(viewDir, normal), 0.0) * max(dot(L, normal), 0.0f) + 0.0001f;
+    float denom = 4.0f * max(dot(viewDir, normal), 0.0f) * max(dot(lightDir, normal), 0.0f) + 0.0001f;
     vec3  specular = num / denom;
 
     vec3 kS = F;
     vec3 kD = vec3(1.0f) - kS;
     kD *= 1.0 - metallic;
 
-    float nDotL = max(dot(normal, L), 0.0f);
+    float nDotL = max(dot(normal, lightDir), 0.0f);
     
     // --Shadow
-    float shadowFactor = calcDirShadow(true, fs_in.SpotLightSpacePos[lightIndex], SpotShadowMap[lightIndex], normal, L);
+    float shadowFactor = calcDirShadow(true, fs_in.SpotLightSpacePos[lightIndex], SpotShadowMap[lightIndex], normal, lightDir);
     
     return (kD * albedo / PI + specular) * radiance * nDotL * (1.0 - shadowFactor);
 }

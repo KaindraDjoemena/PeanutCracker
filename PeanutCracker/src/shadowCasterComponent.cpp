@@ -9,28 +9,23 @@
 #include <iostream>
 
 
-ShadowCasterComponent::ShadowCasterComponent(const glm::vec2& i_shadowMapRes, Shadow_Map_Projection i_projectionType, float i_width, float i_height, float i_nearPlane, float i_farPlane)
-	: m_shadowMapResolution(i_shadowMapRes)
+ShadowCasterComponent::ShadowCasterComponent(int i_shadowMapRes, Shadow_Map_Projection i_projectionType, float i_size, float i_nearPlane, float i_farPlane)
+	: m_shadowMapResolution{ i_shadowMapRes, i_shadowMapRes }
 	, m_projType(i_projectionType)
-	, m_planeWidth(i_width)
-	, m_planeHeight(i_height)
+	, m_planeWidth(i_size)
+	, m_planeHeight(i_size)
 	, m_nearPlane(i_nearPlane)
 	, m_farPlane(i_farPlane)
+	, m_leftPlane(-i_size)
+	, m_rightPlane(i_size)
+	, m_bottomPlane(-i_size)
+	, m_topPlane(i_size)
 {
+	updateFrustum();
 	genDirShadowMap();
 }
-ShadowCasterComponent::ShadowCasterComponent(const glm::vec2& i_shadowMapRes, Shadow_Map_Projection i_projectionType, float i_outCosCutoff, float i_width, float i_height, float i_nearPlane, float i_farPlane)
-	: m_shadowMapResolution(i_shadowMapRes)
-	, m_projType(i_projectionType)
-	, m_fov(glm::degrees(acos(glm::clamp(i_outCosCutoff, -1.0f, 1.0f)) * 2.0f) + 2.0f)
-	, m_planeWidth(i_width)
-	, m_planeHeight(i_height)
-	, m_nearPlane(i_nearPlane)
-	, m_farPlane(i_farPlane)
-{
-	genDirShadowMap();
-}
-ShadowCasterComponent::ShadowCasterComponent(int i_shadowMapRes, Shadow_Map_Projection i_projectionType, float i_fov, float i_size, float i_nearPlane, float i_farPlane)
+// FIX THE CONSTRUCTOR ISSUES
+ShadowCasterComponent::ShadowCasterComponent(bool isPoint, int i_shadowMapRes, Shadow_Map_Projection i_projectionType, float i_fov, float i_size, float i_nearPlane, float i_farPlane)
 	: m_shadowMapResolution{ i_shadowMapRes, i_shadowMapRes }
 	, m_projType(i_projectionType)
 	, m_fov(i_fov)
@@ -38,15 +33,24 @@ ShadowCasterComponent::ShadowCasterComponent(int i_shadowMapRes, Shadow_Map_Proj
 	, m_planeHeight(i_size)
 	, m_nearPlane(i_nearPlane)
 	, m_farPlane(i_farPlane)
+	, m_leftPlane(-i_size)
+	, m_rightPlane(i_size)
+	, m_bottomPlane(-i_size)
+	, m_topPlane(i_size)
 {
-	genOmniShadowMap();
+	if (isPoint) {
+		genOmniShadowMap();
+	}
+	else {
+		genDirShadowMap();
+	}
 }
 
 
-ShadowCasterComponent::~ShadowCasterComponent() {
-	glDeleteFramebuffers(1, &m_fboID);
-	glDeleteTextures(1, &m_depthMapTextureID);
-}
+//ShadowCasterComponent::~ShadowCasterComponent() {
+//	glDeleteFramebuffers(1, &m_fboID);
+//	glDeleteTextures(1, &m_depthMapTextureID);
+//}
 
 void ShadowCasterComponent::updateFrustum() {
 	frustum.constructFrustum(m_planeWidth / m_planeHeight, m_lightProjMat, m_lightViewMat);

@@ -18,11 +18,72 @@ class ShadowCasterComponent {
 public:
 	Frustum frustum;
 
-	ShadowCasterComponent(const glm::vec2& i_shadowMapRes, Shadow_Map_Projection i_projectionType, float i_width, float i_height, float i_nearPlane, float i_farPlane);
-	ShadowCasterComponent(const glm::vec2& i_shadowMapRes, Shadow_Map_Projection i_projectionType, float i_outCosCutoff, float i_width, float i_height, float i_nearPlane, float i_farPlane);
-	ShadowCasterComponent(int i_shadowMapRes, Shadow_Map_Projection i_projectionType, float i_fov, float i_size, float i_nearPlane, float i_farPlane);
+	ShadowCasterComponent() = default;
+	ShadowCasterComponent(int i_shadowMapRes, Shadow_Map_Projection i_projectionType, float i_size, float i_nearPlane, float i_farPlane);
+	ShadowCasterComponent(bool isPoint, int i_shadowMapRes, Shadow_Map_Projection i_projectionType, float i_fov, float i_size, float i_nearPlane, float i_farPlane);
 
-	~ShadowCasterComponent();
+	//~ShadowCasterComponent();
+
+
+
+
+    // 1. DELETE COPYING (Prevents accidental duplication of OpenGL IDs)
+    ShadowCasterComponent(const ShadowCasterComponent&) = delete;
+    ShadowCasterComponent& operator=(const ShadowCasterComponent&) = delete;
+
+    // 2. MOVE CONSTRUCTOR (Transfers ownership)
+    ShadowCasterComponent(ShadowCasterComponent&& other) noexcept
+        : m_depthMapTextureID(other.m_depthMapTextureID)
+        , m_fboID(other.m_fboID)
+        , m_shadowMapResolution(other.m_shadowMapResolution)
+        , m_projType(other.m_projType)
+        // ... copy other simple scalar members ...
+        , m_lightSpaceMatrix(other.m_lightSpaceMatrix)
+    {
+        // NULLIFY the source so its destructor doesn't kill the texture
+        other.m_depthMapTextureID = 0;
+        other.m_fboID = 0;
+    }
+
+    // 3. MOVE ASSIGNMENT (Handles "shadowCaster = ShadowCaster(...)")
+    ShadowCasterComponent& operator=(ShadowCasterComponent&& other) noexcept {
+        if (this != &other) {
+            // Clean up existing resources if this object already had them
+            cleanup();
+
+            // Steal resources
+            m_depthMapTextureID = other.m_depthMapTextureID;
+            m_fboID = other.m_fboID;
+            m_shadowMapResolution = other.m_shadowMapResolution;
+            // ... copy other scalars ...
+            m_lightSpaceMatrix = other.m_lightSpaceMatrix;
+
+            // Nullify source
+            other.m_depthMapTextureID = 0;
+            other.m_fboID = 0;
+        }
+        return *this;
+    }
+
+    // 4. DESTRUCTOR
+    ~ShadowCasterComponent() {
+        cleanup();
+    }
+
+    // Helper to avoid code duplication
+    void cleanup() {
+        if (m_depthMapTextureID != 0) {
+            glDeleteTextures(1, &m_depthMapTextureID);
+            m_depthMapTextureID = 0;
+        }
+        if (m_fboID != 0) {
+            glDeleteFramebuffers(1, &m_fboID);
+            m_fboID = 0;
+        }
+    }
+
+
+
 
 	unsigned int getDepthMapTexID() const { return m_depthMapTextureID; }
 	unsigned int getFboID() const { return m_fboID; }

@@ -180,6 +180,15 @@ void Scene::createAndAddSkybox(const std::filesystem::path& vertPath, const std:
 	m_skybox = std::move(m_skyboxPtr);*/
 }
 void Scene::createAndAddDirectionalLight(std::unique_ptr<DirectionalLight> light) {
+	std::cout << "=== ADDING DIRECTIONAL LIGHT ===" << std::endl;
+	std::cout << "Direction: " << light->direction.x << ", " << light->direction.y << ", " << light->direction.z << std::endl;
+	std::cout << "Power: " << light->light.power << std::endl;
+	std::cout << "Color: " << light->light.color.r << ", " << light->light.color.g << ", " << light->light.color.b << std::endl;
+	std::cout << "Shadow Dist: " << light->shadowDist << std::endl;
+	std::cout << "FBO ID: " << light->shadowCasterComponent.getFboID() << std::endl;
+	std::cout << "Depth Map ID: " << light->shadowCasterComponent.getDepthMapTexID() << std::endl;
+
+
 	m_directionalLights.push_back(std::move(light));
 	numDirectionalLights++;
 }
@@ -269,53 +278,46 @@ void Scene::setupSkyboxShaderUBOs(const Shader& shader) const {
 void Scene::updateShadowMapLSMats() const {
 	// -- Updating light space matrices
 	for (auto& dirLight : m_directionalLights) {
-		if (dirLight->shadowCasterComponent) {
-			// Check if direction is valid before calc
-			if (glm::length(dirLight->direction) < 0.001f) {
-				std::cerr << "ERROR: Direction is zero or near-zero!" << '\n';
-			}
-			if (glm::any(glm::isnan(dirLight->direction))) {
-				std::cerr << "ERROR: Direction contains NaN!" << '\n';
-			}
+		// Check if direction is valid before calc
+		if (glm::length(dirLight->direction) < 0.001f) {
+			std::cerr << "ERROR: Direction is zero or near-zero!" << '\n';
+		}
+		if (glm::any(glm::isnan(dirLight->direction))) {
+			std::cerr << "ERROR: Direction contains NaN!" << '\n';
+		}
 
-			dirLight->shadowCasterComponent->calcLightSpaceMat(dirLight->direction, glm::vec3(0.0f, 0.0f, 0.0f));
+		dirLight->shadowCasterComponent.calcLightSpaceMat(dirLight->direction, glm::vec3(0.0f, 0.0f, 0.0f));
 
-			// Check result immediately
-			glm::mat4 test = dirLight->shadowCasterComponent->getLightSpaceMatrix();
-			if (glm::any(glm::isnan(test[0]))) {
-				std::cerr << "Matrix became NaN inside calcLightSpaceMat!" << '\n';
-			}
+		// Check result immediately
+		glm::mat4 test = dirLight->shadowCasterComponent.getLightSpaceMatrix();
+		if (glm::any(glm::isnan(test[0]))) {
+			std::cerr << "Matrix became NaN inside calcLightSpaceMat!" << '\n';
 		}
 	}
 	for (auto& pointLight : m_pointLights) {
-		if (pointLight->shadowCasterComponent) {
+		pointLight->shadowCasterComponent.calcLightSpaceMats(pointLight->position);
 
-			pointLight->shadowCasterComponent->calcLightSpaceMats(pointLight->position);
-
-			// Check result immediately
-			std::array<glm::mat4, 6> test = pointLight->shadowCasterComponent->getLightSpaceMats();
-			if (glm::any(glm::isnan(test[0][0]))) {
-				std::cerr << "POINTLIGHT: Matrix became NaN inside calcLightSpaceMats!" << '\n';
-			}
+		// Check result immediately
+		std::array<glm::mat4, 6> test = pointLight->shadowCasterComponent.getLightSpaceMats();
+		if (glm::any(glm::isnan(test[0][0]))) {
+			std::cerr << "POINTLIGHT: Matrix became NaN inside calcLightSpaceMats!" << '\n';
 		}
 	}
 	for (auto& spotLight : m_spotLights) {
-		if (spotLight->shadowCasterComponent) {
-			// Check if direction is valid before calc
-			if (glm::length(spotLight->direction) < 0.001f) {
-				std::cerr << "ERROR: Direction is zero or near-zero!" << '\n';
-			}
-			if (glm::any(glm::isnan(spotLight->direction))) {
-				std::cerr << "ERROR: Direction contains NaN!" << '\n';
-			}
+		// Check if direction is valid before calc
+		if (glm::length(spotLight->direction) < 0.001f) {
+			std::cerr << "ERROR: Direction is zero or near-zero!" << '\n';
+		}
+		if (glm::any(glm::isnan(spotLight->direction))) {
+			std::cerr << "ERROR: Direction contains NaN!" << '\n';
+		}
 
-			spotLight->shadowCasterComponent->calcLightSpaceMat(spotLight->direction, spotLight->position);
+		spotLight->shadowCasterComponent.calcLightSpaceMat(spotLight->direction, spotLight->position);
 
-			// Check result immediately
-			glm::mat4 test = spotLight->shadowCasterComponent->getLightSpaceMatrix();
-			if (glm::any(glm::isnan(test[0]))) {
-				std::cerr << "SPOTLIGHT: Matrix became NaN inside calcLightSpaceMat!" << '\n';
-			}
+		// Check result immediately
+		glm::mat4 test = spotLight->shadowCasterComponent.getLightSpaceMatrix();
+		if (glm::any(glm::isnan(test[0]))) {
+			std::cerr << "SPOTLIGHT: Matrix became NaN inside calcLightSpaceMat!" << '\n';
 		}
 	}
 }
@@ -433,9 +435,7 @@ void Scene::drawDirectionalLightFrustums(const glm::mat4& projMat, const glm::ma
 	m_lightFrustumVAO.bind();
 
 	for (auto& dirLight : m_directionalLights) {
-		if (!dirLight->shadowCasterComponent) continue;
-
-		glm::mat4 lightVP = dirLight->shadowCasterComponent->getLightSpaceMatrix();
+		glm::mat4 lightVP = dirLight->shadowCasterComponent.getLightSpaceMatrix();
 		if (glm::any(glm::isnan(lightVP[0])) || glm::any(glm::isinf(lightVP[0]))) {
 			continue;
 		}
@@ -464,9 +464,7 @@ void Scene::drawSpotLightFrustums(const glm::mat4& projMat, const glm::mat4& vie
 	m_lightFrustumVAO.bind();
 
 	for (auto& spotLight : m_spotLights) {
-		if (!spotLight->shadowCasterComponent) continue;
-
-		glm::mat4 lightVP = spotLight->shadowCasterComponent->getLightSpaceMatrix();
+		glm::mat4 lightVP = spotLight->shadowCasterComponent.getLightSpaceMatrix();
 		if (glm::any(glm::isnan(lightVP[0])) || glm::any(glm::isinf(lightVP[0]))) {
 			continue;
 		}
@@ -483,25 +481,18 @@ void Scene::drawSpotLightFrustums(const glm::mat4& projMat, const glm::mat4& vie
 void Scene::bindDepthMaps() const {
 	// --Directinoal lights
 	for (size_t i = 0; i < m_directionalLights.size() && i < MAX_LIGHTS; ++i) {
-		if (m_directionalLights[i]->shadowCasterComponent) {
-			glActiveTexture(GL_TEXTURE0 + DIR_SHADOW_MAP_SLOT + i);
-			glBindTexture(GL_TEXTURE_2D, m_directionalLights[i]->shadowCasterComponent->getDepthMapTexID());
-			std::cout << "dir light " << i << " " << DIR_SHADOW_MAP_SLOT + i << std::endl;
-		}
+		glActiveTexture(GL_TEXTURE0 + DIR_SHADOW_MAP_SLOT + i);
+		glBindTexture(GL_TEXTURE_2D, m_directionalLights[i]->shadowCasterComponent.getDepthMapTexID());
 	}
 	// --Point lights
 	for (size_t i = 0; i < m_pointLights.size() && i < MAX_LIGHTS; ++i) {
-		if (m_pointLights[i]->shadowCasterComponent) {
-			glActiveTexture(GL_TEXTURE0 + POINT_SHADOW_MAP_SLOT + i);
-			glBindTexture(GL_TEXTURE_CUBE_MAP, m_pointLights[i]->shadowCasterComponent->getDepthMapTexID());
-		}
+		glActiveTexture(GL_TEXTURE0 + POINT_SHADOW_MAP_SLOT + i);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, m_pointLights[i]->shadowCasterComponent.getDepthMapTexID());
 	}
 	// --Spot lights
 	for (size_t i = 0; i < m_spotLights.size() && i < MAX_LIGHTS; ++i) {
-		if (m_spotLights[i]->shadowCasterComponent) {
-			glActiveTexture(GL_TEXTURE0 + SPOT_SHADOW_MAP_SLOT + i);
-			glBindTexture(GL_TEXTURE_2D, m_spotLights[i]->shadowCasterComponent->getDepthMapTexID());
-		}
+		glActiveTexture(GL_TEXTURE0 + SPOT_SHADOW_MAP_SLOT + i);
+		glBindTexture(GL_TEXTURE_2D, m_spotLights[i]->shadowCasterComponent.getDepthMapTexID());
 	}
 
 	glActiveTexture(GL_TEXTURE0);
@@ -540,43 +531,83 @@ void Scene::updateLightingUBO() const {
 
 	// --Directional
 	for (size_t i = 0; i < m_directionalLights.size() && i < MAX_LIGHTS; ++i) {
+
+		/*
+		directional light and spotlights work and behave as expected when adding them BEFORE objects. Setting the parameters of the light source (color, far planes, light angles) behaves normally. Meaning that the initialization of light works and the manipulation of these parameters through the GUI is working properly (for directional lights and spotlights, at least -- but lets not worry about point lights for now)
+
+however, when we add any light source (directional, spot, and point) AFTER an object seems to not have any effect on the scene. Interestingly enough though, when we do the same procedure of adding an object first, then a light source in renderdoc, the program crashes and one of the last lines of code that is possible to be read* is the cout statement of Scene::updateLightingUBOs();
+
+	for (size_t i = 0; i < m_directionalLights.size() && i < MAX_LIGHTS; ++i) {
+		std::cout << "updating ubo data: dir" << std::endl;
 		auto& src = m_directionalLights[i];
 		auto& dst = data.directionalLight[i];
-		dst.direction = glm::vec4(src->direction, 0.0f);
-		dst.ambient   = glm::vec4(src->light.ambient, 1.0f);
-		dst.diffuse   = glm::vec4(src->light.diffuse, 1.0f);
-		dst.specular  = glm::vec4(src->light.specular, 1.0f);
+		dst.direction  = glm::vec4(src->direction, 0.0f);
+		dst.color      = glm::vec4(src->light.color, 1.0f);
+		dst.power      = src->light.power;
+		dst.shadowDist = src->shadowDist;
+	}
+
+*there are some other lines that were printed out but they were hard to read as right after printing them to the console, the program crashes immediately so theres no way to read the those last lines
+
+Tried adding the light BEFORE the object in renderdoc to see what happens and it crashes too!
+		*/
+
+		/*
+		if (data.numDirLights > 0) {
+			printf("=== BEFORE COPY ===\n");
+			printf("CPU Light Power: %.2f\n", m_directionalLights[0]->light.power);
+			printf("CPU Light Color: (%.2f, %.2f, %.2f)\n",
+				m_directionalLights[0]->light.color.r,
+				m_directionalLights[0]->light.color.g,
+				m_directionalLights[0]->light.color.b);
+		}
+		*/
+
+		auto& src = m_directionalLights[i];
+		auto& dst = data.directionalLight[i];
+		dst.direction  = glm::vec4(src->direction, 0.0f);
+		dst.color      = glm::vec4(src->light.color, 1.0f);
+		dst.power      = src->light.power;
+		dst.shadowDist = src->shadowDist;
+
+		/*
+		if (data.numDirLights > 0) {
+			printf("=== AFTER COPY ===\n");
+			printf("UBO Struct Power: %.2f\n", data.directionalLight[0].power);
+			printf("UBO Struct Color: (%.2f, %.2f, %.2f)\n",
+				data.directionalLight[0].color.r,
+				data.directionalLight[0].color.g,
+				data.directionalLight[0].color.b);
+		}
+		*/
 	}
 	// --Point
 	for (size_t i = 0; i < m_pointLights.size() && i < MAX_LIGHTS; ++i) {
+		//std::cout << "updating ubo data: point" << std::endl;
 		auto& src = m_pointLights[i];
 		auto& dst = data.pointLight[i];
 		dst.position  = glm::vec4(src->position, 1.0f);
-		dst.ambient   = glm::vec4(src->light.ambient, 1.0f);
-		dst.diffuse   = glm::vec4(src->light.diffuse, 1.0f);
-		dst.specular  = glm::vec4(src->light.specular, 1.0f);
-		dst.constant  = src->attenuation.constant;
-		dst.linear    = src->attenuation.linear;
-		dst.quadratic = src->attenuation.quadratic;
+		dst.color     = glm::vec4(src->light.color, 1.0f);
+		dst.power     = src->light.power;
+		dst.radius    = src->radius;
 	}
 	// --Spot
 	for (size_t i = 0; i < m_spotLights.size() && i < MAX_LIGHTS; ++i) {
+		//std::cout << "updating ubo data: spot" << std::endl;
 		auto& src = m_spotLights[i];
 		auto& dst = data.spotLight[i];
 		dst.position     = glm::vec4(src->position, 1.0f);
 		dst.direction    = glm::vec4(src->direction, 0.0f);
-		dst.ambient      = glm::vec4(src->light.ambient, 1.0f);
-		dst.diffuse      = glm::vec4(src->light.diffuse, 1.0f);
-		dst.specular     = glm::vec4(src->light.specular, 1.0f);
-		dst.constant     = src->attenuation.constant;
-		dst.linear       = src->attenuation.linear;
-		dst.quadratic    = src->attenuation.quadratic;
+		dst.color        = glm::vec4(src->light.color, 1.0f);
+		dst.power        = src->light.power;
+		dst.radius       = src->radius;
 		dst.inCosCutoff  = src->inCosCutoff;
 		dst.outCosCutoff = src->outCosCutoff;
 	}
 
 	glBindBuffer(GL_UNIFORM_BUFFER, lightingUBO);
-	glBufferData(GL_UNIFORM_BUFFER, sizeof(LightingUBOData), &data, GL_DYNAMIC_DRAW);
+	//glBufferData(GL_UNIFORM_BUFFER, sizeof(LightingUBOData), &data, GL_DYNAMIC_DRAW);
+	glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(LightingUBOData), &data);
 	glBindBuffer(GL_UNIFORM_BUFFER, 0);
 }
 // SHADOW UBO
@@ -585,22 +616,16 @@ void Scene::updateShadowUBO() const {
 
 	// --Directional lights
 	for (size_t i = 0; i < m_directionalLights.size() && i < MAX_LIGHTS; ++i) {
-		if (m_directionalLights[i]->shadowCasterComponent) {
-			data.directionalLightSpaceMatrices[i] = m_directionalLights[i]->shadowCasterComponent->getLightSpaceMatrix();
-		}
-		else {
-			data.directionalLightSpaceMatrices[i] = glm::mat4(1.0f);
-		}
+		data.directionalLightSpaceMatrices[i] = m_directionalLights[i]->shadowCasterComponent.getLightSpaceMatrix();
 	}
 	// --Spot lights
 	for (size_t i = 0; i < m_spotLights.size(); ++i) {
-		if (m_spotLights[i]->shadowCasterComponent) {
-			data.spotLightSpaceMatrices[i] = m_spotLights[i]->shadowCasterComponent->getLightSpaceMatrix();
-		}
+		data.spotLightSpaceMatrices[i] = m_spotLights[i]->shadowCasterComponent.getLightSpaceMatrix();
 	}
 
 	glBindBuffer(GL_UNIFORM_BUFFER, shadowUBO);
-	glBufferData(GL_UNIFORM_BUFFER, sizeof(ShadowMatricesUBOData), &data, GL_DYNAMIC_DRAW);
+	//glBufferData(GL_UNIFORM_BUFFER, sizeof(ShadowMatricesUBOData), &data, GL_DYNAMIC_DRAW);
+	glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(ShadowMatricesUBOData), &data);
 	glBindBuffer(GL_UNIFORM_BUFFER, 0);
 }
 
@@ -611,23 +636,14 @@ void Scene::setNodeShadowMapUniforms() const {
 	for (size_t i = 0; i < MAX_LIGHTS; ++i) {
 		std::string uniformName = "DirectionalShadowMap[" + std::to_string(i) + "]";
 		m_modelShader->setInt(uniformName, DIR_SHADOW_MAP_SLOT + i);
-		//std::cout << "[SET_NODE_SMUs] " << uniformName << " : " << DIR_SHADOW_MAP_SLOT + i << std::endl;
 	}
 	for (size_t i = 0; i < MAX_LIGHTS; ++i) {
 		std::string uniformName = "PointShadowMap[" + std::to_string(i) + "]";
 		m_modelShader->setInt(uniformName, POINT_SHADOW_MAP_SLOT + i);
-
-		float farPlane = (i < m_pointLights.size() && m_pointLights[i]->shadowCasterComponent)
-			? m_pointLights[i]->shadowCasterComponent->getFarPlane()
-			: 25.0f;
-		m_modelShader->setFloat("omniShadowMapFarPlanes[" + std::to_string(i) + "]", farPlane);
-
-		//std::cout << "[SET_NODE_SMUs] " << uniformName << " : " << POINT_SHADOW_MAP_SLOT + i << std::endl;
 	}
 	for (size_t i = 0; i < MAX_LIGHTS; ++i) {
 		std::string uniformName = "SpotShadowMap[" + std::to_string(i) + "]";
 		m_modelShader->setInt(uniformName, SPOT_SHADOW_MAP_SLOT + i);
-		//std::cout << "[SET_NODE_SMUs] " << uniformName << " : " << SPOT_SHADOW_MAP_SLOT + i << std::endl;
 	}
 }
 
