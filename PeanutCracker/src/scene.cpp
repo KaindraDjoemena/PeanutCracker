@@ -30,6 +30,7 @@ Scene::Scene(AssetManager* i_assetManager) : m_assetManager(i_assetManager) {
 	m_dirDepthShader    = m_assetManager->loadShaderObject("dirDepth.vert", "dirDepth.frag");
 	m_omniDepthShader   = m_assetManager->loadShaderObject("omniDepth.vert", "omniDepth.frag", "omniDepth.geom");
 	m_outlineShader     = m_assetManager->loadShaderObject("outline.vert", "outline.frag");
+	m_primitiveShader   = m_assetManager->loadShaderObject("primitive.vert", "primitive.frag");
 	m_postProcessShader = m_assetManager->loadShaderObject("postprocess.vert", "postprocess.frag");
 
 	m_skyboxShader      = m_assetManager->loadShaderObject("skybox.vert", "skybox.frag");
@@ -45,6 +46,7 @@ Scene::Scene(AssetManager* i_assetManager) : m_assetManager(i_assetManager) {
 	bindToUBOs(*m_dirDepthShader);
 	bindToUBOs(*m_omniDepthShader);
 	bindToUBOs(*m_outlineShader);
+	bindToUBOs(*m_primitiveShader);
 	bindToUBOs(*m_postProcessShader);
 }
 //Scene::Scene(const Scene&) = delete;
@@ -172,23 +174,7 @@ void Scene::createAndAddObject(const std::string& modelPath) {
 	m_selectedEntities.push_back(newNode.get());
 	m_worldNode->addChild(std::move(newNode));
 }
-void Scene::createAndAddSkybox(const std::filesystem::path& vertPath, const std::filesystem::path& fragPath) {
-	std::shared_ptr<Shader> shaderObjectPtr = m_assetManager->loadShaderObject(vertPath, fragPath);
-	/*auto m_skyboxPtr = std::make_unique<Cubemap>(faces, shaderObjectPtr.get());
-
-	setupSkyboxShaderUBOs(shaderObjectPtr.get());
-	m_skybox = std::move(m_skyboxPtr);*/
-}
 void Scene::createAndAddDirectionalLight(std::unique_ptr<DirectionalLight> light) {
-	std::cout << "=== ADDING DIRECTIONAL LIGHT ===" << std::endl;
-	std::cout << "Direction: " << light->direction.x << ", " << light->direction.y << ", " << light->direction.z << std::endl;
-	std::cout << "Power: " << light->light.power << std::endl;
-	std::cout << "Color: " << light->light.color.r << ", " << light->light.color.g << ", " << light->light.color.b << std::endl;
-	std::cout << "Shadow Dist: " << light->shadowDist << std::endl;
-	std::cout << "FBO ID: " << light->shadowCasterComponent.getFboID() << std::endl;
-	std::cout << "Depth Map ID: " << light->shadowCasterComponent.getDepthMapTexID() << std::endl;
-
-
 	m_directionalLights.push_back(std::move(light));
 	numDirectionalLights++;
 }
@@ -324,8 +310,8 @@ void Scene::updateShadowMapLSMats() const {
 
 void Scene::init() {
 
-	initLightFrustumDebug();
-	initDebugAABBDrawing();
+	//initLightFrustumDebug();
+	//initDebugAABBDrawing();
 
 	//initSelectionOutline();
 	bindToUBOs(*m_outlineShader);
@@ -386,6 +372,7 @@ void Scene::debugPrintSceneGraph(SceneNode* node, int depth) {
 
 
 /* ===== LIGHT FRUSTUM DRAWING ================================================================= */
+/*
 void Scene::initLightFrustumDebug() {
 	float frustumLines[] = {
 		// Near
@@ -476,6 +463,7 @@ void Scene::drawSpotLightFrustums(const glm::mat4& projMat, const glm::mat4& vie
 	}
 	m_lightFrustumVAO.unbind();
 }
+*/
 
 
 void Scene::bindDepthMaps() const {
@@ -531,61 +519,19 @@ void Scene::updateLightingUBO() const {
 
 	// --Directional
 	for (size_t i = 0; i < m_directionalLights.size() && i < MAX_LIGHTS; ++i) {
-
-		/*
-		directional light and spotlights work and behave as expected when adding them BEFORE objects. Setting the parameters of the light source (color, far planes, light angles) behaves normally. Meaning that the initialization of light works and the manipulation of these parameters through the GUI is working properly (for directional lights and spotlights, at least -- but lets not worry about point lights for now)
-
-however, when we add any light source (directional, spot, and point) AFTER an object seems to not have any effect on the scene. Interestingly enough though, when we do the same procedure of adding an object first, then a light source in renderdoc, the program crashes and one of the last lines of code that is possible to be read* is the cout statement of Scene::updateLightingUBOs();
-
-	for (size_t i = 0; i < m_directionalLights.size() && i < MAX_LIGHTS; ++i) {
-		std::cout << "updating ubo data: dir" << std::endl;
 		auto& src = m_directionalLights[i];
 		auto& dst = data.directionalLight[i];
+		
 		dst.direction  = glm::vec4(src->direction, 0.0f);
 		dst.color      = glm::vec4(src->light.color, 1.0f);
 		dst.power      = src->light.power;
-		dst.shadowDist = src->shadowDist;
-	}
-
-*there are some other lines that were printed out but they were hard to read as right after printing them to the console, the program crashes immediately so theres no way to read the those last lines
-
-Tried adding the light BEFORE the object in renderdoc to see what happens and it crashes too!
-		*/
-
-		/*
-		if (data.numDirLights > 0) {
-			printf("=== BEFORE COPY ===\n");
-			printf("CPU Light Power: %.2f\n", m_directionalLights[0]->light.power);
-			printf("CPU Light Color: (%.2f, %.2f, %.2f)\n",
-				m_directionalLights[0]->light.color.r,
-				m_directionalLights[0]->light.color.g,
-				m_directionalLights[0]->light.color.b);
-		}
-		*/
-
-		auto& src = m_directionalLights[i];
-		auto& dst = data.directionalLight[i];
-		dst.direction  = glm::vec4(src->direction, 0.0f);
-		dst.color      = glm::vec4(src->light.color, 1.0f);
-		dst.power      = src->light.power;
-		dst.shadowDist = src->shadowDist;
-
-		/*
-		if (data.numDirLights > 0) {
-			printf("=== AFTER COPY ===\n");
-			printf("UBO Struct Power: %.2f\n", data.directionalLight[0].power);
-			printf("UBO Struct Color: (%.2f, %.2f, %.2f)\n",
-				data.directionalLight[0].color.r,
-				data.directionalLight[0].color.g,
-				data.directionalLight[0].color.b);
-		}
-		*/
+		dst.range      = src->range;
 	}
 	// --Point
 	for (size_t i = 0; i < m_pointLights.size() && i < MAX_LIGHTS; ++i) {
-		//std::cout << "updating ubo data: point" << std::endl;
 		auto& src = m_pointLights[i];
 		auto& dst = data.pointLight[i];
+		
 		dst.position  = glm::vec4(src->position, 1.0f);
 		dst.color     = glm::vec4(src->light.color, 1.0f);
 		dst.power     = src->light.power;
@@ -593,14 +539,14 @@ Tried adding the light BEFORE the object in renderdoc to see what happens and it
 	}
 	// --Spot
 	for (size_t i = 0; i < m_spotLights.size() && i < MAX_LIGHTS; ++i) {
-		//std::cout << "updating ubo data: spot" << std::endl;
 		auto& src = m_spotLights[i];
 		auto& dst = data.spotLight[i];
+		
 		dst.position     = glm::vec4(src->position, 1.0f);
 		dst.direction    = glm::vec4(src->direction, 0.0f);
 		dst.color        = glm::vec4(src->light.color, 1.0f);
 		dst.power        = src->light.power;
-		dst.radius       = src->radius;
+		dst.range        = src->range;
 		dst.inCosCutoff  = src->inCosCutoff;
 		dst.outCosCutoff = src->outCosCutoff;
 	}
@@ -655,6 +601,7 @@ void Scene::setNodeIBLMapUniforms() const {
 }
 
 /* ===== SELECTION DRAWING ================================================================= */
+/*
 void Scene::drawSelectionStencil() const {
 	if (m_selectedEntities.empty()) return;
 
@@ -698,9 +645,10 @@ void Scene::drawSelectionStencil() const {
 	glDisable(GL_STENCIL_TEST);
 	glStencilMask(0xFF);
 }
-
+*/
 
 /* ===== AABB BOX DRAWING ================================================================= */
+/*
 void Scene::initDebugAABBDrawing() {
 	// For the box
 	float vertices[] = {
@@ -749,3 +697,4 @@ void Scene::drawDebugAABBs(SceneNode* node) const {
 		drawDebugAABBs(child.get());
 	}
 }
+*/

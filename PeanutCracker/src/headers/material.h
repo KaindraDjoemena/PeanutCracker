@@ -1,34 +1,17 @@
-#ifndef MATERIAL_H
-#define MATERIAL_H
+#pragma once
 
 #include <glm/glm.hpp>
 #include "shader.h"
 #include "texture.h"
+#include <string>
+#include <memory>
 
 
 struct Material {
-	Texture diffuse;
-	Texture specular;
-	float shininess;
+	std::string name;
 
-	Material(const char* i_diffusePath,
-			 const char* i_specularPath,
-			 float i_shininess
-	) : diffuse(i_diffusePath, 0),
-		specular(i_specularPath, 1),
-		shininess(i_shininess) {}
-
-	Material(const Texture& i_diffuseTex,
-		const Texture& i_specularTex,
-		float i_shininess
-	) : diffuse(i_diffuseTex),
-		specular(i_specularTex),
-		shininess(i_shininess) {}
-
-	void bind() {
-		diffuse.bind();
-		specular.bind();
-	}
+	std::shared_ptr<Texture> albedo;
+	Texture metallic;
+	Texture roughness;
+	Texture ao;
 };
-
-#endif

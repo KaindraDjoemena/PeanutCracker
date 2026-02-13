@@ -46,6 +46,7 @@ add_executable(PeanutCracker
     "PeanutCracker/src/shader.cpp"
     "PeanutCracker/src/shadowCasterComponent.cpp"
     "PeanutCracker/src/sphereColliderComponent.cpp"
+    "PeanutCracker/src/texture.cpp"
 )
 
 target_link_libraries(PeanutCracker PRIVATE 

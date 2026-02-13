@@ -122,6 +122,12 @@ public:
 	void setBgCol(const glm::vec4& bgCol) { m_winBgCol = bgCol; }
 
 private:
+	enum class Primitive_Mode {
+		SOLID    = 0,
+		S_LINE   = 1,
+		SDF_RING = 2
+	};
+
 	Render_Mode _renderMode     = Render_Mode::PBR;
 	bool        _usingShadowMap = true;
 	
@@ -130,11 +136,18 @@ private:
 	Framebuffer m_viewportFBO;
 
 	// Post-processing
+	VAO m_lineVAO;
+	VBO m_lineVBO;
+
 	VAO m_quadVAO;
 	VBO m_quadVBO;
-	float m_exposure = 1.0f;
 
-	void setupPostProcessQuad();
+	VAO m_coneVAO;
+	VBO m_coneVBO;
+	int m_coneVertexCount = 0;
+
+	float m_exposure = 1.0f;
+	
 	void renderPostProcess(const Scene& scene, int vWidth, int vHeight) const;
 
 	void renderShadowPass(const Scene& scene, const Camera& cam) const;
@@ -144,4 +157,11 @@ private:
 	void renderSkybox(const Scene& scena) const;
 
 	void renderSelectionHightlight(const Scene& scene) const;
+	void renderLightAreas(const Scene& scene, const Camera& cam, int vWidth, int vHeight) const;
+
+	// TODO: inside a rendering utils class? (the renderer class just keeps track of the vao)
+	void setupUnitLine();
+	void setupUnitQuad();
+	void setupUnitCone();
+
 };

@@ -3,7 +3,6 @@
 #include "headers/camera.h"
 #include "headers/light.h"
 #include "headers/object.h"
-#include "headers/transform.h"
 
 #include <GLFW/glfw3.h>
 #include <imgui.h>
@@ -13,8 +12,6 @@
 
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/quaternion.hpp> 
-
-#include <array>
 
 
 GUI::GUI(GLFWwindow* window, const char* glsl_version) {
@@ -222,9 +219,9 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
 						DrawProperty("Col", [&]() { ImGui::ColorEdit3("##c", &l.light.color.x); });
 						DrawProperty("Pow", [&]() {ImGui::DragFloat("##pow", &l.light.power); });
 
-						// ShadowDist
-						ImGui::SeparatorText("Max Shadow Dist");
-						DrawProperty("Dist", [&]() { if (ImGui::DragFloat("##rad", &l.shadowDist, 0.01f)) { l.shadowCasterComponent.setFarPlane(l.shadowDist); } });
+						// Range
+						ImGui::SeparatorText("Range");
+						DrawProperty("Range", [&]() { if (ImGui::DragFloat("##range", &l.range, 0.01f)) { l.shadowCasterComponent.setFarPlane(l.range); } });
 										
 						ImGui::Spacing();
 					}
@@ -276,7 +273,7 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
 						DrawProperty("Col", [&]() { ImGui::ColorEdit3("##a", &l.light.color.x); });
 						DrawProperty("Pow", [&]() {ImGui::DragFloat("##pow", &l.light.power); });
 
-						// Attenuation
+						// Radius
 						ImGui::Spacing();
 						ImGui::Separator();
 						ImGui::Spacing();
@@ -350,15 +347,15 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
 						DrawProperty("Col", [&]() { ImGui::ColorEdit3("##a", &l.light.color.x); });
 						DrawProperty("Pow", [&]() {ImGui::DragFloat("##pow", &l.light.power); });
 
-						// Attenuation
+						// Range
 						ImGui::Spacing();
 						ImGui::Separator();
 						ImGui::Spacing();
-						ImGui::SeparatorText("Radius");
+						ImGui::SeparatorText("Range");
 						/*DrawProperty("Kc", [&]() { ImGui::DragFloat("##c", &l.attenuation.constant, 0.01f); });
 						DrawProperty("Kl", [&]() { ImGui::DragFloat("##l", &l.attenuation.linear, 0.001f); });
 						DrawProperty("Kq", [&]() { ImGui::DragFloat("##q", &l.attenuation.quadratic, 0.0001f); });*/
-						DrawProperty("Rad", [&]() { if (ImGui::DragFloat("##rad", &l.radius, 0.01f)) { l.shadowCasterComponent.setFarPlane(l.radius); } });
+						DrawProperty("Range", [&]() { if (ImGui::DragFloat("##range", &l.range, 0.01f)) { l.shadowCasterComponent.setFarPlane(l.range); } });
 
 						// Frustum
 						//ImGui::SeparatorText("Frustum Planes");

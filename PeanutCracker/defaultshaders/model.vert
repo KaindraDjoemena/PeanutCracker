@@ -22,7 +22,7 @@ struct DirectionalLightStruct {  // 48 Bytes
 	vec4  direction;
 	vec4  color;
 	float power;
-	float shadowDist;
+	float range;
 	float p0;
 	float p1;
 };
@@ -41,7 +41,7 @@ struct SpotLightStruct {  // 64 Bytes
 	vec4  direction;
 	vec4  color;
 	float power;
-	float radius;
+	float range;
 	float inCosCutoff;
 	float outCosCutoff;
 };

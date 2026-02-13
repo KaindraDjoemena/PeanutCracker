@@ -28,7 +28,7 @@ struct DirectionalLightStruct {
 	vec4  direction;  // 16
 	vec4  color;      // 16
 	float power;      // 4
-	float shadowDist; // 4
+	float range;      // 4
 	float p0;
 	float p1;     // 8
 };					  // 48 Bytes
@@ -47,7 +47,7 @@ struct SpotLightStruct {
 	vec4  direction;	// 16
 	vec4  color;        // 16
 	float power;        // 4
-	float radius;		// 4
+	float range;		// 4
 	float inCosCutoff;	// 4
 	float outCosCutoff;	// 4
 };						// 64 Bytes
@@ -96,36 +96,11 @@ vec3 calcPBRDir(DirectionalLightStruct light, vec3 normal, vec3 viewDir, vec3 F0
 vec3 calcPBRPoint(PointLightStruct light, vec3 normal, vec3 viewDir, vec3 F0, vec3 albedo, float metallic, float roughness, int lightIndex);
 vec3 calcPBRSpot(SpotLightStruct light, vec3 normal, vec3 viewDir, vec3 F0, vec3 albedo, float metallic, float roughness, int lightIndex);
 
-/*
-void main() {
-    // Are we receiving ANY lights?
-    if (lightingBlock.numDirectionalLights == 0) {
-        FragColor = vec4(1.0, 0.0, 0.0, 1.0);  // RED = NO LIGHTS
-        return;
-    }
-    
-    // We have lights! Show the count as brightness
-    float brightness = float(lightingBlock.numDirectionalLights) / 8.0;
-    FragColor = vec4(vec3(brightness), 1.0);
-}
-*/
-
-/*
-void main() {
-    if (lightingBlock.numDirectionalLights > 0) {
-        // Show light power as brightness
-        float power = lightingBlock.directionalLight[0].power;
-        FragColor = vec4(vec3(power / 20.0), 1.0);
-        return;
-    }
-    FragColor = vec4(1.0, 0.0, 0.0, 1.0);
-}
-*/
 
 /* ======================================================== MAIN === */
 void main() {
-    vec3 viewDir = normalize(cameraPos.xyz - fs_in.FragPos);
-    vec3 norm = getNormal();
+    vec3 viewDir = normalize(cameraPos.xyz - fs_in.FragPos);	// frag.xyz -> camera.xyz
+    vec3 norm = getNormal();	// tangent space
 
     vec3  albedo    = texture(material.albedoMap, fs_in.TexCoord).rgb;
     float metallic  = texture(material.metallicMap, fs_in.TexCoord).b;
@@ -136,6 +111,10 @@ void main() {
     F0 = mix(F0, albedo, metallic);
 
     vec3 directLighting = vec3(0.0f);   // Lighting from light sources
+
+
+
+
 
 	//--Direct lighting
     for (int i = 0; i < lightingBlock.numDirectionalLights; ++i) {
@@ -154,17 +133,20 @@ void main() {
 	vec3 kS = F;
 	vec3 kD = 1.0f - kS;
 	kD *= 1.0f - metallic;
+
 	//--Diffuse IBL
 	vec3 irradiance = texture(irradianceMap, norm).rgb;
-	vec3 diffuse    = irradiance * albedo;
+	vec3 diffuseIBL = irradiance * albedo;
+
 	//--Specular IBL
 	const float MAX_REFLECTION_LOD = 4.0f;
 	vec3 prefilteredCol = textureLod(prefilterMap, R, roughness * MAX_REFLECTION_LOD).rgb;
 	vec2 brdf           = texture(brdfLUT, vec2(max(dot(norm, viewDir), 0.0f), roughness)).rg;
-	vec3 specular       = prefilteredCol * (F * brdf.x + brdf.y);
+	vec3 specularIBL    = prefilteredCol * (F * brdf.x + brdf.y);
 	
-	vec3 ambient = (kD * diffuse + specular) * ao;
-	vec3 color = ambient + directLighting;
+	// Color
+	vec3 ambient = (kD * diffuseIBL + specularIBL) * ao;
+	vec3 color   = ambient + directLighting;
 
     FragColor = vec4(color, 1.0f);
 }
@@ -245,7 +227,7 @@ vec3 calcPBRSpot(SpotLightStruct light, vec3 normal, vec3 viewDir, vec3 F0, vec3
     float dist = length(light.position.xyz - fs_in.FragPos);
     float attenuation = 1.0f / (dist * dist); 
 	
-	float window = pow(clamp(1.0f - pow(dist / light.radius, 4.0f), 0.0f, 1.0f), 2.0f);
+	float window = pow(clamp(1.0f - pow(dist / light.range, 4.0f), 0.0f, 1.0f), 2.0f);
 
     float theta     = dot(lightDir, normalize(-light.direction.xyz));
     float epsilon   = light.inCosCutoff - light.outCosCutoff;

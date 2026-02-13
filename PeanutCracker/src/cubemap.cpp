@@ -75,12 +75,12 @@ unsigned int Cubemap::loadHDRTex(const std::string& hdrPath) const {
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
 		glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
-		stbi_image_free(data);
 	}
 	else {
 		std::cout << "[CUBEMAP] Failed to load HDR image" << std::endl;
 	}
 
+	stbi_image_free(data);
 	return hdrTexID;
 }
 

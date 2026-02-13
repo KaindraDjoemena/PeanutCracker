@@ -1,7 +1,12 @@
 #include "headers/renderer.h"
 
+#include "glm/glm.hpp"
+#include <glm/gtc/matrix_transform.hpp>
+
 void Renderer::initScene(Scene& scene) {
-	setupPostProcessQuad();
+	setupUnitLine();
+	setupUnitQuad();
+	setupUnitCone();
 }
 
 
@@ -34,7 +39,11 @@ void Renderer::renderScene(const Scene& scene, const Camera& cam, int vWidth, in
 	m_viewportFBO.bind(vWidth, vHeight);
 	renderLightPass(scene, cam, vWidth, vHeight);
 
+	// --Debug
 	renderSelectionHightlight(scene);
+	renderLightAreas(scene, cam, vWidth, vHeight);
+
+
 	m_viewportFBO.resolve();
 
 	renderPostProcess(scene, vWidth, vHeight);
@@ -104,24 +113,12 @@ void Renderer::renderLightPass(const Scene& scene, const Camera& cam, int vWidth
 		renderSkybox(scene);
 	}
 
-	//scene.getWorldNode()->update(glm::mat4(1.0f), true);
-
-	scene.setNodeShadowMapUniforms();		// Set fragment shader shadow map uniformms
+	scene.setNodeShadowMapUniforms(); // Set fragment shader shadow map uniformms
 	scene.setNodeIBLMapUniforms();
 
 	if (_renderMode == Render_Mode::WIREFRAME) { glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); }
 	renderObjects(scene, scene.getWorldNode(), cam);
 	if (_renderMode == Render_Mode::WIREFRAME) { glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); }
-
-
-
-	// --Drawing selected objects
-	//drawSelectionStencil();
-
-	// --Debug drawing
-	//drawDirectionalLightFrustums(camera.getProjMat(vWidth / vHeight), camera.getViewMat());
-	//drawSpotLightFrustums(camera.getProjMat(vWidth / vHeight), camera.getViewMat());
-	//drawDebugAABBs(m_worldNode.get());
 }
 
 // Renders objects to the scene
@@ -161,7 +158,6 @@ void Renderer::renderSkybox(const Scene& scene) const {
 	scene.getSkybox()->draw(scene.getSkyboxShader());
 }
 
-
 void Renderer::renderSelectionHightlight(const Scene& scene) const {
 	if (scene.getSelectedEnts().empty()) return;
 
@@ -184,7 +180,8 @@ void Renderer::renderSelectionHightlight(const Scene& scene) const {
 	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 	glDepthMask(GL_TRUE);
 
-	// DRAWING THE OUTLINE
+
+	// === DRAWING THE OUTLINE ===========================================================
 	glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
 	glStencilMask(0x00);
 	glDisable(GL_DEPTH_TEST);
@@ -200,14 +197,141 @@ void Renderer::renderSelectionHightlight(const Scene& scene) const {
 		selectedNode->object->modelPtr->draw(scene.getOutlineShader());
 	}
 
-	// OPENGL STATE CLEANUP
 	glDisable(GL_STENCIL_TEST);
 	glEnable(GL_DEPTH_TEST);
 	glDisable(GL_STENCIL_TEST);
 	glStencilMask(0xFF);
 }
 
-void Renderer::setupPostProcessQuad() {
+void Renderer::renderLightAreas(const Scene& scene, const Camera& cam, int vWidth, int vHeight) const {
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glDepthMask(GL_FALSE);
+
+	const Shader& primitiveShader = scene.getPrimitiveShader();
+	
+	// TODO: USE A UBO
+	primitiveShader.use();
+	primitiveShader.setVec3("color", glm::vec3(1.0f, 1.0f, 0.0f)); // yellow line color (TODO: PUT INSIDE A CONST)
+	primitiveShader.setMat4("view", cam.getViewMat());
+	primitiveShader.setMat4("projection", cam.getProjMat((float)vWidth / (float)vHeight));
+
+	// Draws the dir arrow
+	m_lineVAO.bind();
+	primitiveShader.setInt("mode", static_cast<int>(Primitive_Mode::S_LINE));	// 1
+	for (auto& dirLight : scene.getDirectionalLights()) {
+		glm::vec3 upVec = std::abs(dirLight->direction.y) < 0.99f ? glm::vec3(0, 1, 0) : glm::vec3(1, 0, 0);
+		glm::mat4 modelMat = glm::inverse(glm::lookAt(dirLight->position, dirLight->position + dirLight->direction, upVec));
+		modelMat = glm::scale(modelMat, glm::vec3(1.0f, 1.0f, 10.0f));
+
+		primitiveShader.setMat4("model", modelMat);
+
+		glDrawArrays(GL_LINES, 0, 2);
+	}
+
+	// Draws the radius
+	m_quadVAO.bind();
+	primitiveShader.setInt("mode", static_cast<int>(Primitive_Mode::SDF_RING));	// 2
+	for (auto& pointLight : scene.getPointLights()) {
+		glm::mat4 modelMat = glm::translate(glm::mat4(1.0f), pointLight->position);
+
+		glm::mat4 viewMat = cam.getViewMat();
+		modelMat[0][0] = viewMat[0][0]; modelMat[0][1] = viewMat[1][0]; modelMat[0][2] = viewMat[2][0];
+		modelMat[1][0] = viewMat[0][1]; modelMat[1][1] = viewMat[1][1]; modelMat[1][2] = viewMat[2][1];
+		modelMat[2][0] = viewMat[0][2]; modelMat[2][1] = viewMat[1][2]; modelMat[2][2] = viewMat[2][2];
+
+		modelMat = glm::scale(modelMat, glm::vec3(pointLight->radius));
+
+		primitiveShader.setMat4("model", modelMat);
+
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+	}
+	m_quadVAO.unbind();
+
+	// Draws the light cono
+	m_coneVAO.bind();
+	primitiveShader.setInt("mode", static_cast<int>(Primitive_Mode::S_LINE));	// 1
+	for (auto& spotLight : scene.getSpotLights()) {
+		glm::vec3 upVec    = std::abs(spotLight->direction.y) < 0.99f ? glm::vec3(0, 1, 0) : glm::vec3(1, 0, 0);
+		glm::mat4 modelMat = glm::inverse(glm::lookAt(spotLight->position, spotLight->position + spotLight->direction, upVec));
+		float outerAngleRadians = std::acos(glm::clamp(spotLight->outCosCutoff, -1.0f, 1.0f));
+		float coneBaseRadius    = spotLight->range * std::tan(outerAngleRadians);
+		modelMat = glm::scale(modelMat, glm::vec3(coneBaseRadius, coneBaseRadius, spotLight->range));
+
+		primitiveShader.setMat4("model", modelMat);
+		
+		glDrawArrays(GL_LINES, 0, m_coneVertexCount);
+	}
+
+	glDisable(GL_BLEND);
+	glDepthMask(GL_TRUE);
+}
+
+
+void Renderer::setupUnitCone() {
+	// TODO: USE ARRAYS?
+	std::vector<float> coneVertices;
+	int segments = 32;
+
+	// 1. Generate the Base Circle (Lines connecting segments)
+	for (int i = 0; i < segments; i++) {
+		float angle1 = (float)i / (float)segments * 2.0f * glm::pi<float>();
+		float angle2 = (float)(i + 1) / (float)segments * 2.0f * glm::pi<float>();
+
+		// Point A
+		coneVertices.push_back(cos(angle1)); coneVertices.push_back(sin(angle1)); coneVertices.push_back(-1.0f);
+		// Point B
+		coneVertices.push_back(cos(angle2)); coneVertices.push_back(sin(angle2)); coneVertices.push_back(-1.0f);
+	}
+
+	// 2. Generate the "Spokes" (4 lines from Tip to Circle at 0, 90, 180, 270 degrees)
+	for (int i = 0; i < 4; i++) {
+		float angle = (float)i / 4.0f * 2.0f * glm::pi<float>();
+
+		// Tip (Apex)
+		coneVertices.push_back(0.0f); coneVertices.push_back(0.0f); coneVertices.push_back(0.0f);
+		// Base Point
+		coneVertices.push_back(cos(angle)); coneVertices.push_back(sin(angle)); coneVertices.push_back(-1.0f);
+	}
+
+	m_coneVertexCount = (int)coneVertices.size() / 3;
+
+	m_coneVAO.bind();
+	m_coneVBO = VBO(coneVertices.data(), coneVertices.size() * sizeof(float), GL_STATIC_DRAW);
+	m_coneVAO.linkAttrib(m_coneVBO, 0, 3, GL_FLOAT, 3 * sizeof(float), (void*)0);
+	m_coneVAO.unbind();
+}
+void Renderer::setupUnitQuad() {
+	float quadVertices[] = {
+		// XYZ					// UV
+		-1.0f,  1.0f,  0.0f,	0.0f, 1.0f,
+		-1.0f, -1.0f,  0.0f,    0.0f, 0.0f,
+		 1.0f, -1.0f,  0.0f,    1.0f, 0.0f,
+
+		-1.0f,  1.0f,  0.0f,    0.0f, 1.0f,
+		 1.0f, -1.0f,  0.0f,    1.0f, 0.0f,
+		 1.0f,  1.0f,  0.0f,    1.0f, 1.0f
+	};
+
+	m_quadVAO.bind();
+	m_quadVBO = VBO(quadVertices, sizeof(quadVertices), GL_STATIC_DRAW);
+	m_quadVAO.linkAttrib(m_quadVBO, 0, 3, GL_FLOAT, 5 * sizeof(float), (void*)0);
+	m_quadVAO.linkAttrib(m_quadVBO, 1, 2, GL_FLOAT, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+	m_quadVAO.unbind();
+}
+void Renderer::setupUnitLine() {
+	float lineVertices[] = {
+		0.0f, 0.0f,  0.0f,	// origin
+		0.0f, 0.0f, -1.0f	// destination
+	};
+
+	m_lineVAO.bind();
+	m_lineVBO = VBO(lineVertices, sizeof(lineVertices), GL_STATIC_DRAW);
+	m_lineVAO.linkAttrib(m_lineVBO, 0, 3, GL_FLOAT, 3 * sizeof(float), (void*)0);
+	m_lineVAO.unbind();
+}
+/*
+void Renderer::setupUnitQuad() {
 	float quadVertices[] = {
 		// positions   // texCoords
 		-1.0f,  1.0f,  0.0f, 1.0f,
@@ -225,6 +349,7 @@ void Renderer::setupPostProcessQuad() {
 	m_quadVAO.linkAttrib(m_quadVBO, 1, 2, GL_FLOAT, 4 * sizeof(float), (void*)(2 * sizeof(float)));
 	m_quadVAO.unbind();
 }
+*/
 
 void Renderer::renderPostProcess(const Scene& scene, int vWidth, int vHeight) const {
 	glBindFramebuffer(GL_FRAMEBUFFER, m_viewportFBO.screenFbo);

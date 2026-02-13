@@ -37,6 +37,7 @@ public:
 	const Shader& getDirDepthShader() const { return *m_dirDepthShader; }
 	const Shader& getOmniDepthShader() const { return *m_omniDepthShader; }
 	const Shader& getOutlineShader() const { return *m_outlineShader; }
+	const Shader& getPrimitiveShader() const { return *m_primitiveShader; }
 	const Shader& getPostProcessShader() const { return *m_postProcessShader; }
 
 	const std::vector<std::unique_ptr<DirectionalLight>>& getDirectionalLights() const { return m_directionalLights; }
@@ -60,7 +61,6 @@ public:
 
 	/* ===== ADDING ENTITIES ================================================================= */
 	void createAndAddObject(const std::string& modelPath);
-	void createAndAddSkybox(const std::filesystem::path& vertPath, const std::filesystem::path& fragPath);
 	void createAndAddDirectionalLight(std::unique_ptr<DirectionalLight> light);
 	void createAndAddPointLight(std::unique_ptr<PointLight> light);
 	void createAndAddSpotLight(std::unique_ptr<SpotLight> light);
@@ -122,7 +122,7 @@ private:
 		glm::vec4 direction;	// 16
 		glm::vec4 color;        // 16
 		float     power;        // 4
-		float     shadowDist;   // 4
+		float     range;        // 4
 		float     p0;           // 4
 		float     p1;           // 4
 	};							// 48 Bytes
@@ -141,7 +141,7 @@ private:
 		glm::vec4 direction;	// 16
 		glm::vec4 color;        // 16
 		float     power;        // 4
-		float     radius;		// 4
+		float     range;		// 4
 		float     inCosCutoff;	// 4
 		float     outCosCutoff;	// 4
 	};							// 64 Bytes
@@ -157,7 +157,7 @@ private:
 		int padding;											// 4
 	};
 
-	struct alignas(16) ShadowMatricesUBOData {								// 1024 Bytes
+	struct alignas(16) ShadowMatricesUBOData {					// 1024 Bytes
 		glm::mat4 directionalLightSpaceMatrices[MAX_LIGHTS];	// 64 * 8  = 512
 		glm::mat4 spotLightSpaceMatrices[MAX_LIGHTS];			// 64 * 8  = 512
 	};
@@ -191,6 +191,7 @@ private:
 	std::shared_ptr<Shader> m_dirDepthShader;
 	std::shared_ptr<Shader> m_omniDepthShader;
 	std::shared_ptr<Shader> m_outlineShader;
+	std::shared_ptr<Shader> m_primitiveShader;
 	std::shared_ptr<Shader> m_postProcessShader;
 
 	std::shared_ptr<Shader> m_skyboxShader;
@@ -200,6 +201,7 @@ private:
 	std::shared_ptr<Shader> m_prefilterShader;
 	std::shared_ptr<Shader> m_brdfShader;
 
+	/*
 	VAO m_debugVAO;
 	VBO m_debugVBO;
 	std::shared_ptr<Shader> m_debugShader;
@@ -208,6 +210,7 @@ private:
 	VBO m_lightFrustumVBO;
 	bool drawLightFrustums = true;
 	std::shared_ptr<Shader> m_frustumShader;
+	*/
 
 	/* ===== PICKING OPERATIONS ================================================================= */
 	void findBestNodeRecursive(SceneNode* node, MouseRay& worldRay, float& shortestDist, SceneNode*& bestNode);
@@ -217,15 +220,20 @@ private:
 
 
 	/* ===== LIGHT FRUSTUM DRAWING ================================================================= */
+	/*
 	void initLightFrustumDebug();
 	void drawDirectionalLightFrustums(const glm::mat4& projMat, const glm::mat4& viewMat, const glm::vec4& color = glm::vec4(1.0f, 0.0f, 1.0f, 1.0f), float lineWidth = 2.0f) const;
-	//void drawPointLightFrustums();
+	void drawPointLightFrustums();
 	void drawSpotLightFrustums(const glm::mat4& projMat, const glm::mat4& viewMat, const glm::vec4& color = glm::vec4(0.0f, 1.0f, 1.0f, 1.0f), float lineWidth = 2.0f) const;
-
+	*/
 	/* ===== SELECTION DRAWING ================================================================= */
+	/*
 	void drawSelectionStencil() const;
+	*/
 
 	/* ===== AABB BOX DRAWING ================================================================= */
+	/*
 	void initDebugAABBDrawing();
 	void drawDebugAABBs(SceneNode* node) const;
+	*/
 };
