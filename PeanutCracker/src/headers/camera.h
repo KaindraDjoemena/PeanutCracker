@@ -12,16 +12,16 @@
 
 // CAMERA MOVEMENT ENUM
 enum class Camera_Movement {
-	FORWARD,	// W
-	BACKWARD,	// S
-	LEFT,		// A
-	RIGHT,		// D
-	UP,			// E
-	DOWN,		// Q
-	LOOK_UP,	// Up
-	LOOK_DOWN,	// Down
-	LOOK_LEFT,	// Left
-	LOOK_RIGHT	// Right
+    FORWARD,	// W
+    BACKWARD,	// S
+    LEFT,		// A
+    RIGHT,		// D
+    UP,			// E
+    DOWN,		// Q
+    LOOK_UP,	// Up
+    LOOK_DOWN,	// Down
+    LOOK_LEFT,	// Left
+    LOOK_RIGHT	// Right
 };
 
 const float c_yaw = 0.0f;
@@ -36,75 +36,81 @@ const float c_minZoom = 20.0f;
 
 class Camera {
 public:
-	// CONSTRUCTOR WITH VECTORS
-	Camera(
-		const glm::vec3& i_position = glm::vec3(0.0f, 0.0f, 0.0f),
-		const glm::vec3& i_worldUP = glm::vec3(0.0f, 1.0f, 0.0f),
-		float i_nearPlane = 0.1f,
-		float i_farPlane = 100.0f,
-		float i_yaw = c_yaw,
-		float i_pitch = c_pitch,
-		float i_aspect = (16.0f / 9.0f),
-		float i_lookSpeed = c_lookSpeed
-	);
+    
+    Camera(     // CONSTRUCTOR WITH VECTORS
+        const glm::vec3& i_position = glm::vec3(0.0f, 0.0f, 0.0f),
+        const glm::vec3& i_worldUP = glm::vec3(0.0f, 1.0f, 0.0f),
+        float i_nearPlane = 0.1f,
+        float i_farPlane = 100.0f,
+        float i_yaw = c_yaw,
+        float i_pitch = c_pitch,
+        float i_aspect = (16.0f / 9.0f),
+        float i_lookSpeed = c_lookSpeed
+    );
 
-	// CONSTRUCTOR WITH SCALARS
-	Camera(
-		float posX, float posY, float posZ,
-		float upX, float upY, float upZ,
-		float i_nearPlane, float i_farPlane,
-		float i_aspect,
-		float yawIn, float pitchIn
-	);
+    
+    Camera(     // CONSTRUCTOR WITH SCALARS
+        float posX, float posY, float posZ,
+        float upX, float upY, float upZ,
+        float i_nearPlane, float i_farPlane,
+        float i_aspect,
+        float yawIn, float pitchIn
+    );
 
-	void setAspect(float aspect);
+    /* === SETTERS =========================================================== */
+    void setAspect(float aspect);
 
-	void setPitchYaw(float pitch, float yaw);
+    void setPitchYaw(float pitch, float yaw);
 
-	std::array<float, 2> getPitchYaw() const;
 
-	glm::vec3 getPos() const;
+    /* === GETTERS =========================================================== */
+    float getZoom() const { return m_zoom; }
 
-	glm::vec3 getDir() const;
+    glm::vec3 getPos() const { return m_pos; }
 
-	float getZoom() const;
+    glm::vec3 getDir() const { return m_front; }
 
-	glm::mat4 getViewMat() const;
+    std::array<float, 2> getPitchYaw() const { return { m_pitch, m_yaw }; }
 
-	glm::mat4 getProjMat(float aspect) const;
+    glm::mat4 getViewMat() const { return glm::lookAt(m_pos, m_pos + m_front, m_up); }
 
-	Frustum getFrustum() const;
+    glm::mat4 getProjMat(float aspect) const { return glm::perspective(glm::radians(m_zoom), aspect, m_nearPlane, m_farPlane); }
+   
+    Frustum getFrustum() const { return m_frustum; }
+    
+    MouseRay getMouseRay(float mouseX, float mouseY, int viewportHeight, int viewportWidth);
 
-	MouseRay getMouseRay(float mouseX, float mouseY, int viewportHeight, int viewportWidth);
 
-	void processInput(Camera_Movement type, float deltaTime);
+    /* === INTERFACE =========================================================== */
+    void processInput(Camera_Movement type, float deltaTime);
 
-	void processMouseMovement(double xOffset, double yOffset, GLboolean constrainPitch = true);
+    void processMouseMovement(double xOffset, double yOffset, GLboolean constrainPitch = true);
 
-	void processMouseScroll(double yOffset);
+    void processMouseScroll(double yOffset);
 
-	void updateVectors();
+    void updateVectors();
 
 private:
-	glm::vec3 m_pos;
-	glm::vec3 m_front;
-	glm::vec3 m_up;
-	glm::vec3 m_right;
-	glm::vec3 m_worldUp;
+    glm::vec3 m_pos;
+    glm::vec3 m_front;
+    glm::vec3 m_up;
+    glm::vec3 m_right;
+    glm::vec3 m_worldUp;
 
-	float m_yaw;
-	float m_pitch;
+    float m_yaw;
+    float m_pitch;
 
-	float m_movementSpeed;
-	float m_mouseSensitivity;
-	float m_zoom;
-	float m_lookSpeed;
+    float m_movementSpeed;
+    float m_mouseSensitivity;
+    float m_zoom;
+    float m_lookSpeed;
 
-	float m_nearPlane;
-	float m_farPlane;
-	float m_aspect;
+    float m_nearPlane;
+    float m_farPlane;
+    float m_aspect;
 
-	Frustum m_frustum;
+    Frustum m_frustum;
 
-	bool m_isDirtyCamVectors = true;
+    // --- flags ---
+    bool m_isDirtyCamVectors = true;
 };

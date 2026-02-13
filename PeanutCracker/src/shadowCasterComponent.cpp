@@ -125,7 +125,7 @@ glm::mat4 ShadowCasterComponent::calcViewMat(const glm::vec3& lightDirection, co
 
     switch (m_projType) {
     case Shadow_Map_Projection::ORTHOGRAPHIC:
-        viewMat = glm::lookAt(lightPos, position, upVec);
+        viewMat = glm::lookAt(lightPos, position, upVec);   // FIX: light near frustum is 'pulled' by m_frustumDepth backward from (0, 0, 0). shadow frustum far plane at (0, 0, 0)
         break;
     case Shadow_Map_Projection::PERSPECTIVE:
         viewMat = glm::lookAt(position, position + normDir, upVec);

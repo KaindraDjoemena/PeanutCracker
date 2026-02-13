@@ -19,47 +19,41 @@
 
 
 Object::Object(Model* i_modelPtr)
-	: modelPtr(i_modelPtr)
-	, transform() {
+    : modelPtr(i_modelPtr)
+    , transform() {
 }
 
+
+/* === SETTERS =========================================================== */
 void Object::setPosition(const glm::vec3& pos) {
-	transform.position = pos;
+    transform.position = pos;
 }
 void Object::setScale(const glm::vec3& scl) {
-	transform.scale.x = scl.x < epsilon ? epsilon : scl.x;
-	transform.scale.y = scl.y < epsilon ? epsilon : scl.y;
-	transform.scale.z = scl.z < epsilon ? epsilon : scl.z;
+    transform.scale.x = scl.x < epsilon ? epsilon : scl.x;
+    transform.scale.y = scl.y < epsilon ? epsilon : scl.y;
+    transform.scale.z = scl.z < epsilon ? epsilon : scl.z;
 }
 void Object::setEulerRotation(const glm::vec3& eulerRotDegrees) {
-	glm::vec3 radians = glm::radians(eulerRotDegrees);
-	transform.quatRotation = glm::quat(radians);
+    glm::vec3 radians = glm::radians(eulerRotDegrees);
+    transform.quatRotation = glm::quat(radians);
 }
 void Object::setQuatRotation(const glm::quat& quatRot) {
-	transform.quatRotation = quatRot;
+    transform.quatRotation = quatRot;
 }
 
-glm::vec3 Object::getPosition() const {
-	return transform.position;
-}
-glm::vec3 Object::getScale() const {
-	return transform.scale;
-}
-glm::vec3 Object::getEulerRotation() const {
-	return glm::degrees(glm::eulerAngles(transform.quatRotation));
-}
 
+/* === INTERFACE =========================================================== */
 void Object::draw(const Shader& shader, const glm::mat4& worldMatrix) const {
-	shader.use();
-	shader.setMat4("model", worldMatrix);
-	glm::mat4 normalMatrix = glm::transpose(glm::inverse(worldMatrix));
-	shader.setMat4("normalMatrix", normalMatrix);
-	shader.setFloat("material.shininess", 32.0f);
-	modelPtr->draw(shader);
+    shader.use();
+    shader.setMat4("model", worldMatrix);
+    glm::mat4 normalMatrix = glm::transpose(glm::inverse(worldMatrix));
+    shader.setMat4("normalMatrix", normalMatrix);
+    shader.setFloat("material.shininess", 32.0f);
+    modelPtr->draw(shader);
 }
 
 void Object::drawShadow(const glm::mat4& modelMatrix, const Shader& depthShader) const {
-	depthShader.use();
-	depthShader.setMat4("model", modelMatrix);
-	modelPtr->draw(depthShader);
+    depthShader.use();
+    depthShader.setMat4("model", modelMatrix);
+    modelPtr->draw(depthShader);
 }

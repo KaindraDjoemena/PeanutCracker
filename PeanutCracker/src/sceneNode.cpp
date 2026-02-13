@@ -63,9 +63,7 @@ void SceneNode::setScale(const glm::vec3& scl, bool uniform) {
 	isDirty = true;
 }
 void SceneNode::setEulerRotation(const glm::vec3& eulerRotDegrees) {
-	glm::vec3 radians = glm::radians(eulerRotDegrees);
-	localTransform.quatRotation = glm::quat(radians);
-
+	localTransform.setRotDeg(eulerRotDegrees);
 
 	// *** FLAGS ***
 	isDirty = true;
