@@ -1,17 +1,13 @@
-#ifndef VBO_H
-#define VBO_H
+#pragma once
 
 #include <glad/glad.h>
-
+#include <iostream>
 
 class VBO {
 public:
-	VBO() : m_ID(0) {}
-
-	VBO(const GLfloat* vertices, const GLsizeiptr size, const GLenum drawMode) {
+	VBO() : m_ID(0)
+	{
 		glGenBuffers(1, &m_ID);
-		glBindBuffer(GL_ARRAY_BUFFER, m_ID);
-		glBufferData(GL_ARRAY_BUFFER, size, vertices, drawMode);
 	}
 
 	~VBO() { if (m_ID != 0) glDeleteBuffers(1, &m_ID); }
@@ -22,9 +18,9 @@ public:
 
 	VBO& operator=(VBO&& other) noexcept {
 		if (this != &other) {
-			if (m_ID != 0) glDeleteBuffers(1, &m_ID);  // Delete old
-			m_ID = other.m_ID;                          // Steal new
-			other.m_ID = 0;                             // Nullify temporary
+			if (m_ID != 0) glDeleteBuffers(1, &m_ID);
+			m_ID = other.m_ID;
+			other.m_ID = 0;
 		}
 		return *this;
 	}
@@ -32,7 +28,13 @@ public:
 	VBO(const VBO&) = delete;
 	VBO& operator = (const VBO&) = delete;
 
-	unsigned int getID() { return m_ID; }
+	GLuint getID() const { return m_ID; }
+
+	template<typename T>
+	void setData(const T* data, size_t count, GLenum usage = GL_STATIC_DRAW) {
+		bind();
+		glBufferData(GL_ARRAY_BUFFER, count * sizeof(T), data, usage);
+	}
 
 	void bind() const {
 		glBindBuffer(GL_ARRAY_BUFFER, m_ID);
@@ -43,7 +45,5 @@ public:
 	}
 
 private:
-	unsigned int m_ID;
+	GLuint m_ID;
 };
-
-#endif

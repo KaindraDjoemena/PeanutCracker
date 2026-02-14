@@ -320,12 +320,11 @@ void Cubemap::setupMesh() {
 	};
 
 	m_vao.bind();
-	m_vbo = VBO(skybox_vertices.data(), skybox_vertices.size() * sizeof(float), GL_STATIC_DRAW);
-	m_vao.linkAttrib(m_vbo, 0, 3, GL_FLOAT, 3 * sizeof(float), (void*)0);
+	m_vbo.setData(skybox_vertices.data(), skybox_vertices.size() * sizeof(float), GL_STATIC_DRAW);
+	m_vao.linkAttrib(m_vbo, VertLayout::POS, 3 * sizeof(float), (void*)0);
 	m_vao.unbind();
 }
 
-// In cubemap.cpp:
 void Cubemap::setupQuad() {
 	static const std::array<float, 30> quadVertices = {
 		// positions			// texCoords
@@ -339,8 +338,8 @@ void Cubemap::setupQuad() {
 	};
 
 	m_quadVAO.bind();
-	m_quadVBO = VBO(quadVertices.data(), quadVertices.size() * sizeof(float), GL_STATIC_DRAW);
-	m_quadVAO.linkAttrib(m_quadVBO, 0, 3, GL_FLOAT, 5 * sizeof(float), (void*)0);
-	m_quadVAO.linkAttrib(m_quadVBO, 1, 2, GL_FLOAT, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+	m_quadVBO.setData(quadVertices.data(), quadVertices.size() * sizeof(float), GL_STATIC_DRAW);
+	m_quadVAO.linkAttrib(m_quadVBO, VertLayout::POS, 5 * sizeof(float), (void*)0);
+	m_quadVAO.linkAttrib(m_quadVBO, VertLayout::UV,  5 * sizeof(float), (void*)(3 * sizeof(float)));
 	m_quadVAO.unbind();
 }

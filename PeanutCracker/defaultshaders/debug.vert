@@ -1,6 +1,8 @@
 #version 330 core
 layout (location = 0) in vec3 aPos;
+
 uniform mat4 model;
+
 layout (std140) uniform CameraMatricesUBOData {
     mat4 projection;
     mat4 view;

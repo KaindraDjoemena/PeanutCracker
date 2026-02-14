@@ -358,8 +358,8 @@ void Renderer::setupUnitCone() {
     m_coneVertexCount = (int)coneVertices.size() / 3;
 
     m_coneVAO.bind();
-    m_coneVBO = VBO(coneVertices.data(), coneVertices.size() * sizeof(float), GL_STATIC_DRAW);
-    m_coneVAO.linkAttrib(m_coneVBO, 0, 3, GL_FLOAT, 3 * sizeof(float), (void*)0);
+    m_coneVBO.setData(coneVertices.data(), coneVertices.size() * sizeof(float));
+    m_coneVAO.linkAttrib(m_coneVBO, VertLayout::POS, 3 * sizeof(float), (void*)0);
     m_coneVAO.unbind();
 }
 void Renderer::setupUnitQuad() {
@@ -375,9 +375,9 @@ void Renderer::setupUnitQuad() {
     };
 
     m_quadVAO.bind();
-    m_quadVBO = VBO(quadVertices, sizeof(quadVertices), GL_STATIC_DRAW);
-    m_quadVAO.linkAttrib(m_quadVBO, 0, 3, GL_FLOAT, 5 * sizeof(float), (void*)0);
-    m_quadVAO.linkAttrib(m_quadVBO, 1, 2, GL_FLOAT, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+    m_quadVBO.setData(quadVertices, sizeof(quadVertices));
+    m_quadVAO.linkAttrib(m_quadVBO, VertLayout::POS, 5 * sizeof(float), (void*)0);
+    m_quadVAO.linkAttrib(m_quadVBO, VertLayout::UV,  5 * sizeof(float), (void*)(3 * sizeof(float)));
     m_quadVAO.unbind();
 }
 void Renderer::setupUnitLine() {
@@ -387,30 +387,11 @@ void Renderer::setupUnitLine() {
     };
 
     m_lineVAO.bind();
-    m_lineVBO = VBO(lineVertices, sizeof(lineVertices), GL_STATIC_DRAW);
-    m_lineVAO.linkAttrib(m_lineVBO, 0, 3, GL_FLOAT, 3 * sizeof(float), (void*)0);
+    //m_lineVBO = VBO(lineVertices, sizeof(lineVertices), GL_STATIC_DRAW);
+    m_lineVBO.setData(lineVertices, sizeof(lineVertices), GL_STATIC_DRAW);
+    m_lineVAO.linkAttrib(m_lineVBO, VertLayout::POS, 3 * sizeof(float), (void*)0);
     m_lineVAO.unbind();
 }
-/*
-void Renderer::setupUnitQuad() {
-    float quadVertices[] = {
-        // positions   // texCoords
-        -1.0f,  1.0f,  0.0f, 1.0f,
-        -1.0f, -1.0f,  0.0f, 0.0f,
-         1.0f, -1.0f,  1.0f, 0.0f,
-
-        -1.0f,  1.0f,  0.0f, 1.0f,
-         1.0f, -1.0f,  1.0f, 0.0f,
-         1.0f,  1.0f,  1.0f, 1.0f
-    };
-
-    m_quadVAO.bind();
-    m_quadVBO = VBO(quadVertices, sizeof(quadVertices), GL_STATIC_DRAW);
-    m_quadVAO.linkAttrib(m_quadVBO, 0, 2, GL_FLOAT, 4 * sizeof(float), (void*)0);
-    m_quadVAO.linkAttrib(m_quadVBO, 1, 2, GL_FLOAT, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-    m_quadVAO.unbind();
-}
-*/
 
 void Renderer::renderPostProcess(const Scene& scene, int vWidth, int vHeight) const {
     glBindFramebuffer(GL_FRAMEBUFFER, m_viewportFBO.screenFbo);

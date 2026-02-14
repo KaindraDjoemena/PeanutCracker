@@ -1,6 +1,9 @@
 #pragma once
 
 #include "shader.h"
+#include "vao.h"
+#include "vbo.h"
+#include "ebo.h"
 
 #include <glad/glad.h>
 
@@ -15,35 +18,36 @@ const unsigned int MAX_BONE_INFLUENCE = 4;
 
 
 struct Vertex {
-	glm::vec3   position;
-	glm::vec3   normal;
-	glm::vec2   texCoords;
-	glm::vec3   tangent;
-	glm::vec3   bitangent;
+    glm::vec3   position;
+    glm::vec3   normal;
+    glm::vec2   texCoords;
+    glm::vec3   tangent;
+    glm::vec3   bitangent;
 
-	int         m_boneIDs[MAX_BONE_INFLUENCE];
-	float       m_weights[MAX_BONE_INFLUENCE];
+    int         m_boneIDs[MAX_BONE_INFLUENCE];
+    float       m_weights[MAX_BONE_INFLUENCE];
 };
 
 struct Texture {
-	unsigned int    id = 0;
-	std::string     type;
-	std::string     path;
+    unsigned int    id = 0;
+    std::string     type;
+    std::string     path;
 };
 
 class Mesh {
 public:
-	std::vector<Vertex>			vertices;
-	std::vector<unsigned int>	indices;
-	std::vector<Texture>		textures;
-	unsigned int				VAO;
+    std::vector<Vertex>			vertices;
+    std::vector<unsigned int>	indices;
+    std::vector<Texture>		textures;
 
-	Mesh(std::vector<Vertex> i_vertices, std::vector<unsigned int> i_indices, std::vector<Texture> i_textures);
+    Mesh(std::vector<Vertex> i_vertices, std::vector<unsigned int> i_indices, std::vector<Texture> i_textures);
 
-	void draw(const Shader& shader, bool isShadowPass = false) const;
+    void draw(const Shader& shader, bool isShadowPass = false) const;
 
 private:
-	unsigned int VBO, EBO;
+    VAO m_VAO;
+    VBO m_VBO;
+    EBO m_EBO;
 
-	void setupMesh();
+    void setupMesh();
 };

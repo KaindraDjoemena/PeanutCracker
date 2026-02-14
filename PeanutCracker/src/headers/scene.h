@@ -101,7 +101,9 @@ public:
 private:
 	AssetManager* m_assetManager;
 
+	// TODO: move inside texture.h
 	enum Texture_Slot {
+		MAT_TEX_SLOT		  = 10,
 		DIR_SHADOW_MAP_SLOT   = 20,
 		POINT_SHADOW_MAP_SLOT = 30,
 		SPOT_SHADOW_MAP_SLOT  = 40,
@@ -110,7 +112,7 @@ private:
 		BRDF_LUT_SLOT         = 70
 	};
 
-	// BINDING POINT ENUM
+	// UBO BINDING POINT ENUM
 	enum Binding_Point {
 		CAMERA_BINDING_POINT = 0,	// 0
 		LIGHTS_BINDING_POINT = 1,	// 1
