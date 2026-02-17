@@ -2,7 +2,8 @@
 #include "headers/vao.h"
 #include "headers/vbo.h"
 #include "headers/shader.h"
-#include "headers/cubemap.h"
+//#include "headers/cubemap.h"
+#include "headers/skybox.h"
 #include "headers/object.h"
 #include "headers/model.h"
 #include "headers/light.h"
@@ -36,9 +37,8 @@ Scene::Scene(AssetManager* i_assetManager) : m_assetManager(i_assetManager) {
 	m_skyboxShader      = m_assetManager->loadShaderObject("skybox.vert", "skybox.frag");
 	m_conversionShader  = m_assetManager->loadShaderObject("equirectToUnitCube.vert", "equirectToUnitCube.frag");
 	m_convolutionShader = m_assetManager->loadShaderObject("cubemapConvolution.vert", "cubemapConvolution.frag");
-
-	m_prefilterShader = m_assetManager->loadShaderObject("prefilter.vert", "prefilter.frag");
-	m_brdfShader      = m_assetManager->loadShaderObject("brdfLut.vert", "brdfLut.frag");
+	m_prefilterShader   = m_assetManager->loadShaderObject("prefilter.vert", "prefilter.frag");
+	m_brdfShader        = m_assetManager->loadShaderObject("brdfLut.vert", "brdfLut.frag");
 
 	setupUBOBindings();
 
@@ -186,12 +186,17 @@ void Scene::createAndAddSpotLight(std::unique_ptr<SpotLight> light) {
 	m_spotLights.push_back(std::move(light));
 	numSpotLights++;
 }
-void Scene::createAndAddSkyboxHDR(const std::string& path) {
-
-	auto m_skyboxPtr = std::make_unique<Cubemap>(path, *m_convolutionShader, *m_conversionShader, *m_prefilterShader, *m_brdfShader);
-
+void Scene::createAndAddSkyboxHDR(const std::filesystem::path& path) {
+	auto m_skyboxPtr = std::make_unique<Skybox>(
+		path,
+		*m_convolutionShader,
+		*m_conversionShader,
+		*m_prefilterShader,
+		*m_brdfShader
+	);
 	setupSkyboxShaderUBOs(*m_skyboxShader);
 	setupSkyboxShaderUBOs(*m_convolutionShader);
+
 	m_skybox = std::move(m_skyboxPtr);
 }
 
@@ -205,6 +210,9 @@ void Scene::deletePointLight(int index) {
 }
 void Scene::deleteSpotLight(int index) {
 	m_spotLights.erase(m_spotLights.begin() + index);
+}
+void Scene::deleteSkybox() {
+	m_skybox.reset();
 }
 
 
@@ -487,16 +495,11 @@ void Scene::bindDepthMaps() const {
 }
 void Scene::bindIBLMaps() const {
 	if (m_skybox) {
-		glActiveTexture(GL_TEXTURE0 + IRRADIANCE_MAP_SLOT);
-		glBindTexture(GL_TEXTURE_CUBE_MAP, m_skybox->getIrradianceMapID());
+		
+		m_skybox->getIrradianceMap().bind(IRRADIANCE_MAP_SLOT);
+		m_skybox->getPrefilterMap().bind(PREFILTER_MAP_SLOT);
+		m_skybox->getBRDFLUT().bind(BRDF_LUT_SLOT);
 
-		glActiveTexture(GL_TEXTURE0 + PREFILTER_MAP_SLOT);
-		glBindTexture(GL_TEXTURE_CUBE_MAP, m_skybox->getPreFilterMapID());
-
-		glActiveTexture(GL_TEXTURE0 + BRDF_LUT_SLOT);
-		glBindTexture(GL_TEXTURE_2D, m_skybox->getBRDFLutTexID());
-
-		glActiveTexture(GL_TEXTURE0);
 	}
 }
 

@@ -119,6 +119,7 @@ void Renderer::renderLightPass(const Scene& scene, const Camera& cam, int vWidth
     if (_renderMode == Render_Mode::WIREFRAME) { glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); }
     renderObjects(scene, scene.getWorldNode(), cam);
     if (_renderMode == Render_Mode::WIREFRAME) { glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); }
+
 }
 
 // Renders objects to the scene
@@ -358,7 +359,7 @@ void Renderer::setupUnitCone() {
     m_coneVertexCount = (int)coneVertices.size() / 3;
 
     m_coneVAO.bind();
-    m_coneVBO.setData(coneVertices.data(), coneVertices.size() * sizeof(float));
+    m_coneVBO.setData(coneVertices.data(), coneVertices.size());
     m_coneVAO.linkAttrib(m_coneVBO, VertLayout::POS, 3 * sizeof(float), (void*)0);
     m_coneVAO.unbind();
 }
@@ -387,7 +388,6 @@ void Renderer::setupUnitLine() {
     };
 
     m_lineVAO.bind();
-    //m_lineVBO = VBO(lineVertices, sizeof(lineVertices), GL_STATIC_DRAW);
     m_lineVBO.setData(lineVertices, sizeof(lineVertices), GL_STATIC_DRAW);
     m_lineVAO.linkAttrib(m_lineVBO, VertLayout::POS, 3 * sizeof(float), (void*)0);
     m_lineVAO.unbind();
@@ -400,7 +400,7 @@ void Renderer::renderPostProcess(const Scene& scene, int vWidth, int vHeight) co
     glDisable(GL_DEPTH_TEST);
 
     scene.getPostProcessShader().use();
-    scene.getPostProcessShader().setFloat("exposure", m_exposure);
+    scene.getPostProcessShader().setFloat("EV100", m_EV100);
 
     glBindTexture(GL_TEXTURE_2D, m_viewportFBO.resolveTexture);
     scene.getPostProcessShader().setInt("hdrBuffer", 0);

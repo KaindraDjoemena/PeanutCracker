@@ -5,7 +5,7 @@
 #include "scene.h"
 #include "camera.h"
 #include "sceneNode.h"
-#include "cubemap.h"
+#include "skybox.h"
 
 enum class Render_Mode {
     PBR,
@@ -17,7 +17,7 @@ struct Framebuffer {
 
     unsigned int resolveFbo = 0, resolveTexture = 0;
     unsigned int screenFbo = 0, screenTexture = 0;
-    int samples = 4;
+    int samples = 16;
 
     int width = 0, height = 0;
 
@@ -115,11 +115,13 @@ public:
 
     Framebuffer* getViewportFBO() { return &m_viewportFBO; }
 
-    glm::vec4 getBgCol() { return m_winBgCol; }
+    glm::vec4 getBgCol() const { return m_winBgCol; }
+    float getEV100() const { return m_EV100; }
 
     void setRenderMode(Render_Mode renderMode) { _renderMode = renderMode; }
     void setShadowMode(bool usingShadowMap)    { _usingShadowMap = usingShadowMap; }
     void setBgCol(const glm::vec4& bgCol) { m_winBgCol = bgCol; }
+    void setEV100(float i_EV100) { m_EV100 = i_EV100; }
 
 private:
     enum class Primitive_Mode {
@@ -145,7 +147,7 @@ private:
     VBO m_coneVBO;
     int m_coneVertexCount = 0;
 
-    float m_exposure = 1.0f;
+    float m_EV100 = 0.0f;
     
     void renderPostProcess(const Scene& scene, int vWidth, int vHeight) const;
 

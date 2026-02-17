@@ -1,5 +1,4 @@
 #include "headers/assetManager.h"
-#include "headers/cubemap.h"
 #include "headers/model.h"
 #include "headers/object.h"
 #include "headers/shader.h"

@@ -12,7 +12,7 @@
 
 
 
-Mesh::Mesh(std::vector<Vertex> i_vertices, std::vector<unsigned int> i_indices, std::vector<Texture> i_textures)
+Mesh::Mesh(std::vector<Vertex> i_vertices, std::vector<unsigned int> i_indices, std::vector<MaterialTexture> i_textures)
     : vertices(i_vertices)
     , indices(i_indices)
     , textures(i_textures)

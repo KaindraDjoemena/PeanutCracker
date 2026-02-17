@@ -29,14 +29,8 @@ struct AABB {
 
 class Model {
 public:
-	// Temporary structure to hold data while grouping by material
-	struct MeshBucket {
-		std::vector<Vertex> vertices;
-		std::vector<unsigned int> indices;
-	};
-
 	std::vector<Mesh>    meshes;            // One mesh per material type
-	std::vector<Texture> textures_loaded;
+	std::vector<MaterialTexture> textures_loaded;
 	std::string          directory;
 	std::string          path;
 	AABB				 aabb;
@@ -54,10 +48,10 @@ private:
 	glm::mat4 aiMatrix4x4ToGlm(const aiMatrix4x4& from);
 
 	// High-level material loader
-	std::vector<Texture> loadMaterialTextures(aiMaterial* mat, const aiScene* scene);
+	std::vector<MaterialTexture> loadMaterialTextures(aiMaterial* mat, const aiScene* scene);
 
 	// Helper to handle caching and actual texture type string assignment
-	std::vector<Texture> loadMaterialTexturesByType(aiMaterial* mat, aiTextureType type, std::string typeName, bool gamma);
+	std::vector<MaterialTexture> loadMaterialTexturesByType(aiMaterial* mat, aiTextureType type, std::string typeName, bool gamma);
 	
 	unsigned int TextureFromFile(const char* path, const std::string& directory, bool gamma);
 };

@@ -1,11 +1,12 @@
 #pragma once
 
-#include "cubemap.h"
+//#include "cubemap.h"
 #include "object.h"
 #include "light.h"
 #include "assetManager.h"
 #include "ray.h"
 #include "sceneNode.h"
+#include "skybox.h"
 #include "camera.h"
 
 //#include <glad/glad.h>
@@ -31,7 +32,7 @@ public:
 	/* ===== GETTERS =================================================================================== */
 	const SceneNode* getWorldNode() const { return m_worldNode.get(); }
 	SceneNode* getWorldNode() { return m_worldNode.get(); }
-	const Cubemap* getSkybox() const { return m_skybox.get(); }
+	const Skybox* getSkybox() const { return m_skybox.get(); }
 	const Shader& getSkyboxShader() const { return *m_skyboxShader; }
 	const Shader& getModelShader() const { return *m_modelShader; }
 	const Shader& getDirDepthShader() const { return *m_dirDepthShader; }
@@ -64,13 +65,14 @@ public:
 	void createAndAddDirectionalLight(std::unique_ptr<DirectionalLight> light);
 	void createAndAddPointLight(std::unique_ptr<PointLight> light);
 	void createAndAddSpotLight(std::unique_ptr<SpotLight> light);
-	void createAndAddSkyboxHDR(const std::string& path);
+	void createAndAddSkyboxHDR(const std::filesystem::path& path);
 
 
 	/* ===== DELETING ENTITIES ================================================================= */
 	void deleteDirLight(int index);
 	void deletePointLight(int index);
 	void deleteSpotLight(int index);
+	void deleteSkybox();
 
 	void bindDepthMaps() const;
 	void bindIBLMaps() const;
@@ -108,8 +110,8 @@ private:
 		POINT_SHADOW_MAP_SLOT = 30,
 		SPOT_SHADOW_MAP_SLOT  = 40,
 		IRRADIANCE_MAP_SLOT   = 50,
-		PREFILTER_MAP_SLOT    = 60,
-		BRDF_LUT_SLOT         = 70
+		PREFILTER_MAP_SLOT    = 51,
+		BRDF_LUT_SLOT         = 52
 	};
 
 	// UBO BINDING POINT ENUM
@@ -172,7 +174,7 @@ private:
 
 
 	std::unique_ptr<SceneNode> m_worldNode;	// Scene graph parent
-	std::unique_ptr<Cubemap>   m_skybox;
+	std::unique_ptr<Skybox>   m_skybox;
 
 	std::vector<std::unique_ptr<DirectionalLight>> m_directionalLights;
 	std::vector<std::unique_ptr<PointLight>>	   m_pointLights;

@@ -8,7 +8,6 @@
 #include "headers/light.h"
 #include "headers/model.h"
 #include "headers/object.h"
-#include "headers/cubemap.h"
 #include "headers/gui.h"
 #include "headers/scene.h"
 #include "headers/assetManager.h"

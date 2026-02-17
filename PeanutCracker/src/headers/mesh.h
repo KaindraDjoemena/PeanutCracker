@@ -28,7 +28,7 @@ struct Vertex {
     float       m_weights[MAX_BONE_INFLUENCE];
 };
 
-struct Texture {
+struct MaterialTexture {
     unsigned int    id = 0;
     std::string     type;
     std::string     path;
@@ -38,9 +38,9 @@ class Mesh {
 public:
     std::vector<Vertex>			vertices;
     std::vector<unsigned int>	indices;
-    std::vector<Texture>		textures;
+    std::vector<MaterialTexture>		textures;
 
-    Mesh(std::vector<Vertex> i_vertices, std::vector<unsigned int> i_indices, std::vector<Texture> i_textures);
+    Mesh(std::vector<Vertex> i_vertices, std::vector<unsigned int> i_indices, std::vector<MaterialTexture> i_textures);
 
     void draw(const Shader& shader, bool isShadowPass = false) const;
 

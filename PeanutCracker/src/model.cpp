@@ -10,14 +10,10 @@
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
-#include <assimp/pbrmaterial.h>
 
 #include <string>
-#include <fstream>
-#include <sstream>
 #include <iostream>
 #include <filesystem>
-#include <map>
 #include <vector>
 
 
@@ -128,7 +124,7 @@ Mesh Model::processMesh(aiMesh* mesh, const aiScene* scene, const glm::mat4& tra
 
 	// Process Material
 	aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
-	std::vector<Texture> textures = loadMaterialTextures(material, scene);
+	std::vector<MaterialTexture> textures = loadMaterialTextures(material, scene);
 
 	return Mesh(vertices, indices, textures);
 }
@@ -193,9 +189,9 @@ static void initDefaultTextures() {
 	}
 }
 
-std::vector<Texture> Model::loadMaterialTextures(aiMaterial* mat, const aiScene* scene) {
+std::vector<MaterialTexture> Model::loadMaterialTextures(aiMaterial* mat, const aiScene* scene) {
 	initDefaultTextures();
-	std::vector<Texture> textures;
+	std::vector<MaterialTexture> textures;
 
 	aiString matName;
 	mat->Get(AI_MATKEY_NAME, matName);
@@ -221,14 +217,14 @@ std::vector<Texture> Model::loadMaterialTextures(aiMaterial* mat, const aiScene*
 			unsigned char b = static_cast<unsigned char>(sB * 255.0f);
 			unsigned char a = static_cast<unsigned char>(color.a * 255.0f);
 
-			Texture solidColorTex;
+			MaterialTexture solidColorTex;
 			solidColorTex.id = createDefaultTexture(r, g, b, a, true, false);  // sRGB format
 			solidColorTex.type = "albedoMap";
 			solidColorTex.path = "solid_color";
 			textures.push_back(solidColorTex);
 		}
 		else {
-			Texture def; def.id = defaultAlbedoTex; def.type = "albedoMap"; def.path = "default";
+			MaterialTexture def; def.id = defaultAlbedoTex; def.type = "albedoMap"; def.path = "default";
 			textures.push_back(def);
 		}
 	}
@@ -241,7 +237,7 @@ std::vector<Texture> Model::loadMaterialTextures(aiMaterial* mat, const aiScene*
 	if (normal.empty())
 		normal = loadMaterialTexturesByType(mat, aiTextureType_HEIGHT, "normalMap", false);
 	if (normal.empty()) {
-		Texture def; def.id = defaultNormalTex; def.type = "normalMap"; def.path = "default";
+		MaterialTexture def; def.id = defaultNormalTex; def.type = "normalMap"; def.path = "default";
 		textures.push_back(def);
 	}
 	else {
@@ -269,7 +265,7 @@ std::vector<Texture> Model::loadMaterialTextures(aiMaterial* mat, const aiScene*
 
 		// Add same texture for roughness (will read .g channel in shader)
 		for (auto& tex : metallicRoughness) {
-			Texture roughTex = tex;
+			MaterialTexture roughTex = tex;
 			roughTex.type = "roughnessMap";
 			textures.push_back(roughTex);
 		}
@@ -283,7 +279,7 @@ std::vector<Texture> Model::loadMaterialTextures(aiMaterial* mat, const aiScene*
 		if (mat->Get(AI_MATKEY_METALLIC_FACTOR, metallicFactor) == AI_SUCCESS) {
 			std::cout << "[MODEL] Metallic factor: " << metallicFactor << std::endl;
 			unsigned char val = static_cast<unsigned char>(metallicFactor * 255.0f);
-			Texture metallicTex;
+			MaterialTexture metallicTex;
 			// R=0, G=0, B=metallic_value, no sRGB encoding
 			metallicTex.id = createDefaultTexture(0, 0, val, 255, false, false);
 			metallicTex.type = "metallicMap";
@@ -291,7 +287,7 @@ std::vector<Texture> Model::loadMaterialTextures(aiMaterial* mat, const aiScene*
 			textures.push_back(metallicTex);
 		}
 		else {
-			Texture def; def.id = defaultMetallicTex; def.type = "metallicMap"; def.path = "default";
+			MaterialTexture def; def.id = defaultMetallicTex; def.type = "metallicMap"; def.path = "default";
 			textures.push_back(def);
 		}
 
@@ -300,7 +296,7 @@ std::vector<Texture> Model::loadMaterialTextures(aiMaterial* mat, const aiScene*
 		if (mat->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughnessFactor) == AI_SUCCESS) {
 			std::cout << "[MODEL] Roughness factor: " << roughnessFactor << std::endl;
 			unsigned char val = static_cast<unsigned char>(roughnessFactor * 255.0f);
-			Texture roughnessTex;
+			MaterialTexture roughnessTex;
 			// R=0, G=roughness_value, B=0, no sRGB encoding
 			roughnessTex.id = createDefaultTexture(0, val, 0, 255, false, false);
 			roughnessTex.type = "roughnessMap";
@@ -308,7 +304,7 @@ std::vector<Texture> Model::loadMaterialTextures(aiMaterial* mat, const aiScene*
 			textures.push_back(roughnessTex);
 		}
 		else {
-			Texture def; def.id = defaultRoughnessTex; def.type = "roughnessMap"; def.path = "default";
+			MaterialTexture def; def.id = defaultRoughnessTex; def.type = "roughnessMap"; def.path = "default";
 			textures.push_back(def);
 		}
 	}
@@ -316,7 +312,7 @@ std::vector<Texture> Model::loadMaterialTextures(aiMaterial* mat, const aiScene*
 	// === AO ===
 	auto ao = loadMaterialTexturesByType(mat, aiTextureType_AMBIENT_OCCLUSION, "aoMap", false);
 	if (ao.empty()) {
-		Texture def; def.id = defaultAOTex; def.type = "aoMap"; def.path = "default";
+		MaterialTexture def; def.id = defaultAOTex; def.type = "aoMap"; def.path = "default";
 		textures.push_back(def);
 	}
 	else {
@@ -327,8 +323,8 @@ std::vector<Texture> Model::loadMaterialTextures(aiMaterial* mat, const aiScene*
 }
 
 // Helper to handle caching and actual texture type string assignment
-std::vector<Texture> Model::loadMaterialTexturesByType(aiMaterial* mat, aiTextureType type, std::string typeName, bool gamma) {
-	std::vector<Texture> textures;
+std::vector<MaterialTexture> Model::loadMaterialTexturesByType(aiMaterial* mat, aiTextureType type, std::string typeName, bool gamma) {
+	std::vector<MaterialTexture> textures;
 	for (unsigned int i = 0; i < mat->GetTextureCount(type); i++) {
 		aiString str;
 		mat->GetTexture(type, i, &str);
@@ -346,7 +342,7 @@ std::vector<Texture> Model::loadMaterialTexturesByType(aiMaterial* mat, aiTextur
 		}
 		if (!skip) {
 			std::cout << "[MODEL] Loading new texture..." << '\n';
-			Texture texture;
+			MaterialTexture texture;
 			texture.id = TextureFromFile(str.C_Str(), this->directory, gamma);
 			texture.type = typeName;
 			texture.path = str.C_Str();

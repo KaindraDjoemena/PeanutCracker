@@ -1,6 +1,5 @@
 #pragma once
 
-#include "cubemap.h"
 #include "model.h"
 #include "object.h"
 #include "shader.h"

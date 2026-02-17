@@ -48,7 +48,6 @@ void Object::draw(const Shader& shader, const glm::mat4& worldMatrix) const {
     shader.setMat4("model", worldMatrix);
     glm::mat4 normalMatrix = glm::transpose(glm::inverse(worldMatrix));
     shader.setMat4("normalMatrix", normalMatrix);
-    shader.setFloat("material.shininess", 32.0f);
     modelPtr->draw(shader);
 }
 

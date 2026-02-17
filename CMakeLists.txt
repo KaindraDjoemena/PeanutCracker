@@ -31,7 +31,7 @@ add_executable(PeanutCracker
     ${IMGUI_SOURCES}
     "PeanutCracker/src/assetManager.cpp"
     "PeanutCracker/src/camera.cpp"
-    "PeanutCracker/src/cubemap.cpp"
+    
     "PeanutCracker/src/frustum.cpp"
     "PeanutCracker/src/gui.cpp"
     "PeanutCracker/src/light.cpp"
@@ -47,7 +47,7 @@ add_executable(PeanutCracker
     "PeanutCracker/src/shadowCasterComponent.cpp"
     "PeanutCracker/src/sphereColliderComponent.cpp"
     "PeanutCracker/src/texture.cpp"
-)
+ "PeanutCracker/src/skybox.cpp")
 
 target_link_libraries(PeanutCracker PRIVATE 
     glfw

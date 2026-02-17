@@ -1,119 +1,89 @@
-//#pragma once
-//
-//#include "glad/glad.h"
-//#include "../../dependencies/stb_image/stb_image.h"
-//
-//#include <iostream>
-//#include <filesystem>
-//
-//
-//enum class TEX_TYPE {
-//    ALBEDO,
-//    NORMAL,
-//    METALLIC,
-//    ROUGHNESS,
-//    AO,
-//    ORM
-//};
-//
-//class Texture {
-//public:
-//    GLuint m_ID   = 0;
-//    GLuint m_unit = 0;
-//
-//    TEX_TYPE m_type;
-//    std::filesystem::path m_path;
-//
-//    Texture(GLuint i_unit, const TEX_TYPE& i_type, const std::filesystem::path& i_path)
-//        : m_unit(i_unit)
-//        , m_type(i_type)
-//        , m_path(i_path)
-//    {
-//        m_ID = loadTexture();
-//    }
-//
-//    ~Texture() {
-//        if (m_ID != 0) glDeleteTextures(1, &ID);
-//    }
-//
-//    Texture(const Texture& other) = default;
-//
-//    GLuint load2DTex(bool gamma) const {
-//        std::cout << "[TEX] loading texture: " << path << '\n';
-//
-//        GLuint ID = 0;
-//        glGenTextures(1, &ID);
-//
-//        int w, h, nComps;
-//        unsigned char* data = stbi_load(m_path.string(), &w, &h, &nComps, 0);
-//        if (data) {
-//            GLenum internalFormat;
-//            GLenum dataFormat;
-//
-//            glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-//
-//            if (nComps == 1) {
-//                internalFormat = GL_RED;
-//                dataFormat     = GL_RED;
-//            }
-//            else if (nComps == 3) {
-//                internalFormat = gamma ? GL_SRGB : GL_RGB;
-//                dataFormat     = GL_RGB;
-//            }
-//            else if (nrComps == 4) {
-//                internalFormat = gamma ? GL_SRGB_ALPHA : GL_RGBA;
-//                dataFormat     = GL_RGBA;
-//            }
-//
-//            glBindTexture(GL_TEXTURE_2D, ID);
-//            glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, w, h, 0, dataFormat, GL_UNSIGNED_BYTE, data);
-//            glGenerateMipmap(GL_TEXTURE_2D);
-//
-//            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-//            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-//            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-//            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-//        }
-//
-//        stbi_image_free(data);
-//
-//        return ID;
-//    }
-//
-//    GLuint load2DTexHDR(bool gamma) const
-//    {
-//        std::cout << "[TEX] loading texture: " << path << '\n';
-//
-//        GLuint ID = 0;
-//        glGenTextures(1, &ID);
-//
-//        int w, h, nComps;
-//        unsigned char* data = stbi_loadf(m_path.string(), &w, &h, &nComps, 0);
-//        if (data)
-//        {
-//            glBindTexture(GL_TEXTURE_2D, ID);
-//            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, w, h, 0, GL_RGB, GL_FLOAT, data);
-//            glGenerateMipmap(GL_TEXTURE_2D);
-//
-//            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-//            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-//            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-//            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-//        }
-//
-//        stbi_image_free(data);
-//
-//        return ID;
-//    }
-//
-//    void bind() const {
-//        glActiveTexture(GL_TEXTURE0 + m_unit);
-//        glBindTexture(GL_TEXTURE_2D, m_ID);
-//    }
-//
-//    unsigned int getUnit() const { return m_unit; }
-//    unsigned int getID() const { return m_ID; }
-//
-//private:
-//
-//};
+#pragma once
+
+#include "glad/glad.h"
+
+#include <filesystem>
+
+
+namespace TexSlot {
+    constexpr unsigned int MAT_TEX = 10;
+    constexpr unsigned int DIR_SHAD_MAP = 20;
+    constexpr unsigned int POINT_SHAD_MAP = 30;
+    constexpr unsigned int SPOT_SHAD_MAP = 40;
+    constexpr unsigned int IRRADIANCE_MAP = 50;
+    constexpr unsigned int PREFILTER_MAP = 60;
+    constexpr unsigned int BRDF_LUT = 70;
+}
+
+namespace MatTex {
+    constexpr unsigned int ALBEDO = 0;
+    constexpr unsigned int NORM = 1;
+    constexpr unsigned int METALLIC = 2;
+    constexpr unsigned int ROUGHNESS = 3;
+    constexpr unsigned int AO = 4;
+    constexpr unsigned int ORM = 5;
+}
+
+enum class TexType {
+    TEX_2D   = GL_TEXTURE_2D,
+    TEX_CUBE = GL_TEXTURE_CUBE_MAP
+};
+
+
+class Texture {
+public:
+    // 1. Load from file (2D only)
+    Texture(const std::filesystem::path& i_path, bool sRGB = false, bool hdr = false);
+
+    // 2. Empty cubemap (IBL: env, irradiance, prefilter)
+    Texture(int size, TexType type, GLenum minFilter, GLenum magFilter);
+
+    // 3. Empty 2D with full control (BRDF LUT, shadow maps, render targets)
+    Texture(int w, int h,
+        GLenum internalFormat,
+        bool generateMips = false,
+        GLenum wrapS = GL_CLAMP_TO_EDGE,
+        GLenum wrapT = GL_CLAMP_TO_EDGE,
+        GLenum minFilter = GL_LINEAR,
+        GLenum magFilter = GL_LINEAR);
+
+    ~Texture();
+
+    Texture(const Texture&) = delete;
+    Texture& operator=(const Texture&) = delete;
+
+    Texture(Texture&& other) noexcept
+        : m_ID(other.m_ID), m_type(other.m_type) {
+        other.m_ID = 0;  // Prevent deletion
+    }
+
+    Texture& operator=(Texture&& other) noexcept {
+        if (this != &other) {
+            if (m_ID) glDeleteTextures(1, &m_ID);
+            m_ID = other.m_ID;
+            m_type = other.m_type;
+            other.m_ID = 0;
+        }
+        return *this;
+    }
+
+    GLuint getID() const { return m_ID; }
+    TexType getType() const { return m_type; }
+
+    void generateMipmaps() const;
+
+    void bind(unsigned int slot) const;
+    void unbind() const;
+
+private:
+    GLuint m_ID;
+    TexType m_type;
+
+    // Helpers for file loading
+    GLuint load2D(const std::filesystem::path& i_path, bool sRGB) const;
+    GLuint loadHDR(const std::filesystem::path& i_path) const;
+
+    // Helpers for format inference
+    static GLenum getBaseFormat(GLenum internalFormat);
+    static GLenum getDataType(GLenum internalFormat);
+};

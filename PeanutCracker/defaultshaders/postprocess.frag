@@ -4,9 +4,12 @@ out vec4 FragColor;
 in vec2 TexCoords;
 
 uniform sampler2D hdrBuffer;
-float exposure = 1.0f;
+uniform float EV100 = 2.0f;		// ISO 100
 
-// ACES Filmic Tone Mapping
+float evToExposure(float ev) {
+	return 1.0f / pow(2.0f, ev);
+}
+
 vec3 ACESFilm(vec3 x) {
     float a = 2.51f;
     float b = 0.03f;
@@ -16,13 +19,15 @@ vec3 ACESFilm(vec3 x) {
     return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0f, 1.0f);
 }
 
-void main() {             
+void main() {
     vec3 hdrColor = texture(hdrBuffer, TexCoords).rgb;
 
+	float exposure = evToExposure(EV100);
     hdrColor *= exposure;
     
     vec3 mapped = ACESFilm(hdrColor);        // Tone mapping
     mapped = pow(mapped, vec3(1.0f / 2.2f)); // Gamma correction
   
-    FragColor = vec4(hdrColor, 1.0f);
+    FragColor = vec4(mapped, 1.0f);
+
 }
