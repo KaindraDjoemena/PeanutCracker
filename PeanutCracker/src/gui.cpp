@@ -6,6 +6,7 @@
 
 #include <GLFW/glfw3.h>
 #include <imgui.h>
+#include <imgui_internal.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 #include <ImGuizmo.h>
@@ -18,7 +19,12 @@ GUI::GUI(GLFWwindow* window, const char* glsl_version) {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
+    io.IniFilename = "imgui.ini";
+    
+    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
     setPurpleTheme();
@@ -32,14 +38,9 @@ GUI::~GUI() {
 
 // Returns the available viewport size
 ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& scene, Renderer& renderer, unsigned int textureID) {
-    float screenWidth =  ImGui::GetIO().DisplaySize.x;
+    float screenWidth = ImGui::GetIO().DisplaySize.x;
     float screenHeight = ImGui::GetIO().DisplaySize.y;
-    float statusBarHeight  = 25.0f;
-    float toolbarHeight    = 0.0f;		// change this when adding toolbar
-    float viewportHeight   = screenHeight - statusBarHeight - toolbarHeight;
-    float rightPanelHeight = viewportHeight;
-    float inspectorHeight  = rightPanelHeight * 0.65f;
-    float sceneConfigurationHeight = rightPanelHeight - inspectorHeight;
+    float statusBarHeight = 25.0f;
 
     // ImGui frame init
     ImGui_ImplOpenGL3_NewFrame();
@@ -47,25 +48,46 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
     ImGui::NewFrame();
     ImGuizmo::BeginFrame();
 
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGuiID dockspace_id = ImGui::DockSpaceOverViewport(viewport->ID, viewport,
+        ImGuiDockNodeFlags_PassthruCentralNode|
+        ImGuiDockNodeFlags_NoDockingOverCentralNode |
+        ImGuiTreeNodeFlags_CollapsingHeader
+    );
+
+    static bool firstTime = true;
+    if (firstTime) {
+        firstTime = false;
+        ImGui::DockBuilderRemoveNode(dockspace_id);
+        ImGui::DockBuilderAddNode(dockspace_id, ImGuiDockNodeFlags_DockSpace);
+        ImGui::DockBuilderSetNodeSize(dockspace_id, viewport->Size);
+
+        // Split the dockspace
+        ImGuiID dock_main_id = dockspace_id;
+        ImGuiID dock_left_id = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Left, 0.25f, NULL, &dock_main_id);
+        ImGuiID dock_right_id = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Right, 0.25f, NULL, &dock_main_id);
+        ImGuiID dock_bottom_id = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Down, 0.20f, NULL, &dock_main_id);
+
+        // Dock windows
+        //ImGui::DockBuilderDockWindow("INSPECTOR", dock_right_id);
+        //ImGui::DockBuilderDockWindow("Configuration", dock_right_id);
+        ImGui::DockBuilderDockWindow("Viewport", dock_main_id); // Central node
+        ImGui::DockBuilderFinish(dockspace_id);
+    }
 
     // TODO: WINDOWING CLASS
-    if (ImGui::IsAnyItemActive()) {
-        if (ImGui::IsMouseDragging(ImGuiMouseButton_Left) && !ImGui::GetIO().WantTextInput) {
-            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-        }
-    } 
-    else {
-        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-    }
+    //if (ImGui::IsAnyItemActive()) {
+    //    if (ImGui::IsMouseDragging(ImGuiMouseButton_Left) && !ImGui::GetIO().WantTextInput) {
+    //        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    //    }
+    //} 
+    //else {
+    //    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    //}
 
 
     /* ===== INSPECTOR PANEL ====================================================== */
-    ImGui::SetNextWindowPos(ImVec2(screenWidth - panelWidth, toolbarHeight));
-    ImGui::SetNextWindowSize(ImVec2(panelWidth, inspectorHeight));
-
-    ImGuiWindowFlags inspectorFlags = ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
-
-    ImGui::Begin("INSPECTOR", NULL, inspectorFlags);
+    ImGui::Begin("INSPECTOR", NULL);
     panelWidth = ImGui::GetWindowWidth();
 
     if (ImGui::BeginTabBar("InspectorTabs")) {
@@ -105,7 +127,7 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
                         if (ImGui::DragFloat3("##Position", glm::value_ptr(pos), 0.05f)) {
                             node->setPosition(pos);
                         }
-                    });
+                        });
 
                     // --Scale
                     glm::vec3 scaleDisplay = node->getScale();
@@ -118,7 +140,7 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
                         if (ImGui::DragFloat3("##Scale", glm::value_ptr(tempScale), 0.05f)) {
                             node->setScale(tempScale, mUniformScale);
                         }
-                    });
+                        });
 
                     // --Rotation
                     glm::vec3 rot = node->getEulerRotation();
@@ -126,7 +148,7 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
                         if (ImGui::DragFloat3("##Rotation", glm::value_ptr(rot), 0.05f)) {
                             node->setEulerRotation(rot);
                         }
-                    });
+                        });
                 }
 
                 // --Textures Section
@@ -134,7 +156,7 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
                     if (ImGui::CollapsingHeader("Textures", ImGuiTreeNodeFlags_DefaultOpen)) {
 
                         float thumbSize = 64.0f;
-                        float padding   = 8.0f;
+                        float padding = 8.0f;
                         float windowVisibleX2 = ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x;
 
                         for (int i = 0; i < node->object->modelPtr->textures_loaded.size(); i++) {
@@ -186,7 +208,7 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
                     }
                     ImGui::EndChild();
                     // --Add button
-                    bool isMaxDir   = (scene.getDirectionalLights().size() == MAX_LIGHTS);
+                    bool isMaxDir = (scene.getDirectionalLights().size() == MAX_LIGHTS);
                     bool isEmptyDir = (scene.getDirectionalLights().empty());
                     if (isMaxDir) { ImGui::BeginDisabled(); }
                     if (ImGui::Button("(+)", ImVec2(130, 0))) {
@@ -217,12 +239,12 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
                         // Properties
                         ImGui::SeparatorText("Properties");
                         DrawProperty("Col", [&]() { ImGui::ColorEdit3("##c", &l.light.color.x); });
-                        DrawProperty("Pow", [&]() {ImGui::DragFloat("##pow", &l.light.power); });
+                        DrawProperty("Pow", [&]() { ImGui::SliderFloat("##pow", &l.light.power, 0.0f, 1000.0f); });
 
                         // Range
                         ImGui::SeparatorText("Range");
-                        DrawProperty("Range", [&]() { if (ImGui::DragFloat("##range", &l.range, 0.01f)) { l.shadowCasterComponent.setFarPlane(l.range); } });
-                                        
+                        DrawProperty("Range", [&]() { if (ImGui::SliderFloat("##range", &l.range, 0.1f, 1000.0f)) { l.shadowCasterComponent.setFarPlane(l.range); } });
+
                         ImGui::Spacing();
                     }
                     ImGui::EndChild();
@@ -240,7 +262,7 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
                     }
                     ImGui::EndChild();
                     // --Add button
-                    bool isMaxPoint   = (scene.getPointLights().size() >= MAX_LIGHTS);
+                    bool isMaxPoint = (scene.getPointLights().size() >= MAX_LIGHTS);
                     bool isEmptyPoint = (scene.getPointLights().empty());
                     if (isMaxPoint) { ImGui::BeginDisabled(); }
                     if (ImGui::Button("(+)", ImVec2(130, 0))) {
@@ -271,14 +293,14 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
                         // Properties
                         ImGui::SeparatorText("Properties");
                         DrawProperty("Col", [&]() { ImGui::ColorEdit3("##a", &l.light.color.x); });
-                        DrawProperty("Pow", [&]() {ImGui::DragFloat("##pow", &l.light.power); });
+                        DrawProperty("Pow", [&]() { ImGui::SliderFloat("##pow", &l.light.power, 0.0f, 1000.0f); });
 
                         // Radius
                         ImGui::Spacing();
                         ImGui::Separator();
                         ImGui::Spacing();
                         ImGui::SeparatorText("Radius");
-                        DrawProperty("Rad", [&]() { if (ImGui::DragFloat("##rad", &l.radius, 0.01f)) { l.shadowCasterComponent.setFarPlane(l.radius); } });
+                        DrawProperty("Rad", [&]() { if (ImGui::SliderFloat("##rad", &l.radius, 0.1f, 1000.0f)) { l.shadowCasterComponent.setFarPlane(l.radius); } });
 
                         // Frustum
                         //float nearP = l.shadowCasterComponent.getNearPlane();
@@ -306,7 +328,7 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
                     }
                     ImGui::EndChild();
                     // --Add button
-                    bool isMaxSpot   = (scene.getSpotLights().size() == MAX_LIGHTS);
+                    bool isMaxSpot = (scene.getSpotLights().size() == MAX_LIGHTS);
                     bool isEmptySpot = (scene.getSpotLights().empty());
                     if (isMaxSpot) { ImGui::BeginDisabled(); }
                     if (ImGui::Button("(+)", ImVec2(130, 0))) {
@@ -331,31 +353,29 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
                         auto& l = *scene.getSpotLights()[selectedSpot];
 
                         // Transform
-                        ImGui::SeparatorText("Transform");
+                        ImGui::Separator();
                         DrawProperty("Pos", [&]() { ImGui::DragFloat3("##p", &l.position.x, 0.01f); });
                         DrawProperty("Dir", [&]() { if (ImGui::DragFloat3("##d", &l.direction.x, 0.01f)) { l.direction = glm::normalize(l.direction); } });
 
                         // Angles
                         ImGui::SeparatorText("Light Cone Angles");
+                        ImGui::Separator();
                         float iDeg = glm::degrees(acos(l.inCosCutoff));
                         float oDeg = glm::degrees(acos(l.outCosCutoff));
-                        DrawProperty("Inner", [&]() { if (ImGui::DragFloat("##i", &iDeg, 0.01f, 0.0f, oDeg,  "%.1f deg")) { l.inCosCutoff  = cosf(glm::radians(iDeg)); } });
-                        DrawProperty("Outer", [&]() { if (ImGui::DragFloat("##o", &oDeg, 0.01f, iDeg, 90.0f, "%.1f deg")) { l.outCosCutoff = cosf(glm::radians(oDeg)); l.shadowCasterComponent.setFOVDeg(oDeg); } });
+                        DrawProperty("Inner", [&]() { if (ImGui::SliderFloat("##i", &iDeg, 0.0f, oDeg)) { l.inCosCutoff = cosf(glm::radians(iDeg)); } });
+                        DrawProperty("Outer", [&]() { if (ImGui::SliderFloat("##o", &oDeg, iDeg, 90.0f)) { l.outCosCutoff = cosf(glm::radians(oDeg)); l.shadowCasterComponent.setFOVDeg(oDeg); } });
 
                         // Colors
                         ImGui::SeparatorText("Colors");
                         DrawProperty("Col", [&]() { ImGui::ColorEdit3("##a", &l.light.color.x); });
-                        DrawProperty("Pow", [&]() {ImGui::DragFloat("##pow", &l.light.power); });
+                        DrawProperty("Pow", [&]() { ImGui::SliderFloat("##pow", &l.light.power, 0.0f, 1000.0f); });
 
                         // Range
                         ImGui::Spacing();
                         ImGui::Separator();
                         ImGui::Spacing();
                         ImGui::SeparatorText("Range");
-                        /*DrawProperty("Kc", [&]() { ImGui::DragFloat("##c", &l.attenuation.constant, 0.01f); });
-                        DrawProperty("Kl", [&]() { ImGui::DragFloat("##l", &l.attenuation.linear, 0.001f); });
-                        DrawProperty("Kq", [&]() { ImGui::DragFloat("##q", &l.attenuation.quadratic, 0.0001f); });*/
-                        DrawProperty("Range", [&]() { if (ImGui::DragFloat("##range", &l.range, 0.01f)) { l.shadowCasterComponent.setFarPlane(l.range); } });
+                        DrawProperty("Range", [&]() { if (ImGui::SliderFloat("##range", &l.range, 0.1f, 1000.0f)) { l.shadowCasterComponent.setFarPlane(l.range); } });
 
                         // Frustum
                         //ImGui::SeparatorText("Frustum Planes");
@@ -382,9 +402,7 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
 
 
     /* ===== CONFIGURATION PANEL ==================================================== */
-    ImGui::SetNextWindowPos(ImVec2(screenWidth - panelWidth, toolbarHeight + inspectorHeight));
-    ImGui::SetNextWindowSize(ImVec2(panelWidth, sceneConfigurationHeight));
-    ImGui::Begin("Configuration", NULL, inspectorFlags);
+    ImGui::Begin("Configuration", NULL);
 
     // --Rendering Pipeline
     if (ImGui::CollapsingHeader("Rendering Pipeline", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -414,36 +432,89 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
         ImGui::Indent();
         static char skyboxDirBuffer[512] = "";
 
-        ImGui::Text("Enter Directory Path:");
         widgetStretch([&]() {
             ImGui::InputText("##SkyboxDir", skyboxDirBuffer, IM_ARRAYSIZE(skyboxDirBuffer));
             });
 
-        if (ImGui::Button("Load Skybox from Folder", ImVec2(-FLT_MIN, 0))) {
-            scene.createAndAddSkyboxHDR(skyboxDirBuffer);
+        if (ImGui::Button("Load .HDR", ImVec2(-FLT_MIN, 0))) {
+            bool _validPath = true;
+
+            std::filesystem::path path(skyboxDirBuffer);
+
+            if (!std::filesystem::exists(path)) {
+                std::cerr << "ERROR: Skybox path does not exist: " << path << '\n';
+                _validPath = false;
+            }
+
+            auto ext = path.extension().string();
+            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+
+            const bool isValidExt = (ext == ".hdr" || ext == ".exr" || ext == ".hdri");
+
+            if (!isValidExt) {
+                std::cerr << "ERROR: Invalid skybox file\n";
+                _validPath = false;
+            }
+
+
+            if (_validPath) {
+                scene.createAndAddSkyboxHDR(path);
+            }
         }
-        ImGui::Separator();
-        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
-        ImGui::TextWrapped("Expected files: right, left, top, bottom, front, back (jpg/png)");
-        ImGui::PopStyleColor();
+        if (ImGui::Button("Delete", ImVec2(-FLT_MIN, 0))) {
+            scene.deleteSkybox();
+        }
+
         ImGui::Unindent();
+    }
+
+    // --Viewport
+    if (ImGui::CollapsingHeader("Viewport Post Processing")) {
+        DrawProperty("EV", [&]() {
+            float ev100 = renderer.getEV100();
+            if (ImGui::SliderFloat("##ev", &ev100, -10.0f, 10.0f)) {
+                renderer.setEV100(ev100);
+            }
+            });
+        DrawProperty("MSAA", [&]() {
+            int msaa = renderer.getViewportFBO()->samples;
+            const char* items[] = { "Off", "2x", "4x", "8x", "16x" };
+            int current = static_cast<int>(std::log2(msaa));
+
+            if (ImGui::Combo("##msaa", &current, items, IM_ARRAYSIZE(items))) {
+                msaa = 1 << current;
+                renderer.getViewportFBO()->samples = msaa;
+                renderer.getViewportFBO()->rescale(screenWidth, screenHeight);
+            }
+            });
     }
 
     ImGui::End();
 
 
     // === VIEWPORT PANEL ===========================================================
-    ImGui::SetNextWindowPos(ImVec2(0, toolbarHeight));
-    ImGui::SetNextWindowSize(ImVec2(screenWidth - panelWidth, viewportHeight));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 
-    ImGuiWindowFlags viewportFlags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse |
-        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+    ImGuiWindowClass windowClass;
+    windowClass.DockNodeFlagsOverrideSet = ImGuiDockNodeFlags_HiddenTabBar;
+    ImGui::SetNextWindowClass(&windowClass);
+
+    ImGuiWindowFlags viewportFlags = ImGuiWindowFlags_NoTitleBar |
+        ImGuiWindowFlags_NoMove |      // Locks it in place
+        ImGuiWindowFlags_NoCollapse |  // Optional: prevent collapsing
         ImGuiWindowFlags_NoScrollbar;
 
     // Capture current state
     ImGui::Begin("Viewport", NULL, viewportFlags);
     this->isViewportHovered = ImGui::IsWindowHovered();
+    ImVec2 newSize = ImGui::GetContentRegionAvail();
+
+    // Resize FBO if panel size changed
+    if (newSize.x != this->viewportSize.x || newSize.y != this->viewportSize.y) {
+        if (newSize.x > 0 && newSize.y > 0) {
+            renderer.getViewportFBO()->rescale(static_cast<int>(newSize.x), static_cast<int>(newSize.y));
+        }
+    }
     this->viewportSize = ImGui::GetContentRegionAvail();
     this->viewportBoundsMin = ImGui::GetCursorScreenPos();
 
@@ -496,7 +567,7 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
     // === VIEW ===========================================================================
     ImGuizmo::SetDrawlist();
     float viewManipulateRight = ImGui::GetWindowPos().x + ImGui::GetWindowWidth();
-    float viewManipulateTop = ImGui::GetWindowPos().y;
+    float viewManipulateTop   = ImGui::GetWindowPos().y;
 
     // After ViewManipulate call
     ImVec2 gizmoPos(viewManipulateRight - 96, viewManipulateTop);
@@ -512,12 +583,12 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
 
     // Define axis directions in world space
     glm::vec3 axes[] = {
-        glm::vec3(1, 0, 0),    // +X
-        glm::vec3(-1, 0, 0),   // -X
-        glm::vec3(0, 1, 0),    // +Y
-        glm::vec3(0, -1, 0),   // -Y
-        glm::vec3(0, 0, -1),   // -Z
-        glm::vec3(0, 0, 1)     // +Z
+        glm::vec3( 1,  0,  0),    // +X
+        glm::vec3(-1,  0,  0),   // -X
+        glm::vec3( 0,  1,  0),    // +Y
+        glm::vec3( 0, -1,  0),   // -Y
+        glm::vec3( 0,  0, -1),   // -Z
+        glm::vec3( 0,  0,  1)     // +Z
     };
 
     const char* labels[] = { "+X", "-X", "+Y", "-Y", "+Z", "-Z" };
@@ -562,6 +633,15 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
 
 void GUI::render() {
     ImGui::Render();
+
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+        GLFWwindow* backup_current_context = glfwGetCurrentContext();
+        ImGui::UpdatePlatformWindows();
+        ImGui::RenderPlatformWindowsDefault();
+        glfwMakeContextCurrent(backup_current_context);
+    }
+
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
 
@@ -569,51 +649,52 @@ void GUI::render() {
 void GUI::showStatusBar(int statusbarHeight, Camera& camera) const {
     float screenWidth = ImGui::GetIO().DisplaySize.x;
     float screenHeight = ImGui::GetIO().DisplaySize.y;
+    float statusBarHeight = 25.0f;
 
-    ImGui::SetNextWindowPos(ImVec2(0, screenHeight - statusbarHeight));
-    ImGui::SetNextWindowSize(ImVec2(screenWidth, statusbarHeight));
-
-    // Keep it tight: no padding, no scrolling
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(10, 4));
-    ImGui::Begin("##StatusBar", NULL, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoScrollbar);
 
-    // Using a table with specific flags to stop the "pushing"
-    if (ImGui::BeginTable("##StatusBarTable", 2, ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_SizingFixedFit)) {
+    if (ImGui::BeginViewportSideBar("##StatusBar", ImGui::GetMainViewport(),
+        ImGuiDir_Down, statusBarHeight, ImGuiWindowFlags_NoScrollbar)) {
 
-        // Column 0: Stretch (Takes all available space)
-        ImGui::TableSetupColumn("##Stats", ImGuiTableColumnFlags_WidthStretch);
-        // Column 1: Fixed (Only takes what it needs)
-        ImGui::TableSetupColumn("##Device", ImGuiTableColumnFlags_WidthFixed);
+       
+        if (ImGui::BeginTable("##StatusBarTable", 2, ImGuiTableFlags_NoSavedSettings | ImGuiTableFlags_SizingFixedFit)) {
 
-        ImGui::TableNextRow();
+            // Column 0: Stretch (Takes all available space)
+            ImGui::TableSetupColumn("##Stats", ImGuiTableColumnFlags_WidthStretch);
+            // Column 1: Fixed (Only takes what it needs)
+            ImGui::TableSetupColumn("##Device", ImGuiTableColumnFlags_WidthFixed);
 
-        // --- LEFT COLUMN ---
-        ImGui::TableNextColumn();
-        glm::vec3 camPos = camera.getPos();
-        glm::vec3 camDir = camera.getDir();
-        // Use a more compact format to save space
-        ImGui::Text("Zoom: %.1f% | P: (%.1f, %.1f, %.1f) | D: (%.1f, %.1f)",
-            camera.getZoom(), camPos.x, camPos.y, camPos.z, camDir.x, camDir.y);
+            ImGui::TableNextRow();
 
-        // --- RIGHT COLUMN ---
-        ImGui::TableNextColumn();
-        const char* gpuName = (const char*)glGetString(GL_RENDERER);
-        char rightText[256];
-        sprintf_s(rightText, "FPS: %.1f | %s", ImGui::GetIO().Framerate, gpuName);
+            // --- LEFT COLUMN ---
+            ImGui::TableNextColumn();
+            glm::vec3 camPos = camera.getPos();
+            glm::vec3 camDir = camera.getDir();
+            // Use a more compact format to save space
+            ImGui::Text("Zoom: %.1f% | P: (%.1f, %.1f, %.1f) | D: (%.1f, %.1f)",
+                camera.getZoom(), camPos.x, camPos.y, camPos.z, camDir.x, camDir.y);
 
-        // Right-align the text INSIDE this column
-        float textSize = ImGui::CalcTextSize(rightText).x;
-        float colWidth = ImGui::GetColumnWidth();
-        if (colWidth > textSize) {
-            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (colWidth - textSize));
+            // --- RIGHT COLUMN ---
+            ImGui::TableNextColumn();
+            const char* gpuName = (const char*)glGetString(GL_RENDERER);
+            char rightText[256];
+            sprintf_s(rightText, "FPS: %.1f | %s", ImGui::GetIO().Framerate, gpuName);
+
+            // Right-align the text INSIDE this column
+            float textSize = ImGui::CalcTextSize(rightText).x;
+            float colWidth = ImGui::GetColumnWidth();
+            if (colWidth > textSize) {
+                ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (colWidth - textSize));
+            }
+
+            ImGui::TextDisabled("%s", rightText);
+
+            ImGui::EndTable();
         }
 
-        ImGui::TextDisabled("%s", rightText);
 
-        ImGui::EndTable();
+        ImGui::End();
     }
-
-    ImGui::End();
     ImGui::PopStyleVar();
 }
 
@@ -680,58 +761,58 @@ void GUI::setPurpleTheme() const {
     ImVec4 purple       = ImVec4(0.44f, 0.22f, 1.00f, 1.00f);
     ImVec4 lightPurple  = ImVec4(0.54f, 0.36f, 1.00f, 1.00f);
     ImVec4 darkPurple   = ImVec4(0.35f, 0.15f, 0.80f, 1.00f);
-    ImVec4 darkBg       = ImVec4(0.15f, 0.15f, 0.18f, 1.00f);
-    ImVec4 darkerBg     = ImVec4(0.10f, 0.10f, 0.12f, 1.00f);
+    ImVec4 darkBg       = ImVec4(0.15f, 0.15f, 0.18f, 0.80f);
+    ImVec4 darkerBg     = ImVec4(0.10f, 0.10f, 0.12f, 0.60f);
     ImVec4 peanutYellow = ImVec4(1.00f, 0.84f, 0.30f, 1.00f);
 
     // --Applying palette
     // Window Backgrounds
     colors[ImGuiCol_WindowBg] = darkerBg;
-    colors[ImGuiCol_ChildBg] = darkerBg;
-    colors[ImGuiCol_PopupBg] = darkBg;
+    colors[ImGuiCol_ChildBg]  = darkerBg;
+    colors[ImGuiCol_PopupBg]  = darkBg;
 
     // Frame Backgrounds (Input boxes, sliders, checkboxes)
-    colors[ImGuiCol_FrameBg] = darkBg;
+    colors[ImGuiCol_FrameBg]        = darkBg;
     colors[ImGuiCol_FrameBgHovered] = ImVec4(purple.x, purple.y, purple.z, 0.40f); // Semi-transparent hover
-    colors[ImGuiCol_FrameBgActive] = darkPurple;
+    colors[ImGuiCol_FrameBgActive]  = darkPurple;
 
     // Title Bars
-    colors[ImGuiCol_TitleBg] = darkBg;
-    colors[ImGuiCol_TitleBgActive] = ImVec4(purple.x, purple.y, purple.z, 0.70f);
+    colors[ImGuiCol_TitleBg]          = darkBg;
+    colors[ImGuiCol_TitleBgActive]    = ImVec4(purple.x, purple.y, purple.z, 0.70f);
     colors[ImGuiCol_TitleBgCollapsed] = ImVec4(purple.x, purple.y, purple.z, 0.40f);
 
     // Headers (Collapsing Headers, Selectables)
-    colors[ImGuiCol_Header] = ImVec4(purple.x, purple.y, purple.z, 0.45f);
+    colors[ImGuiCol_Header]        = ImVec4(purple.x, purple.y, purple.z, 0.45f);
     colors[ImGuiCol_HeaderHovered] = lightPurple;
-    colors[ImGuiCol_HeaderActive] = darkPurple;
+    colors[ImGuiCol_HeaderActive]  = darkPurple;
 
     // Buttons
-    colors[ImGuiCol_Button] = ImVec4(purple.x, purple.y, purple.z, 0.80f);
+    colors[ImGuiCol_Button]        = ImVec4(purple.x, purple.y, purple.z, 0.80f);
     colors[ImGuiCol_ButtonHovered] = lightPurple;
-    colors[ImGuiCol_ButtonActive] = darkPurple;
+    colors[ImGuiCol_ButtonActive]  = darkPurple;
 
     // Checkmark/Slider Grab
-    colors[ImGuiCol_CheckMark] = lightPurple;
-    colors[ImGuiCol_SliderGrab] = lightPurple;
+    colors[ImGuiCol_CheckMark]        = lightPurple;
+    colors[ImGuiCol_SliderGrab]       = lightPurple;
     colors[ImGuiCol_SliderGrabActive] = darkPurple;
 
     // Resize Grip (for resizable windows)
-    colors[ImGuiCol_ResizeGrip] = darkPurple;
+    colors[ImGuiCol_ResizeGrip]        = darkPurple;
     colors[ImGuiCol_ResizeGripHovered] = lightPurple;
-    colors[ImGuiCol_ResizeGripActive] = darkPurple;
+    colors[ImGuiCol_ResizeGripActive]  = darkPurple;
 
     // Scrollbar
-    colors[ImGuiCol_ScrollbarBg] = darkBg;
+    colors[ImGuiCol_ScrollbarBg]   = darkBg;
     colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.30f, 0.30f, 0.32f, 1.00f);
 
     // Text
-    colors[ImGuiCol_Text] = ImVec4(0.90f, 0.90f, 0.90f, 1.00f);
+    colors[ImGuiCol_Text]         = ImVec4(0.90f, 0.90f, 0.90f, 1.00f);
     colors[ImGuiCol_TextDisabled] = peanutYellow;
 
     // Tabs
-    colors[ImGuiCol_Tab] = ImVec4(0.15f, 0.15f, 0.18f, 1.00f);
-    colors[ImGuiCol_TabHovered] = lightPurple;
-    colors[ImGuiCol_TabActive] = purple;
-    colors[ImGuiCol_TabUnfocused] = darkerBg;
+    colors[ImGuiCol_Tab]                = ImVec4(0.15f, 0.15f, 0.18f, 1.00f);
+    colors[ImGuiCol_TabHovered]         = lightPurple;
+    colors[ImGuiCol_TabActive]          = purple;
+    colors[ImGuiCol_TabUnfocused]       = darkerBg;
     colors[ImGuiCol_TabUnfocusedActive] = ImVec4(0.20f, 0.20f, 0.22f, 1.00f);
 }
