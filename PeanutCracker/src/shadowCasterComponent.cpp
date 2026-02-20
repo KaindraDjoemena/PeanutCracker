@@ -39,6 +39,7 @@ ShadowCasterComponent::ShadowCasterComponent(bool isPoint, int i_shadowMapRes, S
     , m_bottomPlane(-i_size)
     , m_topPlane(i_size)
 {
+
     updateFrustum();
     if (isPoint) {
         genOmniShadowMap();
@@ -120,7 +121,7 @@ glm::mat4 ShadowCasterComponent::calcViewMat(const glm::vec3& lightDirection, co
         upVec = glm::vec3(0.0f, 0.0f, 1.0f);
     }
 
-    glm::mat4 viewMat = glm::mat4(1.0f);
+    glm::mat4 viewMat  = glm::mat4(1.0f);
     glm::vec3 lightPos = position - normDir * m_frustumDepth;
 
     switch (m_projType) {

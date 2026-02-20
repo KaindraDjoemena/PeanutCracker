@@ -152,42 +152,42 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
                 }
 
                 // --Textures Section
-                if (node->object && node->object->modelPtr) {
-                    if (ImGui::CollapsingHeader("Textures", ImGuiTreeNodeFlags_DefaultOpen)) {
+                //if (node->object && node->object->modelPtr) {
+                //    if (ImGui::CollapsingHeader("Textures", ImGuiTreeNodeFlags_DefaultOpen)) {
 
-                        float thumbSize = 64.0f;
-                        float padding = 8.0f;
-                        float windowVisibleX2 = ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x;
+                //        float thumbSize = 64.0f;
+                //        float padding = 8.0f;
+                //        float windowVisibleX2 = ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x;
 
-                        for (int i = 0; i < node->object->modelPtr->textures_loaded.size(); i++) {
-                            auto& tex = node->object->modelPtr->textures_loaded[i];
+                //        for (int i = 0; i < node->object->modelPtr->textures_loaded.size(); i++) {
+                //            auto& tex = node->object->modelPtr->textures_loaded[i];
 
-                            ImGui::PushID(i);
-                            ImGui::BeginGroup();
+                //            ImGui::PushID(i);
+                //            ImGui::BeginGroup();
 
-                            ImGui::TextDisabled("%s", tex.type.c_str());
+                //            ImGui::TextDisabled("%s", tex.type.c_str());
 
-                            // Thumbnail
-                            ImTextureID texID = (ImTextureID)(intptr_t)tex.id;
-                            ImGui::Image(texID, ImVec2(thumbSize, thumbSize), ImVec2(0, 1), ImVec2(1, 0), ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 0.5f));
-                            if (ImGui::IsItemHovered()) {
-                                ImGui::BeginTooltip();
-                                ImGui::Text("ID: %d", tex.id);
-                                ImGui::Text("Path: %s", tex.path.c_str());
-                                ImGui::Image(texID, ImVec2(256, 256), ImVec2(0, 1), ImVec2(1, 0));
-                                ImGui::EndTooltip();
-                            }
-                            ImGui::EndGroup();
+                //            // Thumbnail
+                //            ImTextureID texID = (ImTextureID)(intptr_t)tex.id;
+                //            ImGui::Image(texID, ImVec2(thumbSize, thumbSize), ImVec2(0, 1), ImVec2(1, 0), ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 0.5f));
+                //            if (ImGui::IsItemHovered()) {
+                //                ImGui::BeginTooltip();
+                //                ImGui::Text("ID: %d", tex.id);
+                //                ImGui::Text("Path: %s", tex.path.c_str());
+                //                ImGui::Image(texID, ImVec2(256, 256), ImVec2(0, 1), ImVec2(1, 0));
+                //                ImGui::EndTooltip();
+                //            }
+                //            ImGui::EndGroup();
 
-                            float lastX2 = ImGui::GetItemRectMax().x;
-                            float nextX2 = lastX2 + padding + thumbSize;
-                            if (i + 1 < node->object->modelPtr->textures_loaded.size() && nextX2 < windowVisibleX2)
-                                ImGui::SameLine();
+                //            float lastX2 = ImGui::GetItemRectMax().x;
+                //            float nextX2 = lastX2 + padding + thumbSize;
+                //            if (i + 1 < node->object->modelPtr->material.size() && nextX2 < windowVisibleX2)
+                //                ImGui::SameLine();
 
-                            ImGui::PopID();
-                        }
-                    }
-                }
+                //            ImGui::PopID();
+                //        }
+                //    }
+                //}
                 ImGui::PopID();
                 itemID++;
             }
@@ -671,8 +671,8 @@ void GUI::showStatusBar(int statusbarHeight, Camera& camera) const {
             glm::vec3 camPos = camera.getPos();
             glm::vec3 camDir = camera.getDir();
             // Use a more compact format to save space
-            ImGui::Text("Zoom: %.1f% | P: (%.1f, %.1f, %.1f) | D: (%.1f, %.1f)",
-                camera.getZoom(), camPos.x, camPos.y, camPos.z, camDir.x, camDir.y);
+            ImGui::Text("Zoom: %.1f% | P: (%.1f, %.1f, %.1f) | D: (%.1f, %.1f, %.1f)",
+                camera.getZoom(), camPos.x, camPos.y, camPos.z, camDir.x, camDir.y, camDir.z);
 
             // --- RIGHT COLUMN ---
             ImGui::TableNextColumn();

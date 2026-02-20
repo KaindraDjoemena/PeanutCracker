@@ -1,6 +1,7 @@
 #pragma once
 
 #include "glad/glad.h"
+#include "glm/glm.hpp"
 
 #include <filesystem>
 
@@ -32,13 +33,16 @@ enum class TexType {
 
 class Texture {
 public:
-    // 1. Load from file (2D only)
+    // Load 2D texture
     Texture(const std::filesystem::path& i_path, bool sRGB = false, bool hdr = false);
+    
+    // Make 1x1 colored texture
+    Texture(const glm::vec4& color, bool sRGB);
 
-    // 2. Empty cubemap (IBL: env, irradiance, prefilter)
+    // Empty cubemap texture
     Texture(int size, TexType type, GLenum minFilter, GLenum magFilter);
 
-    // 3. Empty 2D with full control (BRDF LUT, shadow maps, render targets)
+    // Empty 2D texture
     Texture(int w, int h,
         GLenum internalFormat,
         bool generateMips = false,

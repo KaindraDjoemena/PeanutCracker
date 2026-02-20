@@ -98,13 +98,120 @@ void AssetManager::reloadShaders() {
     }
 }
 
+// TODO: CHANGE TO FILESYSTEM::PATH
 std::shared_ptr<Model> AssetManager::loadModel(const std::string& path) {
 	auto modelPath = modelCache.find(path);
 	if (modelPath != modelCache.end()) {
 		return modelPath->second;
 	}
 
-	auto newModel = std::make_shared<Model>(path);
+	auto newModel = std::make_shared<Model>(this, path);
 	modelCache[path] = newModel;
 	return newModel;
+}
+
+std::shared_ptr<Texture> AssetManager::loadTexture(const std::filesystem::path& path, bool sRGB, bool hdr) {
+    std::string key = path.string();
+
+    if (textureCache.find(key) != textureCache.end()) {
+        return textureCache[key];
+    }
+
+    auto newTexture = std::make_shared<Texture>(path, sRGB, hdr);
+    textureCache[key] = newTexture;
+    return newTexture;
+}
+
+std::shared_ptr<Material> AssetManager::loadMaterial(aiMaterial* mat, const std::filesystem::path& dir) {
+    aiString name;
+    mat->Get(AI_MATKEY_NAME, name);
+    std::string key = (dir / name.C_Str()).string();
+
+    if (materialCache.find(key) != materialCache.end()) {
+        return materialCache[key];
+    }
+
+    auto material = std::make_shared<Material>();
+    material->name = name.C_Str();
+
+    // Helper func
+    auto getTex = [&](aiTextureType type, bool sRGB) -> std::shared_ptr<Texture> {
+        if (mat->GetTextureCount(type) > 0) {
+            aiString path;
+            mat->GetTexture(type, 0, &path);
+            return loadTexture(std::filesystem::path(dir) / path.C_Str(), sRGB, false);
+        }
+        return nullptr;
+        };
+
+    //--Albedo
+    if (mat->GetTextureCount(aiTextureType_DIFFUSE) > 0) {
+        aiString path;
+        mat->GetTexture(aiTextureType_DIFFUSE, 0, &path);
+
+        material->albedoMap = loadTexture(dir / path.C_Str(), true, false);
+    }
+    else {
+        aiColor4D defaultAlbedo = { 1.0f, 0.0f, 1.0f, 1.0f };
+        mat->Get(AI_MATKEY_COLOR_DIFFUSE, defaultAlbedo);
+
+        material->albedoMap = getOrCreateSolidTexture(
+            glm::vec4(defaultAlbedo.r, defaultAlbedo.g, defaultAlbedo.b, defaultAlbedo.a),
+            true);
+    }
+
+    //--Normals
+    if (mat->GetTextureCount(aiTextureType_NORMALS) > 0) {
+        aiString path;
+        mat->GetTexture(aiTextureType_NORMALS, 0, &path);
+
+        material->normalMap = loadTexture(dir / path.C_Str(), false, false);
+    }
+    else {
+        aiColor4D defaultNormal = { 0.5f, 0.5f, 1.0f, 1.0f };
+        material->normalMap = getOrCreateSolidTexture(
+            glm::vec4(defaultNormal.r, defaultNormal.g, defaultNormal.b, defaultNormal.a),
+            false);
+    }
+
+    //--ORM check
+    if (mat->GetTextureCount(aiTextureType_UNKNOWN) > 0 || mat->GetTextureCount(aiTextureType_METALNESS) > 0) {
+        aiString path;
+        if (mat->GetTextureCount(aiTextureType_UNKNOWN) > 0) {
+            mat->GetTexture(aiTextureType_UNKNOWN, 0, &path);
+        }
+        else {
+            mat->GetTexture(aiTextureType_METALNESS, 0, &path);
+        }
+
+        auto ormTex = loadTexture(dir / path.C_Str(), false, false);
+        material->aoMap        = ormTex;
+        material->roughnessMap = ormTex;
+        material->metallicMap  = ormTex;
+    }
+    else {
+        float metalFactor = 0.0f;
+        float roughFactor = 0.5f;
+
+        mat->Get(AI_MATKEY_METALLIC_FACTOR, metalFactor);
+        mat->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughFactor);
+
+        material->metallicMap  = getOrCreateSolidTexture(glm::vec4(0,    0,           metalFactor, 1.0f), false);
+        material->roughnessMap = getOrCreateSolidTexture(glm::vec4(0,    roughFactor, 0,           1.0f), false);
+        material->aoMap        = getOrCreateSolidTexture(glm::vec4(1.0f, 0,           0,           1.0f), false);
+    }
+
+    materialCache[key] = material;
+    return material;
+}
+
+std::shared_ptr<Texture> AssetManager::getOrCreateSolidTexture(const glm::vec4& color, bool sRGB) {
+    std::string key = "solid_" + std::to_string(color.r) + "_" + std::to_string(color.g) +
+        "_" + std::to_string(color.b) + "_" + std::to_string(color.a) + (sRGB ? "_srgb" : "_lin");
+
+    if (textureCache.count(key)) return textureCache[key];
+
+    auto tex = std::make_shared<Texture>(color, sRGB);  // create 1x1 colored texture
+    textureCache[key] = tex;
+    return tex;
 }

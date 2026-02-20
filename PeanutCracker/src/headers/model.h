@@ -2,6 +2,7 @@
 
 #include "mesh.h"
 #include "shader.h"
+#include "material.h"
 
 #include <glad/glad.h> 
 #include <glm/glm.hpp>
@@ -21,6 +22,7 @@
 #include <vector>
 
 
+class AssetManager;
 
 struct AABB {
 	glm::vec3 min = glm::vec3(FLT_MAX);
@@ -30,29 +32,23 @@ struct AABB {
 class Model {
 public:
 	std::vector<Mesh>    meshes;            // One mesh per material type
-	std::vector<MaterialTexture> textures_loaded;
+	std::shared_ptr<Material> material;
 	std::string          directory;
 	std::string          path;
 	AABB				 aabb;
 	bool                 gammaCorrection;
 
-	Model(std::string const& path, bool gamma = false);
+	Model(AssetManager* assetManager, std::string const& path, bool gamma = false);
 
 	void draw(const Shader& shader);
 
-	int loadModel(std::string const& path);
+	int loadModel(AssetManager* assetManager, std::string const& path);
 
 private:
-	Mesh processMesh(aiMesh* mesh, const aiScene* scene, const glm::mat4& transform);
-	void processNode(aiNode* node, const aiScene* scene, const glm::mat4& parentTransform);
-	glm::mat4 aiMatrix4x4ToGlm(const aiMatrix4x4& from);
-
-	// High-level material loader
-	std::vector<MaterialTexture> loadMaterialTextures(aiMaterial* mat, const aiScene* scene);
-
-	// Helper to handle caching and actual texture type string assignment
-	std::vector<MaterialTexture> loadMaterialTexturesByType(aiMaterial* mat, aiTextureType type, std::string typeName, bool gamma);
+	Mesh processMesh(AssetManager* assetManager, aiMesh* mesh, const aiScene* scene, const glm::mat4& transform);
 	
-	unsigned int TextureFromFile(const char* path, const std::string& directory, bool gamma);
+	void processNode(AssetManager* assetManager, aiNode* node, const aiScene* scene, const glm::mat4& parentTransform);
+	
+	glm::mat4 aiMatrix4x4ToGlm(const aiMatrix4x4& from);
 };
 

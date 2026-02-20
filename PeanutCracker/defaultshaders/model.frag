@@ -7,7 +7,6 @@ const float PI = 3.14159f;
 
 in VS_OUT {
     vec3 FragPos;
-    vec3 Normal;
     vec2 TexCoord;
     vec4 DirectionalLightSpacePos[MAX_LIGHTS];
     vec4 SpotLightSpacePos[MAX_LIGHTS];

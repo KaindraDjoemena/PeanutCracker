@@ -5,7 +5,7 @@
 #include <iostream>
 
 
-// 1. File loading constructor
+// Load 2D texture
 Texture::Texture(const std::filesystem::path& i_path, bool sRGB, bool hdr)
     : m_ID(0)
     , m_type(TexType::TEX_2D)
@@ -13,7 +13,31 @@ Texture::Texture(const std::filesystem::path& i_path, bool sRGB, bool hdr)
     m_ID = hdr ? loadHDR(i_path) : load2D(i_path, sRGB);
 }
 
-// 2. Cubemap constructor
+// Make 1x1 colored texture
+Texture::Texture(const glm::vec4& color, bool sRGB) {
+    m_type = TexType::TEX_2D;
+
+    glGenTextures(1, &m_ID);
+    glBindTexture(GL_TEXTURE_2D, m_ID);
+
+    // [0.0, 1.0] -> [0, 255]
+    unsigned char data[] = {
+        static_cast<unsigned char>(color.r * 255),
+        static_cast<unsigned char>(color.g * 255),
+        static_cast<unsigned char>(color.b * 255),
+        static_cast<unsigned char>(color.a * 255)
+    };
+
+    GLenum internalFormat = sRGB ? GL_SRGB8_ALPHA8 : GL_RGBA8;
+    glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+}
+
+// Empty cubemap texture
 Texture::Texture(int size, TexType type, GLenum minFilter, GLenum magFilter)
     : m_ID(0)
     , m_type(type)
@@ -40,7 +64,7 @@ Texture::Texture(int size, TexType type, GLenum minFilter, GLenum magFilter)
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, magFilter);
 }
 
-// 3. Explicit 2D constructor
+// Empty 2D texture
 Texture::Texture(int w, int h,
     GLenum internalFormat,
     bool generateMips,
@@ -56,8 +80,7 @@ Texture::Texture(int w, int h,
     glGenTextures(1, &m_ID);
     glBindTexture(GL_TEXTURE_2D, m_ID);
 
-    glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, w, h, 0,
-        getBaseFormat(internalFormat), getDataType(internalFormat), nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, w, h, 0, getBaseFormat(internalFormat), getDataType(internalFormat), nullptr);
 
     if (generateMips) {
         glGenerateMipmap(GL_TEXTURE_2D);
@@ -197,7 +220,7 @@ GLenum Texture::getDataType(GLenum internalFormat) {
     case GL_RGBA32F:
     case GL_DEPTH_COMPONENT32F: return GL_FLOAT;
     case GL_DEPTH_COMPONENT16:  return GL_UNSIGNED_SHORT;
-    case GL_DEPTH_COMPONENT24:  return GL_UNSIGNED_INT; // or GL_FLOAT, depending
+    case GL_DEPTH_COMPONENT24:  return GL_UNSIGNED_INT;
     default:                    return GL_UNSIGNED_BYTE;
     }
 }

@@ -1,8 +1,11 @@
 #pragma once
 
-#include "model.h"
 #include "object.h"
 #include "shader.h"
+#include "texture.h"
+#include "material.h"
+
+#include <assimp/material.h>
 
 #include <string>
 #include <filesystem>
@@ -10,6 +13,8 @@
 #include <functional>
 #include <unordered_map>
 #include <chrono>
+
+class Model;
 
 class AssetManager {
 public:
@@ -37,8 +42,14 @@ public:
 	void reloadShaders();
 
 	std::shared_ptr<Model> loadModel(const std::string& path);
+	std::shared_ptr<Texture> loadTexture(const std::filesystem::path& path, bool sRGB, bool hdr);
+	std::shared_ptr<Material> loadMaterial(aiMaterial* mat, const std::filesystem::path& dir);
 
 private:
 	std::unordered_map<std::string, std::shared_ptr<Model>> modelCache;
+	std::unordered_map<std::string, std::shared_ptr<Texture>> textureCache;
+	std::unordered_map<std::string, std::shared_ptr<Material>> materialCache;
 	std::unordered_map<std::string, CachedShader> shaderCache;
+
+	std::shared_ptr<Texture> getOrCreateSolidTexture(const glm::vec4& color, bool sRGB);
 };

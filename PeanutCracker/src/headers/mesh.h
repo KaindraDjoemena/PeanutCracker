@@ -10,6 +10,9 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include "material.h"
+
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -39,8 +42,9 @@ public:
     std::vector<Vertex>			vertices;
     std::vector<unsigned int>	indices;
     std::vector<MaterialTexture>		textures;
+    std::shared_ptr<Material>  material;
 
-    Mesh(std::vector<Vertex> i_vertices, std::vector<unsigned int> i_indices, std::vector<MaterialTexture> i_textures);
+    Mesh(std::vector<Vertex> i_vertices, std::vector<unsigned int> i_indices, std::shared_ptr<Material> i_mat);
 
     void draw(const Shader& shader, bool isShadowPass = false) const;
 

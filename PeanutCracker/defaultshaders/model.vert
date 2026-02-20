@@ -9,7 +9,6 @@ layout (location = 4) in vec3 aBitangent;
 
 out VS_OUT {
 	vec3 FragPos;
-	vec3 Normal;
 	vec2 TexCoord;
 	vec4 DirectionalLightSpacePos[MAX_LIGHTS];
 	vec4 SpotLightSpacePos[MAX_LIGHTS];
@@ -73,18 +72,14 @@ uniform mat4 normalMatrix;
 
 void main() {
     vs_out.FragPos  = vec3(model * vec4(aPos, 1.0f));
-	
+	vs_out.TexCoord = aTexCoords;
+
 	// Tangent space matrix
 	vec3 T = normalize(mat3(normalMatrix) * aTangent);
 	vec3 N = normalize(mat3(normalMatrix) * aNormal);
 	T      = normalize(T - dot(T, N) * N);
 	vec3 B = cross(N, T);
 	vs_out.TBN = mat3(T, B, N);
-
-	vs_out.Normal = N;
-    vs_out.TexCoord = aTexCoords;
-
-    gl_Position = projection * view * model * vec4(aPos, 1.0f);
 
 	for (int i = 0; i < lightingBlock.numDirectionalLights; ++i) {
 		vs_out.DirectionalLightSpacePos[i] = shadowMatricesBlock.directionalLightSpaceMatrices[i] * model * vec4(aPos, 1.0f);
@@ -93,4 +88,6 @@ void main() {
 	for (int i = 0; i < lightingBlock.numSpotLights; ++i) {
 		vs_out.SpotLightSpacePos[i] = shadowMatricesBlock.spotLightSpaceMatrices[i] * model * vec4(aPos, 1.0f);
 	}
+	
+	gl_Position = projection * view * model * vec4(aPos, 1.0f);
 }

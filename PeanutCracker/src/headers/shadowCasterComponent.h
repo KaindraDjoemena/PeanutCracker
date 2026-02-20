@@ -5,6 +5,8 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include "texture.h"
+
 #include <array>
 #include <iostream>
 
@@ -21,9 +23,6 @@ public:
     ShadowCasterComponent() = delete;
     ShadowCasterComponent(int i_shadowMapRes, Shadow_Map_Projection i_projectionType, float i_size, float i_nearPlane, float i_farPlane);
     ShadowCasterComponent(bool isPoint, int i_shadowMapRes, Shadow_Map_Projection i_projectionType, float i_fov, float i_size, float i_nearPlane, float i_farPlane);
-
-    ShadowCasterComponent(const ShadowCasterComponent&) = delete;
-    ShadowCasterComponent& operator = (const ShadowCasterComponent&) = delete;
 
     ShadowCasterComponent(ShadowCasterComponent&& other) noexcept;
     ShadowCasterComponent& operator = (ShadowCasterComponent&& other) noexcept;
@@ -69,7 +68,7 @@ private:
     Shadow_Map_Projection m_projType;
     glm::mat4 m_lightViewMat = glm::mat4(1.0f);
     glm::mat4 m_lightProjMat = glm::mat4(1.0f);
-    glm::mat4	 m_lightSpaceMatrix = glm::mat4(1.0f);
+    glm::mat4 m_lightSpaceMatrix = glm::mat4(1.0f);
     std::array<glm::mat4, 6> m_lightSpaceMatrices;
 
     float m_leftPlane	= -50.0f;

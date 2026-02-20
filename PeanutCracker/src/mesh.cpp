@@ -12,25 +12,28 @@
 
 
 
-Mesh::Mesh(std::vector<Vertex> i_vertices, std::vector<unsigned int> i_indices, std::vector<MaterialTexture> i_textures)
+Mesh::Mesh(std::vector<Vertex> i_vertices, std::vector<unsigned int> i_indices, std::shared_ptr<Material> i_mat)
     : vertices(i_vertices)
     , indices(i_indices)
-    , textures(i_textures)
+    , material(i_mat)
 {
     setupMesh();
 }
 
+// TODO: REMOVE isShadowPass
 void Mesh::draw(const Shader& shader, bool isShadowPass) const {
     // Texture Binding
 
-    const int OBJECT_TEX_SLOT = 10;
-    for (unsigned int i = 0; i < textures.size(); i++) {
-        glActiveTexture(GL_TEXTURE0 + OBJECT_TEX_SLOT + i);
+    //const int OBJECT_TEX_SLOT = 10;
+    //for (unsigned int i = 0; i < textures.size(); i++) {
+    //    glActiveTexture(GL_TEXTURE0 + OBJECT_TEX_SLOT + i);
 
-        std::string name = textures[i].type;
-        shader.setInt(("material." + name), OBJECT_TEX_SLOT + i);
-        glBindTexture(GL_TEXTURE_2D, textures[i].id);
-    }
+    //    std::string name = textures[i].type;
+    //    shader.setInt(("material." + name), OBJECT_TEX_SLOT + i);
+    //    glBindTexture(GL_TEXTURE_2D, textures[i].id);
+    //}
+
+    material->bind(shader);
 
     // draw mesh
     m_VAO.bind();
