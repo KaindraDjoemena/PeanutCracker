@@ -24,6 +24,11 @@ enum class Camera_Movement {
     LOOK_RIGHT	// Right
 };
 
+enum class Camera_Mode {
+    ARCBALL,
+    FLY
+};
+
 const float c_yaw = 0.0f;
 const float c_pitch = 0.0f;
 const float c_fov = 70.0f;

@@ -54,7 +54,11 @@ void Renderer::renderScene(const Scene& scene, const Camera& cam, int vWidth, in
 void Renderer::renderShadowPass(const Scene& scene, const Camera& cam) const {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
-    glCullFace(GL_FRONT);
+    glCullFace(GL_BACK);
+
+    glEnable(GL_POLYGON_OFFSET_FILL);
+
+    glPolygonOffset(1.0f, 1.0f);
 
     // --Rendering each object for each light from the lights pov,
     // and storing the depth value to an FBO
@@ -102,7 +106,7 @@ void Renderer::renderShadowPass(const Scene& scene, const Camera& cam) const {
     }
 
     // --Reset opengl stuff
-    glCullFace(GL_BACK);
+    glDisable(GL_POLYGON_OFFSET_FILL);
 }
 
 void Renderer::renderLightPass(const Scene& scene, const Camera& cam, int vWidth, int vHeight) const {

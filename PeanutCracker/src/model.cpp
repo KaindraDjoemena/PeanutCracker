@@ -130,7 +130,7 @@ Mesh Model::processMesh(AssetManager* assetManager, aiMesh* mesh, const aiScene*
 			indices.push_back(face.mIndices[j]);
 	}
 
-	auto material = assetManager->loadMaterial(scene->mMaterials[mesh->mMaterialIndex], directory);
+	auto material = assetManager->loadMaterial(scene->mMaterials[mesh->mMaterialIndex], directory, mesh->mMaterialIndex);
 
 	return Mesh(vertices, indices, material);
 }

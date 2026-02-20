@@ -43,7 +43,7 @@ public:
 
 	std::shared_ptr<Model> loadModel(const std::string& path);
 	std::shared_ptr<Texture> loadTexture(const std::filesystem::path& path, bool sRGB, bool hdr);
-	std::shared_ptr<Material> loadMaterial(aiMaterial* mat, const std::filesystem::path& dir);
+	std::shared_ptr<Material> loadMaterial(aiMaterial* mat, const std::filesystem::path& dir, int matIndex);
 
 private:
 	std::unordered_map<std::string, std::shared_ptr<Model>> modelCache;

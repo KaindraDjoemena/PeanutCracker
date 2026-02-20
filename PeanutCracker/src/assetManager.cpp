@@ -122,83 +122,78 @@ std::shared_ptr<Texture> AssetManager::loadTexture(const std::filesystem::path& 
     return newTexture;
 }
 
-std::shared_ptr<Material> AssetManager::loadMaterial(aiMaterial* mat, const std::filesystem::path& dir) {
-    aiString name;
-    mat->Get(AI_MATKEY_NAME, name);
-    std::string key = (dir / name.C_Str()).string();
+std::shared_ptr<Material> AssetManager::loadMaterial(aiMaterial* mat, const std::filesystem::path& dir, int matIndex) {
+    std::string key = dir.string() + "_index_" + std::to_string(matIndex);
 
     if (materialCache.find(key) != materialCache.end()) {
         return materialCache[key];
     }
 
+    aiString aiName;
+    mat->Get(AI_MATKEY_NAME, aiName);
+
     auto material = std::make_shared<Material>();
-    material->name = name.C_Str();
+    material->name = aiName.C_Str();
 
     // Helper func
     auto getTex = [&](aiTextureType type, bool sRGB) -> std::shared_ptr<Texture> {
         if (mat->GetTextureCount(type) > 0) {
             aiString path;
             mat->GetTexture(type, 0, &path);
-            return loadTexture(std::filesystem::path(dir) / path.C_Str(), sRGB, false);
+            return loadTexture(dir / path.C_Str(), sRGB, false);
         }
+        
         return nullptr;
-        };
+    };
 
     //--Albedo
-    if (mat->GetTextureCount(aiTextureType_DIFFUSE) > 0) {
-        aiString path;
-        mat->GetTexture(aiTextureType_DIFFUSE, 0, &path);
-
-        material->albedoMap = loadTexture(dir / path.C_Str(), true, false);
+    material->albedoMap = getTex(aiTextureType_DIFFUSE, true);
+    if (!material->albedoMap) {
+        material->albedoMap = getTex(aiTextureType_BASE_COLOR, true);
     }
-    else {
+
+    if (!material->albedoMap) {
         aiColor4D defaultAlbedo = { 1.0f, 0.0f, 1.0f, 1.0f };
         mat->Get(AI_MATKEY_COLOR_DIFFUSE, defaultAlbedo);
-
         material->albedoMap = getOrCreateSolidTexture(
             glm::vec4(defaultAlbedo.r, defaultAlbedo.g, defaultAlbedo.b, defaultAlbedo.a),
             true);
     }
 
     //--Normals
-    if (mat->GetTextureCount(aiTextureType_NORMALS) > 0) {
-        aiString path;
-        mat->GetTexture(aiTextureType_NORMALS, 0, &path);
-
-        material->normalMap = loadTexture(dir / path.C_Str(), false, false);
-    }
-    else {
-        aiColor4D defaultNormal = { 0.5f, 0.5f, 1.0f, 1.0f };
+    material->normalMap = getTex(aiTextureType_NORMALS, false);
+    if (!material->normalMap) {
         material->normalMap = getOrCreateSolidTexture(
-            glm::vec4(defaultNormal.r, defaultNormal.g, defaultNormal.b, defaultNormal.a),
+            glm::vec4(0.5f, 0.5f, 1.0f, 1.0f),
             false);
     }
 
     //--ORM check
-    if (mat->GetTextureCount(aiTextureType_UNKNOWN) > 0 || mat->GetTextureCount(aiTextureType_METALNESS) > 0) {
-        aiString path;
-        if (mat->GetTextureCount(aiTextureType_UNKNOWN) > 0) {
-            mat->GetTexture(aiTextureType_UNKNOWN, 0, &path);
-        }
-        else {
-            mat->GetTexture(aiTextureType_METALNESS, 0, &path);
-        }
+    auto metalTex   = getTex(aiTextureType_METALNESS, false);
+    auto roughTex   = getTex(aiTextureType_DIFFUSE_ROUGHNESS, false);
+    auto unknownTex = getTex(aiTextureType_UNKNOWN, false);
 
-        auto ormTex = loadTexture(dir / path.C_Str(), false, false);
-        material->aoMap        = ormTex;
-        material->roughnessMap = ormTex;
-        material->metallicMap  = ormTex;
+    if (unknownTex) {
+        // ORM
+        material->aoMap = unknownTex;
+        material->roughnessMap = unknownTex;
+        material->metallicMap = unknownTex;
+    }
+    else if (metalTex || roughTex) {
+        // Seperate
+        material->metallicMap  = metalTex ? metalTex : getOrCreateSolidTexture(glm::vec4(0, 0, 0, 1), false);
+        material->roughnessMap = roughTex ? roughTex : getOrCreateSolidTexture(glm::vec4(0, 0.5f, 0, 1), false);
+        material->aoMap        = getOrCreateSolidTexture(glm::vec4(1, 0, 0, 1), false);
     }
     else {
         float metalFactor = 0.0f;
         float roughFactor = 0.5f;
-
         mat->Get(AI_MATKEY_METALLIC_FACTOR, metalFactor);
         mat->Get(AI_MATKEY_ROUGHNESS_FACTOR, roughFactor);
 
-        material->metallicMap  = getOrCreateSolidTexture(glm::vec4(0,    0,           metalFactor, 1.0f), false);
-        material->roughnessMap = getOrCreateSolidTexture(glm::vec4(0,    roughFactor, 0,           1.0f), false);
-        material->aoMap        = getOrCreateSolidTexture(glm::vec4(1.0f, 0,           0,           1.0f), false);
+        material->metallicMap  = getOrCreateSolidTexture(glm::vec4(0, 0, metalFactor, 1), false);
+        material->roughnessMap = getOrCreateSolidTexture(glm::vec4(0, roughFactor, 0, 1), false);
+        material->aoMap        = getOrCreateSolidTexture(glm::vec4(1, 0, 0, 1), false);
     }
 
     materialCache[key] = material;

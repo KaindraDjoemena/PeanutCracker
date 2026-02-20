@@ -245,6 +245,11 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
                         ImGui::SeparatorText("Range");
                         DrawProperty("Range", [&]() { if (ImGui::SliderFloat("##range", &l.range, 0.1f, 1000.0f)) { l.shadowCasterComponent.setFarPlane(l.range); } });
 
+                        // Shadow Bias
+                        ImGui::SeparatorText("Shadow Bias");
+                        DrawProperty("Normal", [&]() { ImGui::DragFloat("##nbias", &l.light.normalBias, 0.00001f, 0.00001f, 0.1f, "%.5f");  });
+                        DrawProperty("Depth",  [&]() { ImGui::DragFloat("##dbias", &l.light.depthBias, 0.00001f, 0.00001f, 0.1f, "%.5f");  });
+
                         ImGui::Spacing();
                     }
                     ImGui::EndChild();
@@ -301,6 +306,11 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
                         ImGui::Spacing();
                         ImGui::SeparatorText("Radius");
                         DrawProperty("Rad", [&]() { if (ImGui::SliderFloat("##rad", &l.radius, 0.1f, 1000.0f)) { l.shadowCasterComponent.setFarPlane(l.radius); } });
+
+                        // Shadow Bias
+                        ImGui::SeparatorText("Shadow Bias");
+                        DrawProperty("Normal", [&]() { ImGui::DragFloat("##nbias", &l.light.normalBias, 0.00001f, 0.00001f, 0.1f, "%.5f");  });
+                        DrawProperty("Depth",  [&]() { ImGui::DragFloat("##dbias", &l.light.depthBias, 0.00001f, 0.00001f, 0.1f, "%.5f");  });
 
                         // Frustum
                         //float nearP = l.shadowCasterComponent.getNearPlane();
@@ -375,7 +385,12 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
                         ImGui::Separator();
                         ImGui::Spacing();
                         ImGui::SeparatorText("Range");
-                        DrawProperty("Range", [&]() { if (ImGui::SliderFloat("##range", &l.range, 0.1f, 1000.0f)) { l.shadowCasterComponent.setFarPlane(l.range); } });
+                        DrawProperty("Range", [&]() { if (ImGui::SliderFloat("##range", &l.range, 0.01f, 1000.0f)) { l.shadowCasterComponent.setFarPlane(l.range); } });
+
+                        // Shadow Bias
+                        ImGui::SeparatorText("Shadow Bias");
+                        DrawProperty("Normal", [&]() { ImGui::DragFloat("##nbias", &l.light.normalBias, 0.00001f, 0.00001f, 0.1f, "%.5f");  });
+                        DrawProperty("Depth",  [&]() { ImGui::DragFloat("##dbias", &l.light.depthBias, 0.00001f, 0.00001f, 0.1f, "%.5f");  });
 
                         // Frustum
                         //ImGui::SeparatorText("Frustum Planes");

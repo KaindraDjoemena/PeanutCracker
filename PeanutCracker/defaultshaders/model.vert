@@ -17,33 +17,37 @@ out VS_OUT {
 } vs_out;
 
 // LIGHT STRUCTS
-struct DirectionalLightStruct {  // 48 Bytes
-	vec4  direction;
-	vec4  color;
-	float power;
-	float range;
-	float p0;
-	float p1;
-};
+struct DirectionalLightStruct {
+	vec4  direction;	// 16
+	vec4  color;        // 16
+	float power;        // 4
+	float range;        // 4
+	float normalBias;   // 4
+	float depthBias;    // 4
+};						// 48 Bytes
 
-struct PointLightStruct {  // 48 Bytes
-	vec4  position;
-	vec4  color;
-	float power;
-	float radius;
-	float p0;
-	float p1;
-};
+struct PointLightStruct {
+	vec4  position;   // 16
+	vec4  color;      // 16
+	float power;      // 4
+	float radius;     // 4
+	float normalBias; // 4
+	float depthBias;  // 4 
+};				 	  // 48 Bytes
 
-struct SpotLightStruct {  // 64 Bytes
-	vec4  position;
-	vec4  direction;
-	vec4  color;
-	float power;
-	float range;
-	float inCosCutoff;
-	float outCosCutoff;
-};
+struct SpotLightStruct {
+	vec4  position;		// 16
+	vec4  direction;	// 16
+	vec4  color;        // 16
+	float power;        // 4
+	float range;		// 4
+	float inCosCutoff;	// 4
+	float outCosCutoff;	// 4
+	float normalBias;   // 4
+	float depthBias;    // 4
+	float p0;		    // 4
+	float p1;           // 4
+};						// 80 Bytes
 
 layout (std140) uniform CameraMatricesUBOData {
     mat4 projection;
@@ -82,11 +86,13 @@ void main() {
 	vs_out.TBN = mat3(T, B, N);
 
 	for (int i = 0; i < lightingBlock.numDirectionalLights; ++i) {
-		vs_out.DirectionalLightSpacePos[i] = shadowMatricesBlock.directionalLightSpaceMatrices[i] * model * vec4(aPos, 1.0f);
+		vec3 offsetPos = vs_out.FragPos + N * lightingBlock.directionalLight[i].normalBias;
+		vs_out.DirectionalLightSpacePos[i] = shadowMatricesBlock.directionalLightSpaceMatrices[i] * vec4(offsetPos, 1.0f);
 	}
-    
+
 	for (int i = 0; i < lightingBlock.numSpotLights; ++i) {
-		vs_out.SpotLightSpacePos[i] = shadowMatricesBlock.spotLightSpaceMatrices[i] * model * vec4(aPos, 1.0f);
+		vec3 offsetPos = vs_out.FragPos + N * lightingBlock.spotLight[i].normalBias;
+		vs_out.SpotLightSpacePos[i] = shadowMatricesBlock.spotLightSpaceMatrices[i] * vec4(offsetPos, 1.0f);
 	}
 	
 	gl_Position = projection * view * model * vec4(aPos, 1.0f);

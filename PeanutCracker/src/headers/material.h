@@ -32,7 +32,7 @@ struct Material {
         }
         if (metallicMap) {
             metallicMap->bind(MatTex::METALLIC);
-            shader.setInt("material.metallicMap", MatTex::ROUGHNESS);
+            shader.setInt("material.metallicMap", MatTex::METALLIC);
         }
         if (roughnessMap) {
             roughnessMap->bind(MatTex::ROUGHNESS);

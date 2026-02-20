@@ -529,16 +529,20 @@ void Scene::updateLightingUBO() const {
 		dst.color      = glm::vec4(src->light.color, 1.0f);
 		dst.power      = src->light.power;
 		dst.range      = src->range;
+		dst.normalBias = src->light.normalBias;
+		dst.depthBias  = src->light.depthBias;
 	}
 	// --Point
 	for (size_t i = 0; i < m_pointLights.size() && i < MAX_LIGHTS; ++i) {
 		auto& src = m_pointLights[i];
 		auto& dst = data.pointLight[i];
 		
-		dst.position  = glm::vec4(src->position, 1.0f);
-		dst.color     = glm::vec4(src->light.color, 1.0f);
-		dst.power     = src->light.power;
-		dst.radius    = src->radius;
+		dst.position   = glm::vec4(src->position, 1.0f);
+		dst.color      = glm::vec4(src->light.color, 1.0f);
+		dst.power      = src->light.power;
+		dst.radius     = src->radius;
+		dst.normalBias = src->light.normalBias;
+		dst.depthBias  = src->light.depthBias;
 	}
 	// --Spot
 	for (size_t i = 0; i < m_spotLights.size() && i < MAX_LIGHTS; ++i) {
@@ -552,6 +556,8 @@ void Scene::updateLightingUBO() const {
 		dst.range        = src->range;
 		dst.inCosCutoff  = src->inCosCutoff;
 		dst.outCosCutoff = src->outCosCutoff;
+		dst.normalBias   = src->light.depthBias;
+		dst.depthBias    = src->light.depthBias;
 	}
 
 	glBindBuffer(GL_UNIFORM_BUFFER, lightingUBO);

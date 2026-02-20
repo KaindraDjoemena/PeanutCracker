@@ -5,8 +5,10 @@
 
 
 struct Light {
-    glm::vec3	color = glm::vec3(1.0f);
-    float		power = 10.0f;
+    glm::vec3 color      = glm::vec3(1.0f);
+    float	  power      = 10.0f;
+    float     normalBias = 0.0005f;
+    float     depthBias  = 0.00005f;
 
     Light() = default;
 

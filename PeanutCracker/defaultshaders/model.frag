@@ -24,22 +24,22 @@ struct Material {
 
 // === LIGHT STRUCTS ========================================================
 struct DirectionalLightStruct {
-	vec4  direction;  // 16
-	vec4  color;      // 16
-	float power;      // 4
-	float range;      // 4
-	float p0;
-	float p1;     // 8
-};					  // 48 Bytes
+	vec4  direction;	// 16
+	vec4  color;        // 16
+	float power;        // 4
+	float range;        // 4
+	float normalBias;   // 4
+	float depthBias;    // 4
+};						// 48 Bytes
 
 struct PointLightStruct {
-	vec4  position;	// 16
-	vec4  color;    // 16
-	float power;    // 4
-	float radius;   // 4
-	float p0;
-	float p1;   // 8
-};					// 48 Bytes
+	vec4  position;   // 16
+	vec4  color;      // 16
+	float power;      // 4
+	float radius;     // 4
+	float normalBias; // 4
+	float depthBias;  // 4 
+};				 	  // 48 Bytes
 
 struct SpotLightStruct {
 	vec4  position;		// 16
@@ -49,7 +49,11 @@ struct SpotLightStruct {
 	float range;		// 4
 	float inCosCutoff;	// 4
 	float outCosCutoff;	// 4
-};						// 64 Bytes
+	float normalBias;   // 4
+	float depthBias;    // 4
+	float p0;		    // 4
+	float p1;           // 4
+};						// 80 Bytes
 
 uniform Material material;
 
@@ -88,8 +92,8 @@ float geometrySmithGGX(vec3 normal, vec3 viewDir, vec3 lightDir, float roughness
 vec3  fresnelSchlick(float hDotV, vec3 F0);
 vec3  fresnelSchlickRoughness(float hDotV, vec3 F0, float roughness);
 
-float calcDirShadow(bool isLocalLight, vec4 fragPosLightSpace, sampler2DShadow shadowMap, vec3 normal, vec3 lightDir);
-float calcOmniShadow(vec3 lightPos, samplerCube shadowMap, float farPlane, vec3 normal);
+float calcDirShadow(bool isLocalLight, vec4 fragPosLightSpace, sampler2DShadow shadowMap, vec3 normal, vec3 lightDir, float depthBias);
+float calcOmniShadow(vec3 lightPos, samplerCube shadowMap, float farPlane, vec3 normal, float depthBias);
 
 vec3 calcPBRDir(DirectionalLightStruct light, vec3 normal, vec3 viewDir, vec3 F0, vec3 albedo, float metallic, float roughness, int lightIndex);
 vec3 calcPBRPoint(PointLightStruct light, vec3 normal, vec3 viewDir, vec3 F0, vec3 albedo, float metallic, float roughness, int lightIndex);
@@ -110,10 +114,6 @@ void main() {
     F0 = mix(F0, albedo, metallic);
 
     vec3 directLighting = vec3(0.0f);   // Lighting from light sources
-
-
-
-
 
 	//--Direct lighting
     for (int i = 0; i < lightingBlock.numDirectionalLights; ++i) {
@@ -174,7 +174,7 @@ vec3 calcPBRDir(DirectionalLightStruct light, vec3 normal, vec3 viewDir, vec3 F0
 
     float nDotL  = max(dot(normal, lightDir), 0.0f);
     // --Shadow
-    float shadowFactor = calcDirShadow(false, fs_in.DirectionalLightSpacePos[lightIndex], DirectionalShadowMap[lightIndex], normal, lightDir);
+    float shadowFactor = calcDirShadow(false, fs_in.DirectionalLightSpacePos[lightIndex], DirectionalShadowMap[lightIndex], normal, lightDir, light.depthBias);
 
 	return (kD * albedo / PI + specular) * radiance * nDotL * (1.0f - shadowFactor);
 }
@@ -208,12 +208,12 @@ vec3 calcPBRPoint(PointLightStruct light, vec3 normal, vec3 viewDir, vec3 F0, ve
     // --Shadow
     float shadowFactor = 0.0f;
     switch (lightIndex) {
-        case 0: shadowFactor = calcOmniShadow(light.position.xyz, PointShadowMap[0], light.radius, normal); break;
-        case 1: shadowFactor = calcOmniShadow(light.position.xyz, PointShadowMap[1], light.radius, normal); break;
-        case 2: shadowFactor = calcOmniShadow(light.position.xyz, PointShadowMap[2], light.radius, normal); break;
-        case 3: shadowFactor = calcOmniShadow(light.position.xyz, PointShadowMap[3], light.radius, normal); break;
-        case 4: shadowFactor = calcOmniShadow(light.position.xyz, PointShadowMap[4], light.radius, normal); break;
-        case 5: shadowFactor = calcOmniShadow(light.position.xyz, PointShadowMap[5], light.radius, normal); break;
+        case 0: shadowFactor = calcOmniShadow(light.position.xyz, PointShadowMap[0], light.radius, normal, light.depthBias); break;
+        case 1: shadowFactor = calcOmniShadow(light.position.xyz, PointShadowMap[1], light.radius, normal, light.depthBias); break;
+        case 2: shadowFactor = calcOmniShadow(light.position.xyz, PointShadowMap[2], light.radius, normal, light.depthBias); break;
+        case 3: shadowFactor = calcOmniShadow(light.position.xyz, PointShadowMap[3], light.radius, normal, light.depthBias); break;
+        case 4: shadowFactor = calcOmniShadow(light.position.xyz, PointShadowMap[4], light.radius, normal, light.depthBias); break;
+        case 5: shadowFactor = calcOmniShadow(light.position.xyz, PointShadowMap[5], light.radius, normal, light.depthBias); break;
     }
     
     return (kD * albedo / PI + specular) * radiance * nDotL * (1.0f - shadowFactor);
@@ -250,7 +250,7 @@ vec3 calcPBRSpot(SpotLightStruct light, vec3 normal, vec3 viewDir, vec3 F0, vec3
     float nDotL = max(dot(normal, lightDir), 0.0f);
     
     // --Shadow
-    float shadowFactor = calcDirShadow(true, fs_in.SpotLightSpacePos[lightIndex], SpotShadowMap[lightIndex], normal, lightDir);
+    float shadowFactor = calcDirShadow(true, fs_in.SpotLightSpacePos[lightIndex], SpotShadowMap[lightIndex], normal, lightDir, light.depthBias);
     
     return (kD * albedo / PI + specular) * radiance * nDotL * (1.0 - shadowFactor);
 }
@@ -300,7 +300,7 @@ vec3  fresnelSchlickRoughness(float hDotV, vec3 F0, float roughness) {
 	return F0 + (max(vec3(1.0f - roughness), F0) - F0) * pow(clamp(1.0f - hDotV, 0.0f, 1.0f), 5.0f);
 }
 
-float calcDirShadow(bool isLocalLight, vec4 fragPosLightSpace, sampler2DShadow shadowMap, vec3 normal, vec3 lightDir) {
+float calcDirShadow(bool isLocalLight, vec4 fragPosLightSpace, sampler2DShadow shadowMap, vec3 normal, vec3 lightDir, float depthBias) {
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
     projCoords = projCoords * 0.5f + 0.5f;
     
@@ -318,10 +318,9 @@ float calcDirShadow(bool isLocalLight, vec4 fragPosLightSpace, sampler2DShadow s
         return isLocalLight ? 1.0f : 0.0f;
     }
     
-    // Bias
+	// Bias
     float cosTheta = clamp(dot(normal, lightDir), 0.0f, 1.0f);
-    float bias = max(0.005f * tan(acos(cosTheta)), 0.001f); 
-    bias = clamp(bias, 0.0001f, 0.01f);
+    float bias     = mix(depthBias, depthBias * 5.0f, 1.0f - cosTheta);
 
     // 3x3 PCF
     float shadow = 0.0f;
@@ -336,23 +335,23 @@ float calcDirShadow(bool isLocalLight, vec4 fragPosLightSpace, sampler2DShadow s
     return 1.0f - (shadow / 9.0f);
 }
 
-float calcOmniShadow(vec3 lightPos, samplerCube shadowMap, float farPlane, vec3 normal) {
-    vec3 fragToLight = fs_in.FragPos - lightPos;
+float calcOmniShadow(vec3 lightPos, samplerCube shadowMap, float farPlane, vec3 normal, float depthBias) {
+    vec3 fragToLight   = fs_in.FragPos - lightPos;
     float currentDepth = length(fragToLight);
-    vec3 sampleDir = normalize(fragToLight);
+    vec3 sampleDir     = normalize(fragToLight);
     
     // Bias based on surface angle
-    vec3 lightDir = normalize(lightPos - fs_in.FragPos);
-    float cosTheta = max(dot(normal, lightDir), 0.0f);
-    float bias = max(0.005f * (1.0f - cosTheta), 0.001f);
-    
+	vec3  lightDir = normalize(lightPos - fs_in.FragPos);
+	float cosTheta = clamp(dot(normal, lightDir), 0.0f, 1.0f);
+	float bias     = mix(depthBias, depthBias * 5.0f, 1.0f - cosTheta);
+
     // PCF
     vec3 gridSamplingDisk[20] = vec3[](
-       vec3(1, 1, 1),  vec3(1, -1, 1),  vec3(-1, -1, 1),  vec3(-1, 1, 1), 
+       vec3(1, 1,  1),  vec3(1, -1, 1),  vec3(-1, -1, 1),  vec3(-1, 1, 1), 
        vec3(1, 1, -1), vec3(1, -1, -1), vec3(-1, -1, -1), vec3(-1, 1, -1),
-       vec3(1, 1, 0),  vec3(1, -1, 0),  vec3(-1, -1, 0),  vec3(-1, 1, 0),
-       vec3(1, 0, 1),  vec3(-1, 0, 1),  vec3(1, 0, -1),   vec3(-1, 0, -1),
-       vec3(0, 1, 1),  vec3(0, -1, 1),  vec3(0, -1, -1),  vec3(0, 1, -1)
+       vec3(1, 1,  0),  vec3(1, -1, 0),  vec3(-1, -1, 0),  vec3(-1, 1, 0),
+       vec3(1, 0,  1),  vec3(-1, 0, 1),  vec3(1, 0, -1),   vec3(-1, 0, -1),
+       vec3(0, 1,  1),  vec3(0, -1, 1),  vec3(0, -1, -1),  vec3(0, 1, -1)
     );
     float shadow = 0.0f;
     int samples = 20;
