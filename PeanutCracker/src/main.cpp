@@ -46,9 +46,6 @@ void scrollCallback(GLFWwindow* window, double xOffset, double yOffset);
 void dropCallback(GLFWwindow* window, int count, const char** paths);
 void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
 
-// POLLING FUNCTIONS
-void processInput(GLFWwindow* window);
-
 
 // WINDOW SETUP
 const unsigned int SCR_WIDTH  = 1200;
@@ -63,14 +60,15 @@ float lastY = SCR_HEIGHT / 2.0;
 bool firstMouse = true;
 
 // CAMERA SETUP
-glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
-glm::vec3 cameraWorldUp = glm::vec3(0.0f, 1.0f, 0.0f);
-float cameraYaw = 0.0f;
-float cameraPitch = 0.0f;
-float nearPlane = 0.01f;
-float farPlane = 100.0f;
+//glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
+//glm::vec3 cameraWorldUp = glm::vec3(0.0f, 1.0f, 0.0f);
+//float cameraYaw = 0.0f;
+//float cameraPitch = 0.0f;
+//float nearPlane = 0.01f;
+//float farPlane = 100.0f;
 float aspect = (float)scr_width / (float)scr_height;
-Camera cameraObject(cameraPos, cameraWorldUp, nearPlane, farPlane, aspect, cameraYaw, cameraPitch);
+//Camera cameraObject(cameraPos, cameraWorldUp, nearPlane, farPlane, aspect, cameraYaw, cameraPitch);
+Camera cameraObject(glm::vec3(0.0f), 10.0f, 0.01f, 1000.0f, aspect);
 
 // DELTA TIME
 float deltaTime = 0.0f;
@@ -185,9 +183,6 @@ int main() {
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 
-		// INPUT HANDLING
-		processInput(window);
-
 		// OBJECT LOADING QUEUE
 		scene.processLoadQueue();
 	}
@@ -205,27 +200,13 @@ void frameBufferSizeCallback(GLFWwindow* window, int width, int height) {
 void mouseCallback(GLFWwindow* window, double xPos, double yPos) {
 	WindowContext* ctx = static_cast<WindowContext*>(glfwGetWindowUserPointer(window));
 	if (!ctx || !ctx->gui) return;
-	if (ctx->gui && ImGui::GetIO().WantCaptureMouse && !ctx->gui->isViewportHovered) return;
+	if (ImGui::GetIO().WantCaptureMouse && !ctx->gui->isViewportHovered) return;
 	if (ImGuizmo::IsOver() || ImGuizmo::IsUsing()) return;
 
-	// --Navigation
-	if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS) {
-		if (firstMouse) {
-			lastX = xPos;
-			lastY = yPos;
-			firstMouse = false;
-		}
+	glm::vec2 mousePos = glm::vec2((float)xPos, (float)yPos);
+	glm::vec2 viewportSize = glm::vec2(ctx->gui->viewportSize.x, ctx->gui->viewportSize.y);
 
-		float xOffset =   xPos - lastX;
-		float yOffset = -(yPos - lastY);
-		lastX = xPos;
-		lastY = yPos;
-
-		cameraObject.processMouseMovement(xOffset, yOffset, true);
-	}
-	else {
-		firstMouse = true;
-	}
+	cameraObject.processDrag(mousePos, viewportSize);
 }
 
 void keyPressCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
@@ -258,16 +239,17 @@ void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
 	if (ImGui::GetIO().WantCaptureMouse && !ctx->gui->isViewportHovered) return;
 	if (ImGuizmo::IsOver() || ImGuizmo::IsUsing()) return;
 
+	double xPos, yPos;
+	glfwGetCursorPos(window, &xPos, &yPos);
+	glm::vec2 mousePos = glm::vec2((float)xPos, (float)yPos);
 
+	// LEFT MOUSE - selection
 	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
-		double xPos, yPos;
-		glfwGetCursorPos(window, &xPos, &yPos);
+		if (!ctx->gui->isViewportHovered) return;
+		if (ctx->gui->viewportSize.x <= 0 || ctx->gui->viewportSize.y <= 0) return;
 
 		float relX = (float)xPos - ctx->gui->viewportBoundsMin.x;
 		float relY = (float)yPos - ctx->gui->viewportBoundsMin.y;
-
-		if (!ctx->gui->isViewportHovered) return;
-		if (ctx->gui->viewportSize.x <= 0 || ctx->gui->viewportSize.y <= 0) return;
 
 		MouseRay ray = cameraObject.getMouseRay(
 			relX, relY,
@@ -275,13 +257,20 @@ void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
 			(int)ctx->gui->viewportSize.y
 		);
 
-		bool isHoldingShift = false;
-
-		if (glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
-			isHoldingShift = true;
-		}
-
+		bool isHoldingShift = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS
+			|| glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS;
 		ctx->scene->selectEntity(ray, isHoldingShift);
+	}
+
+	// MIDDLE MOUSE - rotate or pan depending on shift
+	if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
+		if (action == GLFW_PRESS) {
+			bool isPan = (mods & GLFW_MOD_SHIFT);
+			cameraObject.beginDrag(mousePos, isPan);
+		}
+		if (action == GLFW_RELEASE) {
+			cameraObject.endDrag();
+		}
 	}
 }
 
@@ -292,31 +281,6 @@ void scrollCallback(GLFWwindow* window, double xOffset, double yOffset) {
 
 
 	cameraObject.processMouseScroll(yOffset);
-}
-
-// USER KEYBOARD INPUT
-void processInput(GLFWwindow* window) {
-	WindowContext* ctx = static_cast<WindowContext*>(glfwGetWindowUserPointer(window));
-	if (!ctx || !ctx->gui || !ctx->scene) return;
-	if (ImGui::GetIO().WantCaptureMouse && !ctx->gui->isViewportHovered) return;
-
-
-	bool isHoldingCTRL = (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS ||
-		glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS);
-
-	if (!isHoldingCTRL) {
-		if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) cameraObject.processInput(Camera_Movement::FORWARD, deltaTime);
-		if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) cameraObject.processInput(Camera_Movement::BACKWARD, deltaTime);
-		if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) cameraObject.processInput(Camera_Movement::LEFT, deltaTime);
-		if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) cameraObject.processInput(Camera_Movement::RIGHT, deltaTime);
-		if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS) cameraObject.processInput(Camera_Movement::UP, deltaTime);
-		if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS) cameraObject.processInput(Camera_Movement::DOWN, deltaTime);
-	
-		if (glfwGetKey(window, GLFW_KEY_UP)	   == GLFW_PRESS) cameraObject.processInput(Camera_Movement::LOOK_UP, deltaTime);
-		if (glfwGetKey(window, GLFW_KEY_DOWN)  == GLFW_PRESS) cameraObject.processInput(Camera_Movement::LOOK_DOWN , deltaTime);
-		if (glfwGetKey(window, GLFW_KEY_LEFT)  == GLFW_PRESS) cameraObject.processInput(Camera_Movement::LOOK_LEFT , deltaTime);
-		if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS) cameraObject.processInput(Camera_Movement::LOOK_RIGHT , deltaTime);
-	}
 }
 
 // DROPPING MODEL FILES

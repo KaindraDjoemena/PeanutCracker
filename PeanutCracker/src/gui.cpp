@@ -681,6 +681,7 @@ void GUI::showStatusBar(int statusbarHeight, Camera& camera) const {
 
             ImGui::TableNextRow();
 
+            /*
             // --- LEFT COLUMN ---
             ImGui::TableNextColumn();
             glm::vec3 camPos = camera.getPos();
@@ -703,6 +704,7 @@ void GUI::showStatusBar(int statusbarHeight, Camera& camera) const {
             }
 
             ImGui::TextDisabled("%s", rightText);
+            */
 
             ImGui::EndTable();
         }

@@ -556,7 +556,7 @@ void Scene::updateLightingUBO() const {
 		dst.range        = src->range;
 		dst.inCosCutoff  = src->inCosCutoff;
 		dst.outCosCutoff = src->outCosCutoff;
-		dst.normalBias   = src->light.depthBias;
+		dst.normalBias   = src->light.normalBias;
 		dst.depthBias    = src->light.depthBias;
 	}
 

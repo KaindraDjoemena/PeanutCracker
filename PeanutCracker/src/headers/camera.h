@@ -2,120 +2,57 @@
 
 #include "ray.h"
 #include "frustum.h"
-#include "sphereColliderComponent.h"
 
-#include <glad/glad.h>
-#include <glm/glm.hpp>
-
-#include <array>
-
-
-// CAMERA MOVEMENT ENUM
-enum class Camera_Movement {
-    FORWARD,	// W
-    BACKWARD,	// S
-    LEFT,		// A
-    RIGHT,		// D
-    UP,			// E
-    DOWN,		// Q
-    LOOK_UP,	// Up
-    LOOK_DOWN,	// Down
-    LOOK_LEFT,	// Left
-    LOOK_RIGHT	// Right
-};
-
-enum class Camera_Mode {
-    ARCBALL,
-    FLY
-};
-
-const float c_yaw = 0.0f;
-const float c_pitch = 0.0f;
-const float c_fov = 70.0f;
-const float c_speed = 5.0f;
-const float c_sensitivity = 0.3f;
-const float c_zoom = c_fov;
-const float c_lookSpeed = 10.0f;
-const float c_maxZoom = 75.0f;
-const float c_minZoom = 20.0f;
+const float c_fov = 50.0f;
+const float c_minDistance = 0.1f;
+const float c_maxDistance = 1000.0f;
 
 class Camera {
 public:
-    
-    Camera(     // CONSTRUCTOR WITH VECTORS
-        const glm::vec3& i_position = glm::vec3(0.0f, 0.0f, 0.0f),
-        const glm::vec3& i_worldUP = glm::vec3(0.0f, 1.0f, 0.0f),
-        float i_nearPlane = 0.1f,
-        float i_farPlane = 100.0f,
-        float i_yaw = c_yaw,
-        float i_pitch = c_pitch,
-        float i_aspect = (16.0f / 9.0f),
-        float i_lookSpeed = c_lookSpeed
+    Camera(
+        const glm::vec3& i_target = glm::vec3(0.0f),
+        float            i_distance = 10.0f,
+        float            i_nearPlane = 0.1f,
+        float            i_farPlane = 1000.0f,
+        float            i_aspect = (16.0f / 9.0f)
     );
 
-    
-    Camera(     // CONSTRUCTOR WITH SCALARS
-        float posX, float posY, float posZ,
-        float upX, float upY, float upZ,
-        float i_nearPlane, float i_farPlane,
-        float i_aspect,
-        float yawIn, float pitchIn
-    );
-
-    /* === SETTERS =========================================================== */
     void setAspect(float aspect);
+    void setTarget(const glm::vec3& target);
 
-    void setPitchYaw(float pitch, float yaw);
+    float     getFov()      const { return c_fov; }
+    glm::vec3 getPos()      const;
+    glm::mat4 getViewMat()  const;
+    glm::mat4 getProjMat(float i_aspect) const { return glm::perspective(glm::radians(c_fov), i_aspect, m_nearPlane, m_farPlane); }
+    glm::mat4 getProjMat()  const { return glm::perspective(glm::radians(c_fov), m_aspect, m_nearPlane, m_farPlane); }
+    Frustum   getFrustum()  const { return m_frustum; }
+    MouseRay  getMouseRay(float mouseX, float mouseY, int viewportHeight, int viewportWidth);
 
-
-    /* === GETTERS =========================================================== */
-    float getZoom() const { return m_zoom; }
-
-    glm::vec3 getPos() const { return m_pos; }
-
-    glm::vec3 getDir() const { return m_front; }
-
-    std::array<float, 2> getPitchYaw() const { return { m_pitch, m_yaw }; }
-
-    glm::mat4 getViewMat() const { return glm::lookAt(m_pos, m_pos + m_front, m_up); }
-
-    glm::mat4 getProjMat(float aspect) const { return glm::perspective(glm::radians(m_zoom), aspect, m_nearPlane, m_farPlane); }
-   
-    Frustum getFrustum() const { return m_frustum; }
-    
-    MouseRay getMouseRay(float mouseX, float mouseY, int viewportHeight, int viewportWidth);
-
-
-    /* === INTERFACE =========================================================== */
-    void processInput(Camera_Movement type, float deltaTime);
-
-    void processMouseMovement(double xOffset, double yOffset, GLboolean constrainPitch = true);
-
+    void beginDrag(glm::vec2 mousePos, bool isPan);
+    void endDrag();
+    void processDrag(glm::vec2 mousePos, glm::vec2 viewportSize);
     void processMouseScroll(double yOffset);
-
     void updateVectors();
 
 private:
-    glm::vec3 m_pos;
-    glm::vec3 m_front;
-    glm::vec3 m_up;
-    glm::vec3 m_right;
-    glm::vec3 m_worldUp;
+    float m_yaw = 0.0f;  
+    float m_pitch = 0.0f;
 
-    float m_yaw;
-    float m_pitch;
-
-    float m_movementSpeed;
-    float m_mouseSensitivity;
-    float m_zoom;
-    float m_lookSpeed;
+    glm::vec3 m_target = glm::vec3(0.0f);
+    float m_distance = 10.0f;
 
     float m_nearPlane;
     float m_farPlane;
     float m_aspect;
 
-    Frustum m_frustum;
+    glm::vec2 m_lastMousePos = glm::vec2(0.0f);
+    bool m_isDragging = false;
+    bool m_isPanning = false;
 
-    // --- flags ---
+    Frustum m_frustum;
     bool m_isDirtyCamVectors = true;
+
+    static constexpr float ROTATION_SENSITIVITY = 0.3f;
+    static constexpr float PAN_SENSITIVITY = 0.002f;
+    static constexpr float SCROLL_SENSITIVITY = 0.1f;
 };
