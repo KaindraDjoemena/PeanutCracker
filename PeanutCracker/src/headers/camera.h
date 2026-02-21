@@ -3,8 +3,8 @@
 #include "ray.h"
 #include "frustum.h"
 
-const float c_fov = 50.0f;
-const float c_minDistance = 0.1f;
+const float c_fov = 60.0f;
+const float c_minDistance = 0.01f;
 const float c_maxDistance = 1000.0f;
 
 class Camera {

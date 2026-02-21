@@ -167,45 +167,54 @@ void Renderer::renderSelectionHightlight(const Scene& scene) const {
     if (scene.getSelectedEnts().empty()) return;
 
     // WRITE TO THE STENCIL BUFFER
+    glStencilMask(0xFF);
+    glClear(GL_DEPTH_BUFFER_BIT);
+
     glEnable(GL_STENCIL_TEST);
+
     glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
     glStencilFunc(GL_ALWAYS, 1, 0xFF);
-    glStencilMask(0xFF);
 
     glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
     glDepthMask(GL_FALSE);
 
+    // draw object to the stencil buffer
+    scene.getOutlineShader().use();
+    scene.getOutlineShader().setFloat("outlineThickness", 0.0f);
+
     for (SceneNode* selectedNode : scene.getSelectedEnts()) {
         if (!selectedNode->object) continue;
-        scene.getOutlineShader().use();
+
+        scene.getOutlineShader().setMat4("normalMatrix", selectedNode->object->normalMatrixCache);
         scene.getOutlineShader().setMat4("model", selectedNode->worldMatrix);
         selectedNode->object->modelPtr->draw(scene.getOutlineShader());
     }
 
+    // DRAWING OUTLINE
+    glStencilMask(0x00);
+    glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+
     glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-    glDepthMask(GL_TRUE);
 
-
-    // === DRAWING THE OUTLINE ===========================================================
     glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
     glStencilMask(0x00);
     glDisable(GL_DEPTH_TEST);
 
-    scene.getOutlineShader().use();
-    scene.getOutlineShader().setVec4("color", glm::vec4(0.8f, 0.4f, 1.0f, 0.2f));
+    scene.getOutlineShader().setVec4("color", glm::vec4(1.0f, 0.0f, 1.0f, 1.0f));
+    scene.getOutlineShader().setFloat("outlineThickness", 0.3f);
 
     for (SceneNode* selectedNode : scene.getSelectedEnts()) {
         if (!selectedNode->object) continue;
 
-        glm::mat4 fatterModel = glm::scale(selectedNode->worldMatrix, glm::vec3(1.03f));
-        scene.getOutlineShader().setMat4("model", fatterModel);
+        scene.getOutlineShader().setMat4("normalMatrix", selectedNode->object->normalMatrixCache);
+        scene.getOutlineShader().setMat4("model", selectedNode->worldMatrix);
         selectedNode->object->modelPtr->draw(scene.getOutlineShader());
     }
 
+    glStencilMask(0xFF);
     glDisable(GL_STENCIL_TEST);
     glEnable(GL_DEPTH_TEST);
-    glDisable(GL_STENCIL_TEST);
-    glStencilMask(0xFF);
+    glDepthMask(GL_TRUE);
 }
 
 // HACK: its pretty late im tired. gotta fix these uniform settings

@@ -1,6 +1,6 @@
 #version 330 core
 layout (location = 0) in vec3 aPos;
-layout (location = 1) in vec3 aNormal; // We need normals for expansion!
+layout (location = 1) in vec3 aNormal;
 
 layout (std140) uniform CameraMatricesUBOData {
     mat4 projection;
@@ -8,12 +8,17 @@ layout (std140) uniform CameraMatricesUBOData {
     vec4 cameraPos;
 };
 
-
 uniform mat4 model;
-uniform float outlineThickness = 0.01f;
+uniform mat4 normalMatrix;
+uniform float outlineThickness = 0.8f;
 
 void main() {
-    // Expand along normal in Model Space
-    vec3 pos = aPos + aNormal * outlineThickness;
-    gl_Position = projection * view * model * vec4(pos, 1.0);
+    vec4 worldPos  = model * vec4(aPos, 1.0f);
+	vec3 worldNorm = normalize(mat3(normalMatrix) * aNormal);
+
+	float dist = distance(cameraPos.xyz, worldPos.xyz);
+
+	worldPos.xyz += worldNorm * outlineThickness * (dist * 0.01f);
+
+    gl_Position = projection * view * worldPos;
 }
