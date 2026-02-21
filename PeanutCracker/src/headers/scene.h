@@ -38,6 +38,7 @@ public:
     const Shader& getDirDepthShader() const { return *m_dirDepthShader; }
     const Shader& getOmniDepthShader() const { return *m_omniDepthShader; }
     const Shader& getOutlineShader() const { return *m_outlineShader; }
+    const Shader& getPickingShader() const { return *m_pickingShader; }
     const Shader& getPrimitiveShader() const { return *m_primitiveShader; }
     const Shader& getPostProcessShader() const { return *m_postProcessShader; }
 
@@ -46,12 +47,18 @@ public:
     const std::vector<std::unique_ptr<SpotLight>>& getSpotLights() const { return m_spotLights; }
     const std::vector<SceneNode*>& getSelectedEnts() const { return m_selectedEntities; }
 
+
     /* ===== OBJECT PICKING & OPERATIONS ================================================================= */
-    // --PICKING
-    void selectEntity(MouseRay& worldRay, bool isHoldingShift);
-    // --DELETION
+
+    //--PICKING
+    SceneNode* Scene::getNodeByPickingID(uint32_t pickingID) const;
+    void handleSelectionLogic(SceneNode* node, bool isHoldingShift);
+    void clearSelection();
+
+    //--DELETION
     void deleteSelectedEntities();
-    // --DUPLICATION
+    
+    //--DUPLICATION
     void duplicateSelectedEntities();
 
 
@@ -178,7 +185,7 @@ private:
 
 
     std::unique_ptr<SceneNode> m_worldNode;	// Scene graph parent
-    std::unique_ptr<Skybox>   m_skybox;
+    std::unique_ptr<Skybox>    m_skybox;
 
     std::vector<std::unique_ptr<DirectionalLight>> m_directionalLights;
     std::vector<std::unique_ptr<PointLight>>	   m_pointLights;
@@ -199,6 +206,7 @@ private:
     std::shared_ptr<Shader> m_dirDepthShader;
     std::shared_ptr<Shader> m_omniDepthShader;
     std::shared_ptr<Shader> m_outlineShader;
+    std::shared_ptr<Shader> m_pickingShader;
     std::shared_ptr<Shader> m_primitiveShader;
     std::shared_ptr<Shader> m_postProcessShader;
 
@@ -222,8 +230,6 @@ private:
 
     /* ===== PICKING OPERATIONS ================================================================= */
     void findBestNodeRecursive(SceneNode* node, MouseRay& worldRay, float& shortestDist, SceneNode*& bestNode);
-    void handleSelectionLogic(SceneNode* node, bool isHoldingShift);
-    void clearSelection();
     void debugPrintSceneGraph(SceneNode* node, int depth = 0);
 
 

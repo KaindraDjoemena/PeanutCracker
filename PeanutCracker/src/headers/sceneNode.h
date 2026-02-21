@@ -16,12 +16,13 @@
 
 class SceneNode {
 public:
+	uint32_t pickingID;
 	std::string	name;
 	Transform	localTransform;
 	glm::mat4	worldMatrix = glm::mat4(1.0f);
 	bool		isDirty	= true;
 	bool		isSelected = false;
-	SceneNode*								parent = nullptr;
+	SceneNode*  parent = nullptr;
 	std::vector<std::unique_ptr<SceneNode>>	children;
 	std::unique_ptr<Object>	object = nullptr;
 
@@ -46,4 +47,7 @@ public:
 	void addChild(std::unique_ptr<SceneNode> child);
 
 	std::unique_ptr<SceneNode> clone() const;
+
+private:
+	inline static uint32_t m_pickingIDCount = 1;
 };

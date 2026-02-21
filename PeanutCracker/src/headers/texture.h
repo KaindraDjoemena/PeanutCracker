@@ -33,6 +33,8 @@ enum class TexType {
 
 class Texture {
 public:
+    Texture();
+
     // Load 2D texture
     Texture(const std::filesystem::path& i_path, bool sRGB = false, bool hdr = false);
     

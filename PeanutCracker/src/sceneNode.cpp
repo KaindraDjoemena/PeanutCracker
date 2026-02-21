@@ -13,6 +13,8 @@
 
 
 SceneNode::SceneNode(std::string i_name) : name(i_name) {
+	pickingID = m_pickingIDCount; m_pickingIDCount++;	// NOTE: FIND A SMARTER WAY
+
 	sphereColliderComponent = std::make_unique<SphereColliderComponent>(localTransform.position, 1.0f);
 }
 
@@ -81,7 +83,6 @@ void SceneNode::setSphereComponentRadius() const {
 
 		sphereColliderComponent->localRadius = maxExtent;
 	}
-
 }
 
 void SceneNode::updateFromMatrix(const glm::mat4& newLocalMatrix) {
@@ -119,11 +120,13 @@ void SceneNode::update(const glm::mat4& parentWorldMatrix, bool isParentDirty) {
 		isDirty = false;
 	}
 
+	/*
 	if (object) {
 		object->setScale(localTransform.scale);
 		object->setPosition(localTransform.position);
 		object->setQuatRotation(localTransform.quatRotation);
 	}
+	*/
 
 	// Propagate update to children nodes
 	for (auto& child : children) {
@@ -142,16 +145,18 @@ void SceneNode::addChild(std::unique_ptr<SceneNode> child) {
 std::unique_ptr<SceneNode> SceneNode::clone() const {
 	auto newNode = std::make_unique<SceneNode>(name + "_copy");
 
-	// Copy spatial data
 	newNode->localTransform = this->localTransform;
 	newNode->isDirty = true;
 
-	// Copy the visual object (assuming Object has a simple constructor)
+	if (this->sphereColliderComponent && newNode->sphereColliderComponent) {
+		newNode->sphereColliderComponent->localRadius = this->sphereColliderComponent->localRadius;
+		newNode->sphereColliderComponent->localCenter = this->sphereColliderComponent->localCenter;
+	}
+
 	if (this->object) {
 		newNode->object = std::make_unique<Object>(this->object->modelPtr);
 	}
 
-	// Recursively clone all children (The "Deep Copy")
 	for (const auto& child : this->children) {
 		newNode->addChild(child->clone());
 	}

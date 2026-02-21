@@ -217,6 +217,53 @@ void Renderer::renderSelectionHightlight(const Scene& scene) const {
     glDepthMask(GL_TRUE);
 }
 
+// Returns picking ID
+uint32_t Renderer::renderPickingPass(const Scene& scene, const Camera& cam, int mouseX, int mouseY, int vWidth, int vHeight) {
+    m_pickingFBO.resize(vWidth, vHeight);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, m_pickingFBO.fbo);
+    glViewport(0, 0, vWidth, vHeight);
+
+    GLuint clearVal = 0;
+    glClearBufferuiv(GL_COLOR, 0, &clearVal);
+    glClear(GL_DEPTH_BUFFER_BIT);
+
+    glDisable(GL_BLEND);
+    glEnable(GL_SCISSOR_TEST);
+    int flippedY = (vHeight - 1) - mouseY;
+    glScissor(mouseX, flippedY, 1, 1);
+
+    scene.getPickingShader().use();
+
+    uint32_t id = 1;
+    renderPickingNode(scene, scene.getWorldNode(), id);
+
+    glDisable(GL_SCISSOR_TEST);
+    glEnable(GL_BLEND);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // read back the single pixel
+    unsigned int pickedID = 0;
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, m_pickingFBO.fbo);
+    glReadBuffer(GL_COLOR_ATTACHMENT0);
+    glReadPixels(mouseX, flippedY, 1, 1, GL_RED_INTEGER, GL_UNSIGNED_INT, &pickedID);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+
+    return pickedID; // 0 = nothing hit, otherwise matches the ID assigned during traversal
+}
+
+void Renderer::renderPickingNode(const Scene& scene, const SceneNode* node, uint32_t& id) {
+    if (node->object) {
+        scene.getPickingShader().setUint("objectID", id);
+        scene.getPickingShader().setMat4("modelMat", node->worldMatrix);
+        node->object->modelPtr->draw(scene.getPickingShader());
+        ++id;
+    }
+
+    for (auto& child : node->children)
+        renderPickingNode(scene, child.get(), id);
+}
+
 // HACK: its pretty late im tired. gotta fix these uniform settings
 void Renderer::renderLightAreas(const Scene& scene, const Camera& cam, int vWidth, int vHeight) const {
     glEnable(GL_BLEND);
@@ -238,6 +285,8 @@ void Renderer::renderLightAreas(const Scene& scene, const Camera& cam, int vWidt
     m_lineVAO.bind();
     primitiveShader.setInt("mode", static_cast<int>(Primitive_Mode::LINE));	// 0
     for (auto& dirLight : scene.getDirectionalLights()) {
+        if (!dirLight->isVisible) continue;
+
         // light direction
         glm::mat4 arrowMat = calcLookAtMat(dirLight->position, dirLight->position + dirLight->direction);
         arrowMat = glm::scale(arrowMat, glm::vec3(1.0f, 1.0f, dirLight->range));
@@ -264,6 +313,8 @@ void Renderer::renderLightAreas(const Scene& scene, const Camera& cam, int vWidt
     m_quadVAO.bind();
     primitiveShader.setInt("mode", static_cast<int>(Primitive_Mode::SDF));   // 2
     for (auto& pointLight : scene.getPointLights()) {
+        if (!pointLight->isVisible) continue;
+
         glm::mat4 baseMat = calcBillboardMat(pointLight->position, cam.getViewMat());
         
         // light area
@@ -285,6 +336,8 @@ void Renderer::renderLightAreas(const Scene& scene, const Camera& cam, int vWidt
     m_coneVAO.bind();
     primitiveShader.setInt("mode", static_cast<int>(Primitive_Mode::LINE));	// 0
     for (auto& spotLight : scene.getSpotLights()) {
+        if (!spotLight->isVisible) continue;
+
         glm::mat4 baseMat = calcLookAtMat(spotLight->position, spotLight->position + spotLight->direction);
 
         float outerAngle = std::acos(glm::clamp(spotLight->outCosCutoff, -1.0f, 1.0f));

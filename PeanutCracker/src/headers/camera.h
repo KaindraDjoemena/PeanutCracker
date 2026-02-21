@@ -26,7 +26,6 @@ public:
     glm::mat4 getProjMat(float i_aspect) const { return glm::perspective(glm::radians(c_fov), i_aspect, m_nearPlane, m_farPlane); }
     glm::mat4 getProjMat()  const { return glm::perspective(glm::radians(c_fov), m_aspect, m_nearPlane, m_farPlane); }
     Frustum   getFrustum()  const { return m_frustum; }
-    MouseRay  getMouseRay(float mouseX, float mouseY, int viewportHeight, int viewportWidth);
 
     void beginDrag(glm::vec2 mousePos, bool isPan);
     void endDrag();

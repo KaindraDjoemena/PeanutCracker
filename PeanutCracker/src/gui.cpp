@@ -232,6 +232,8 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
                     if (selectedDir >= 0 && selectedDir < (int)scene.getDirectionalLights().size()) {
                         auto& l = *scene.getDirectionalLights()[selectedDir];
 
+                        ImGui::Checkbox("Visible Area", &l.isVisible);
+
                         // Transform
                         ImGui::SeparatorText("Transform");
                         DrawProperty("Dir", [&]() { if (ImGui::DragFloat3("##d", &l.direction.x, 0.01f)) { l.direction = glm::normalize(l.direction); } });
@@ -290,6 +292,8 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
                     ImGui::BeginChild("PointDetails", ImVec2(0, 0), false);
                     if (selectedPoint >= 0 && selectedPoint < (int)scene.getPointLights().size()) {
                         auto& l = *scene.getPointLights()[selectedPoint];
+
+                        ImGui::Checkbox("Visible Area", &l.isVisible);
 
                         // Transform
                         ImGui::SeparatorText("Transform");
@@ -362,6 +366,8 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
                     if (selectedSpot >= 0 && selectedSpot < (int)scene.getSpotLights().size()) {
                         auto& l = *scene.getSpotLights()[selectedSpot];
 
+                        ImGui::Checkbox("Visible Area", &l.isVisible);
+
                         // Transform
                         ImGui::Separator();
                         DrawProperty("Pos", [&]() { ImGui::DragFloat3("##p", &l.position.x, 0.01f); });
@@ -417,7 +423,7 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
 
 
     /* ===== CONFIGURATION PANEL ==================================================== */
-    ImGui::Begin("Configuration", NULL);
+    ImGui::Begin("CONFIGURATION", NULL);
 
     // --Rendering Pipeline
     if (ImGui::CollapsingHeader("Rendering Pipeline", ImGuiTreeNodeFlags_DefaultOpen)) {

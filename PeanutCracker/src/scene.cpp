@@ -31,6 +31,7 @@ Scene::Scene(AssetManager* i_assetManager) : m_assetManager(i_assetManager) {
 	m_dirDepthShader    = m_assetManager->loadShaderObject("dirDepth.vert", "dirDepth.frag");
 	m_omniDepthShader   = m_assetManager->loadShaderObject("omniDepth.vert", "omniDepth.frag", "omniDepth.geom");
 	m_outlineShader     = m_assetManager->loadShaderObject("outline.vert", "outline.frag");
+	m_pickingShader		= m_assetManager->loadShaderObject("picking.vert", "picking.frag");
 	m_primitiveShader   = m_assetManager->loadShaderObject("primitive.vert", "primitive.frag");
 	m_postProcessShader = m_assetManager->loadShaderObject("postprocess.vert", "postprocess.frag");
 
@@ -47,28 +48,58 @@ Scene::Scene(AssetManager* i_assetManager) : m_assetManager(i_assetManager) {
 	bindToUBOs(*m_omniDepthShader);
 	bindToUBOs(*m_outlineShader);
 	bindToUBOs(*m_primitiveShader);
+	bindToUBOs(*m_primitiveShader);
 	bindToUBOs(*m_postProcessShader);
 }
 //Scene::Scene(const Scene&) = delete;
 //Scene::Scene& operator = (const Scene&) = delete;
 
 /* ===== OBJECT PICKING & OPERATIONS ================================================================= */
-// --PICKING
-void Scene::selectEntity(MouseRay& worldRay, bool isHoldingShift) {
-	float shortestDist = FLT_MAX;
-	SceneNode* bestNode = nullptr;
+//--PICKING
+SceneNode* Scene::getNodeByPickingID(uint32_t targetID) const {
+	uint32_t id = 1;
+	
+	// NOTE:: THIS IS LINEAR
+	std::function<SceneNode*(SceneNode*)> find = [&](SceneNode* node) -> SceneNode* {
+		if (node->object) {
+			if (id == targetID) return node;
+			++id;
+		}
+		for (auto& child : node->children) {
+			if (SceneNode* result = find(child.get())) return result;
+		}
+		return nullptr;
+	};
 
-	if (m_worldNode) {
-		findBestNodeRecursive(m_worldNode.get(), worldRay, shortestDist, bestNode);
+	return find(m_worldNode.get());
+}
+// TODO: MOVE TO SOME INPUT LAYER
+void Scene::handleSelectionLogic(SceneNode* node, bool isHoldingShift) {
+	if (isHoldingShift) {
+		// Toggle selection
+		auto it = std::find(m_selectedEntities.begin(), m_selectedEntities.end(), node);
+		if (it == m_selectedEntities.end()) {
+			node->isSelected = true;
+			m_selectedEntities.push_back(node);
+		}
+		else {
+			node->isSelected = false;
+			m_selectedEntities.erase(it);
+		}
 	}
-
-	if (bestNode) {
-		handleSelectionLogic(bestNode, isHoldingShift);
-	}
-	else if (!isHoldingShift) {
+	else {
+		// Single select
 		clearSelection();
+		node->isSelected = true;
+		m_selectedEntities.push_back(node);
 	}
 }
+void Scene::clearSelection() {
+	for (auto* node : m_selectedEntities) node->isSelected = false;
+	m_selectedEntities.clear();
+}
+
+
 // --DELETION
 void Scene::deleteSelectedEntities() {
 	if (m_selectedEntities.empty()) return;
@@ -348,30 +379,7 @@ void Scene::findBestNodeRecursive(SceneNode* node, MouseRay& worldRay, float& sh
 		findBestNodeRecursive(child.get(), worldRay, shortestDist, bestNode);
 	}
 }
-void Scene::handleSelectionLogic(SceneNode* node, bool isHoldingShift) {
-	if (isHoldingShift) {
-		// Toggle selection
-		auto it = std::find(m_selectedEntities.begin(), m_selectedEntities.end(), node);
-		if (it == m_selectedEntities.end()) {
-			node->isSelected = true;
-			m_selectedEntities.push_back(node);
-		}
-		else {
-			node->isSelected = false;
-			m_selectedEntities.erase(it);
-		}
-	}
-	else {
-		// Single select
-		clearSelection();
-		node->isSelected = true;
-		m_selectedEntities.push_back(node);
-	}
-}
-void Scene::clearSelection() {
-	for (auto* node : m_selectedEntities) node->isSelected = false;
-	m_selectedEntities.clear();
-}
+
 void Scene::debugPrintSceneGraph(SceneNode* node, int depth) {
 	for (auto& child : node->children) {
 		debugPrintSceneGraph(child.get(), depth + 1);

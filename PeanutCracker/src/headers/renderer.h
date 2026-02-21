@@ -105,9 +105,52 @@ struct Framebuffer {
     ~Framebuffer() { cleanUp(); }
 };
 
+struct PickingFBO {
+    unsigned int fbo = 0;
+    unsigned int depthRbo = 0;
+    Texture colorTex;
+    int width = 0, height = 0;
+
+    ~PickingFBO() { 
+        if (fbo)      glDeleteFramebuffers(1, &fbo);
+        if (depthRbo) glDeleteRenderbuffers(1, &depthRbo);
+        fbo = depthRbo = 0;
+    }
+
+    void setup(int w, int h) {
+        glGenFramebuffers(1, &fbo);
+        glGenRenderbuffers(1, &depthRbo);
+        resize(w, h);
+    }
+
+    void resize(int w, int h) {
+        if (w == width && h == height) return;
+        width = w; height = h;
+
+        colorTex = Texture(w, h, GL_R32UI, false,
+            GL_CLAMP_TO_EDGE,
+            GL_CLAMP_TO_EDGE,
+            GL_NEAREST,
+            GL_NEAREST);
+
+        glBindRenderbuffer(GL_RENDERBUFFER, depthRbo);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, w, h);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorTex.getID(), 0);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthRbo);
+
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+            std::cerr << "[PICK] FBO incomplete\n";
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
+};
+
+
 class Renderer {
 public:
-    Renderer(int i_vWidth, int i_vHeight)  { m_viewportFBO.setup(i_vWidth, i_vHeight); }
+    Renderer(int i_vWidth, int i_vHeight) { m_viewportFBO.setup(i_vWidth, i_vHeight); m_pickingFBO.setup(i_vWidth, i_vHeight); }
 
     void initScene(Scene& scene);
     void update(Scene& scene, Camera& cam, int vWidth, int vHeight);
@@ -123,6 +166,8 @@ public:
     void setBgCol(const glm::vec4& bgCol) { m_winBgCol = bgCol; }
     void setEV100(float i_EV100) { m_EV100 = i_EV100; }
 
+    uint32_t renderPickingPass(const Scene& scene, const Camera& cam, int mouseX, int mouseY, int vWidth, int vHeight);
+
 private:
     enum class Primitive_Mode {
         LINE = 0,
@@ -135,6 +180,7 @@ private:
     glm::vec4  m_winBgCol = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
 
     Framebuffer m_viewportFBO;
+    PickingFBO m_pickingFBO;
 
     // Post-processing
     VAO m_lineVAO;
@@ -156,6 +202,8 @@ private:
     void renderObjects(const Scene& scene, const SceneNode* node, const Camera& cam) const;
     void renderShadowMap(const SceneNode* node, const Shader& depthShader) const;
     void renderSkybox(const Scene& scena) const;
+
+    void renderPickingNode(const Scene& scene, const SceneNode* node, uint32_t& id);
 
     void renderSelectionHightlight(const Scene& scene) const;
     void renderLightAreas(const Scene& scene, const Camera& cam, int vWidth, int vHeight) const;

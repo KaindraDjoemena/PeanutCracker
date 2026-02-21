@@ -5,6 +5,12 @@
 #include <iostream>
 
 
+Texture::Texture()
+    : m_ID(0)
+    , m_type(TexType::TEX_2D)
+{
+}
+
 // Load 2D texture
 Texture::Texture(const std::filesystem::path& i_path, bool sRGB, bool hdr)
     : m_ID(0)
@@ -188,6 +194,7 @@ GLenum Texture::getBaseFormat(GLenum internalFormat) {
     case GL_R8:
     case GL_R16F:
     case GL_R32F:           return GL_RED;
+    case GL_R32UI:          return GL_RED_INTEGER;
     case GL_RG8:
     case GL_RG16F:
     case GL_RG32F:          return GL_RG;
@@ -219,6 +226,7 @@ GLenum Texture::getDataType(GLenum internalFormat) {
     case GL_RGB32F:
     case GL_RGBA32F:
     case GL_DEPTH_COMPONENT32F: return GL_FLOAT;
+    case GL_R32UI:              return GL_UNSIGNED_INT;
     case GL_DEPTH_COMPONENT16:  return GL_UNSIGNED_SHORT;
     case GL_DEPTH_COMPONENT24:  return GL_UNSIGNED_INT;
     default:                    return GL_UNSIGNED_BYTE;

@@ -23,6 +23,7 @@ struct DirectionalLight {
     glm::vec3 direction;
     Light light;
     float range;
+    bool  isVisible = true;
     ShadowCasterComponent shadowCasterComponent;
 
     DirectionalLight()
@@ -49,6 +50,7 @@ struct PointLight {
     glm::vec3 position;
     Light light;
     float radius;
+    bool  isVisible = true;
     ShadowCasterComponent shadowCasterComponent;
 
     PointLight()
@@ -76,6 +78,7 @@ struct SpotLight {
     float range;
     float inCosCutoff;
     float outCosCutoff;
+    bool  isVisible = true;
     ShadowCasterComponent shadowCasterComponent;
 
     SpotLight()

@@ -47,28 +47,6 @@ glm::mat4 Camera::getViewMat() const {
     return glm::lookAt(getPos(), m_target, glm::vec3(0.0f, 1.0f, 0.0f));
 }
 
-MouseRay Camera::getMouseRay(float mouseX, float mouseY, int viewportHeight, int viewportWidth) {
-    MouseRay mouseRay;
-
-    float winX = mouseX;
-    float winY = static_cast<float>(viewportHeight) - mouseY;
-    glm::vec4 viewport(0.0f, 0.0f, (float)viewportWidth, (float)viewportHeight);
-
-    glm::mat4 proj = getProjMat();
-    glm::mat4 view = getViewMat();
-    glm::mat4 projView = proj * view;
-
-    glm::vec3 nearPt = glm::unProject(glm::vec3(winX, winY, 0.0f), glm::mat4(1.0f), projView, viewport);
-    glm::vec3 farPt = glm::unProject(glm::vec3(winX, winY, 1.0f), glm::mat4(1.0f), projView, viewport);
-
-    mouseRay.origin = nearPt;
-    mouseRay.direction = glm::normalize(farPt - nearPt);
-    mouseRay.hit = false;
-    mouseRay.dist = -1.0f;
-
-    return mouseRay;
-}
-
 void Camera::beginDrag(glm::vec2 mousePos, bool isPan) {
     m_lastMousePos = mousePos;
     m_isDragging = !isPan;

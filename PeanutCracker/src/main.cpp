@@ -33,8 +33,9 @@
 
 
 struct WindowContext {
-	GUI* gui;
-	Scene* scene;
+	GUI*	  gui;
+	Scene*	  scene;
+	Renderer* renderer;
 };
 
 
@@ -60,14 +61,7 @@ float lastY = SCR_HEIGHT / 2.0;
 bool firstMouse = true;
 
 // CAMERA SETUP
-//glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
-//glm::vec3 cameraWorldUp = glm::vec3(0.0f, 1.0f, 0.0f);
-//float cameraYaw = 0.0f;
-//float cameraPitch = 0.0f;
-//float nearPlane = 0.01f;
-//float farPlane = 100.0f;
 float aspect = (float)scr_width / (float)scr_height;
-//Camera cameraObject(cameraPos, cameraWorldUp, nearPlane, farPlane, aspect, cameraYaw, cameraPitch);
 Camera cameraObject(glm::vec3(0.0f), 10.0f, 0.01f, 1000.0f, aspect);
 
 // DELTA TIME
@@ -144,7 +138,7 @@ int main() {
 	Renderer renderer(SCR_WIDTH, SCR_HEIGHT);
 	renderer.initScene(scene);
 
-	WindowContext context = { &gui, &scene};
+	WindowContext context = { &gui, &scene, &renderer };
 	glfwSetWindowUserPointer(window, &gui);
 	glfwSetWindowUserPointer(window, &context);
 
@@ -245,21 +239,32 @@ void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
 
 	// LEFT MOUSE - selection
 	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+
 		if (!ctx->gui->isViewportHovered) return;
 		if (ctx->gui->viewportSize.x <= 0 || ctx->gui->viewportSize.y <= 0) return;
 
-		float relX = (float)xPos - ctx->gui->viewportBoundsMin.x;
-		float relY = (float)yPos - ctx->gui->viewportBoundsMin.y;
+		ImGuiViewport* mainViewport = ImGui::GetMainViewport();
+		float relX = (float)xPos - (ctx->gui->viewportBoundsMin.x - mainViewport->Pos.x);
+		float relY = (float)yPos - (ctx->gui->viewportBoundsMin.y - mainViewport->Pos.y);
 
-		MouseRay ray = cameraObject.getMouseRay(
-			relX, relY,
-			(int)ctx->gui->viewportSize.x,
-			(int)ctx->gui->viewportSize.y
+		bool isHoldingShift = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS || glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS;
+
+		int vWidth  = (int)ctx->gui->viewportSize.x;
+		int vHeight = (int)ctx->gui->viewportSize.y;
+
+		uint32_t pickedID = ctx->renderer->renderPickingPass(
+			*ctx->scene, cameraObject,
+			(int)relX, (int)relY,
+			vWidth, vHeight
 		);
 
-		bool isHoldingShift = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS
-			|| glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS;
-		ctx->scene->selectEntity(ray, isHoldingShift);
+		if (pickedID == 0) {
+			if (!isHoldingShift) ctx->scene->clearSelection();
+		}
+		else {
+			SceneNode* node = ctx->scene->getNodeByPickingID(pickedID);
+			if (node) ctx->scene->handleSelectionLogic(node, isHoldingShift);
+		}
 	}
 
 	// MIDDLE MOUSE - rotate or pan depending on shift
