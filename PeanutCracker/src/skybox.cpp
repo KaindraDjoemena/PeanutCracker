@@ -115,7 +115,7 @@ void Skybox::generateIrradianceMap(const Shader& convolutionShader) {
     convolutionShader.use();
     convolutionShader.setInt("environmentMap", 0);
     convolutionShader.setMat4("projection", m_captureProjection);
-    
+
     m_envCubemap.bind(100);
 
     glViewport(0, 0, 32, 32);
