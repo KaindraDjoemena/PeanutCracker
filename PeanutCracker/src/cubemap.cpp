@@ -1,4 +1,4 @@
-#include "headers/skybox.h"
+#include "headers/cubemap.h"
 
 #include <glad/glad.h>
 
@@ -8,9 +8,9 @@
 #include <array>
 
 
-const glm::mat4 Skybox::m_captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
+const glm::mat4 Cubemap::m_captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
 
-const std::array<glm::mat4, 6> Skybox::m_captureViews = {
+const std::array<glm::mat4, 6> Cubemap::m_captureViews = {
     glm::lookAt(glm::vec3(0.0f), glm::vec3(1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
     glm::lookAt(glm::vec3(0.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
     glm::lookAt(glm::vec3(0.0f), glm::vec3(0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)),
@@ -19,7 +19,7 @@ const std::array<glm::mat4, 6> Skybox::m_captureViews = {
     glm::lookAt(glm::vec3(0.0f), glm::vec3(0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
 };
 
-Skybox::Skybox(
+Cubemap::Cubemap(
     const std::filesystem::path& i_hdrPath,
     const Shader& i_convolutionShader,
     const Shader& i_conversionShader,
@@ -60,13 +60,13 @@ Skybox::Skybox(
     generateBRDFLUT(i_brdfShader);
 }
 
-Skybox::~Skybox() {
+Cubemap::~Cubemap() {
     if (m_captureFBO != 0) glDeleteFramebuffers(1, &m_captureFBO);
     if (m_captureRBO != 0) glDeleteRenderbuffers(1, &m_captureRBO);
 }
 
 
-void Skybox::draw(const Shader& shader) const {
+void Cubemap::draw(const Shader& shader) const {
     glDepthFunc(GL_LEQUAL);
 
     shader.use();
@@ -79,7 +79,7 @@ void Skybox::draw(const Shader& shader) const {
 }
 
 // HDR equirect -> cubemap
-void Skybox::convertEquirectToCubemap(GLuint hdrTexID, const Shader& conversionShader) {
+void Cubemap::convertEquirectToCubemap(GLuint hdrTexID, const Shader& conversionShader) {
     std::cout << "[SKYBOX] Converting equirectangular to cubemap\n";
 
     conversionShader.use();
@@ -105,7 +105,7 @@ void Skybox::convertEquirectToCubemap(GLuint hdrTexID, const Shader& conversionS
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void Skybox::generateIrradianceMap(const Shader& convolutionShader) {
+void Cubemap::generateIrradianceMap(const Shader& convolutionShader) {
     std::cout << "[SKYBOX] Generating irradiance map\n";
 
     glBindFramebuffer(GL_FRAMEBUFFER, m_captureFBO);
@@ -138,7 +138,7 @@ void Skybox::generateIrradianceMap(const Shader& convolutionShader) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void Skybox::generatePrefilterMap(const Shader& prefilterShader) {
+void Cubemap::generatePrefilterMap(const Shader& prefilterShader) {
     std::cout << "[SKYBOX] Generating prefilter map\n";
 
     prefilterShader.use();
@@ -175,7 +175,7 @@ void Skybox::generatePrefilterMap(const Shader& prefilterShader) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void Skybox::generateBRDFLUT(const Shader& brdfShader) {
+void Cubemap::generateBRDFLUT(const Shader& brdfShader) {
     std::cout << "[SKYBOX] Generating BRDF LUT\n";
 
     glBindFramebuffer(GL_FRAMEBUFFER, m_captureFBO);
@@ -194,7 +194,7 @@ void Skybox::generateBRDFLUT(const Shader& brdfShader) {
 }
 
 
-void Skybox::setupCubeMesh() {
+void Cubemap::setupCubeMesh() {
     static const std::array<float, 108> vertices = {
         -1.0f, 1.0f, -1.0f,
         -1.0f, -1.0f, -1.0f,
@@ -245,7 +245,7 @@ void Skybox::setupCubeMesh() {
     m_cubeVAO.unbind();
 }
 
-void Skybox::setupQuadMesh() {
+void Cubemap::setupQuadMesh() {
     static const std::array<float, 30> quadVertices = {
         // positions            // texCoords
         -1.0f,  1.0f, 0.0f,     0.0f, 1.0f,

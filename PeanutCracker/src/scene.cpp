@@ -3,7 +3,7 @@
 #include "headers/vbo.h"
 #include "headers/shader.h"
 //#include "headers/cubemap.h"
-#include "headers/skybox.h"
+#include "headers/cubemap.h"
 #include "headers/object.h"
 #include "headers/model.h"
 #include "headers/light.h"
@@ -218,7 +218,7 @@ void Scene::createAndAddSpotLight(std::unique_ptr<SpotLight> light) {
 	numSpotLights++;
 }
 void Scene::createAndAddSkyboxHDR(const std::filesystem::path& path) {
-	auto m_skyboxPtr = std::make_unique<Skybox>(
+	auto m_skyboxPtr = std::make_unique<Cubemap>(
 		path,
 		*m_convolutionShader,
 		*m_conversionShader,

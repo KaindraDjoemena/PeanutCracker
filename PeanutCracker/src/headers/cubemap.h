@@ -9,9 +9,9 @@
 #include "shader.h"
 
 
-class Skybox {
+class Cubemap {
 public:
-    Skybox(
+    Cubemap(
         const std::filesystem::path& i_hdrPath,
         const Shader& i_convolutionShader,
         const Shader& i_conversionShader,
@@ -19,7 +19,7 @@ public:
         const Shader& i_brdfShader
     );
 
-    ~Skybox();
+    ~Cubemap();
 
     //Skybox(const Skybox&) = delete;
     //Skybox& operator=(const Skybox&) = delete;

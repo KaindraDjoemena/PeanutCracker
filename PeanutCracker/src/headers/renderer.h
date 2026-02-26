@@ -5,7 +5,7 @@
 #include "scene.h"
 #include "camera.h"
 #include "sceneNode.h"
-#include "skybox.h"
+#include "cubemap.h"
 
 enum class Render_Mode {
     PBR,
