@@ -46,10 +46,15 @@ Scene::Scene(AssetManager* i_assetManager) : m_assetManager(i_assetManager) {
 	bindToUBOs(*m_modelShader);
 	bindToUBOs(*m_dirDepthShader);
 	bindToUBOs(*m_omniDepthShader);
+	bindToUBOs(*m_skyboxShader);
+	bindToUBOs(*m_convolutionShader);
+
 	bindToUBOs(*m_outlineShader);
 	bindToUBOs(*m_primitiveShader);
-	bindToUBOs(*m_primitiveShader);
+	
 	bindToUBOs(*m_postProcessShader);
+
+	generateBRDFLUT();
 }
 //Scene::Scene(const Scene&) = delete;
 //Scene::Scene& operator = (const Scene&) = delete;
@@ -217,16 +222,17 @@ void Scene::createAndAddSpotLight(std::unique_ptr<SpotLight> light) {
 	m_spotLights.push_back(std::move(light));
 	numSpotLights++;
 }
+void Scene::createAndAddReflectionProbe(std::unique_ptr<RefProbe> probe) {
+	m_refProbes.push_back(std::move(probe));
+	numRefProbes++;
+}
 void Scene::createAndAddSkyboxHDR(const std::filesystem::path& path) {
 	auto m_skyboxPtr = std::make_unique<Cubemap>(
 		path,
 		*m_convolutionShader,
 		*m_conversionShader,
-		*m_prefilterShader,
-		*m_brdfShader
+		*m_prefilterShader
 	);
-	setupSkyboxShaderUBOs(*m_skyboxShader);
-	setupSkyboxShaderUBOs(*m_convolutionShader);
 
 	m_skybox = std::move(m_skyboxPtr);
 }
@@ -251,23 +257,26 @@ void Scene::deleteSkybox() {
 // --ALLOCATION
 // gets called once in to set the binding points
 void Scene::setupUBOBindings() {
-	// Setup Camera UBO
-	glGenBuffers(1, &cameraMatricesUBO);
-	glBindBuffer(GL_UNIFORM_BUFFER, cameraMatricesUBO);
+
+	glGenBuffers(1, &m_cameraMatricesUBO);
+	glBindBuffer(GL_UNIFORM_BUFFER, m_cameraMatricesUBO);
 	glBufferData(GL_UNIFORM_BUFFER, sizeof(CameraMatricesUBOData), NULL, GL_DYNAMIC_DRAW);
-	glBindBufferBase(GL_UNIFORM_BUFFER, CAMERA_BINDING_POINT, cameraMatricesUBO); // binding Point 0
+	glBindBufferBase(GL_UNIFORM_BUFFER, CAMERA_BINDING_POINT, m_cameraMatricesUBO);
 
-	// Setup Lighting UBO
-	glGenBuffers(1, &lightingUBO);
-	glBindBuffer(GL_UNIFORM_BUFFER, lightingUBO);
+	glGenBuffers(1, &m_lightingUBO);
+	glBindBuffer(GL_UNIFORM_BUFFER, m_lightingUBO);
 	glBufferData(GL_UNIFORM_BUFFER, sizeof(LightingUBOData), NULL, GL_DYNAMIC_DRAW);
-	glBindBufferBase(GL_UNIFORM_BUFFER, LIGHTS_BINDING_POINT, lightingUBO); // binding Point 1
+	glBindBufferBase(GL_UNIFORM_BUFFER, LIGHTS_BINDING_POINT, m_lightingUBO);
 
-	// Setup Shadow UBO
-	glGenBuffers(1, &shadowUBO);
-	glBindBuffer(GL_UNIFORM_BUFFER, shadowUBO);
+	glGenBuffers(1, &m_refProbeUBO);
+	glBindBuffer(GL_UNIFORM_BUFFER, m_refProbeUBO);
+	glBufferData(GL_UNIFORM_BUFFER, sizeof(ReflectionProbeUBOData), NULL, GL_DYNAMIC_DRAW);
+	glBindBufferBase(GL_UNIFORM_BUFFER, REF_PROBE_BINDING_POINT, m_refProbeUBO); 
+
+	glGenBuffers(1, &m_shadowUBO);
+	glBindBuffer(GL_UNIFORM_BUFFER, m_shadowUBO);
 	glBufferData(GL_UNIFORM_BUFFER, sizeof(ShadowMatricesUBOData), NULL, GL_DYNAMIC_DRAW);
-	glBindBufferBase(GL_UNIFORM_BUFFER, SHADOW_BINDING_POINT, shadowUBO);	// binding point 2
+	glBindBufferBase(GL_UNIFORM_BUFFER, SHADOW_BINDING_POINT, m_shadowUBO);
 
 	glBindBuffer(GL_UNIFORM_BUFFER, 0);
 }
@@ -275,325 +284,123 @@ void Scene::setupUBOBindings() {
 // --SHADER BINDING
 // gets called for every shader
 void Scene::bindToUBOs(const Shader& shader) const {
-	// Camera
+
 	unsigned int camIndex = glGetUniformBlockIndex(shader.ID, "CameraMatricesUBOData");
 	if (camIndex != GL_INVALID_INDEX) {
 		glUniformBlockBinding(shader.ID, camIndex, CAMERA_BINDING_POINT);
 	}
 
-	// Lighting
 	unsigned int lightIndex = glGetUniformBlockIndex(shader.ID, "LightingUBOData");
 	if (lightIndex != GL_INVALID_INDEX) {
 		glUniformBlockBinding(shader.ID, lightIndex, LIGHTS_BINDING_POINT);
 	}
 
-	// Shadow
+	unsigned int refProbeIndex = glGetUniformBlockIndex(shader.ID, "ReflectionProbeUBOData");
+	if (refProbeIndex != GL_INVALID_INDEX) {
+		glUniformBlockBinding(shader.ID, refProbeIndex, REF_PROBE_BINDING_POINT);
+	}
+
 	unsigned int shadowIndex = glGetUniformBlockIndex(shader.ID, "ShadowMatricesUBOData");
 	if (shadowIndex != GL_INVALID_INDEX) {
 		glUniformBlockBinding(shader.ID, shadowIndex, SHADOW_BINDING_POINT);
 	}
 }
-void Scene::setupSkyboxShaderUBOs(const Shader& shader) const {
-	unsigned int camIndex = glGetUniformBlockIndex(shader.ID, "CameraMatricesUBOData");
-	if (camIndex != GL_INVALID_INDEX) {
-		glUniformBlockBinding(shader.ID, camIndex, CAMERA_BINDING_POINT);
-	}
-}
-
-void Scene::updateShadowMapLSMats() const {
-	// -- Updating light space matrices
-	for (auto& dirLight : m_directionalLights) {
-		// Check if direction is valid before calc
-		if (glm::length(dirLight->direction) < 0.001f) {
-			std::cerr << "ERROR: Direction is zero or near-zero!" << '\n';
-		}
-		if (glm::any(glm::isnan(dirLight->direction))) {
-			std::cerr << "ERROR: Direction contains NaN!" << '\n';
-		}
-
-		dirLight->shadowCasterComponent.calcLightSpaceMat(dirLight->direction, glm::vec3(0.0f, 0.0f, 0.0f));
-
-		// Check result immediately
-		glm::mat4 test = dirLight->shadowCasterComponent.getLightSpaceMatrix();
-		if (glm::any(glm::isnan(test[0]))) {
-			std::cerr << "Matrix became NaN inside calcLightSpaceMat!" << '\n';
-		}
-	}
-	for (auto& pointLight : m_pointLights) {
-		pointLight->shadowCasterComponent.calcLightSpaceMats(pointLight->position);
-
-		// Check result immediately
-		std::array<glm::mat4, 6> test = pointLight->shadowCasterComponent.getLightSpaceMats();
-		if (glm::any(glm::isnan(test[0][0]))) {
-			std::cerr << "POINTLIGHT: Matrix became NaN inside calcLightSpaceMats!" << '\n';
-		}
-	}
-	for (auto& spotLight : m_spotLights) {
-		// Check if direction is valid before calc
-		if (glm::length(spotLight->direction) < 0.001f) {
-			std::cerr << "ERROR: Direction is zero or near-zero!" << '\n';
-		}
-		if (glm::any(glm::isnan(spotLight->direction))) {
-			std::cerr << "ERROR: Direction contains NaN!" << '\n';
-		}
-
-		spotLight->shadowCasterComponent.calcLightSpaceMat(spotLight->direction, spotLight->position);
-
-		// Check result immediately
-		glm::mat4 test = spotLight->shadowCasterComponent.getLightSpaceMatrix();
-		if (glm::any(glm::isnan(test[0]))) {
-			std::cerr << "SPOTLIGHT: Matrix became NaN inside calcLightSpaceMat!" << '\n';
-		}
-	}
-}
-
-void Scene::init() {
-
-	//initLightFrustumDebug();
-	//initDebugAABBDrawing();
-
-	//initSelectionOutline();
-	bindToUBOs(*m_outlineShader);
-
-	//if (m_skybox && m_skybox->shaderPtr) {
-	//	setupSkyboxShaderUBOs(m_skybox->shaderPtr);
-	//}
-}
-
-/* ===== PICKING OPERATIONS ================================================================= */
-void Scene::findBestNodeRecursive(SceneNode* node, MouseRay& worldRay, float& shortestDist, SceneNode*& bestNode) {
-	if (node->object && node->object->modelPtr) {
-		glm::mat4 invWorld = glm::inverse(node->worldMatrix);
-		MouseRay localRay = worldRay;
-		localRay.origin = glm::vec3(invWorld * glm::vec4(worldRay.origin, 1.0f));
-		localRay.direction = glm::normalize(glm::vec3(invWorld * glm::vec4(worldRay.direction, 0.0f)));
-
-		localRay.calcRayDist(node->object.get());
-
-		if (localRay.hit && localRay.dist < shortestDist) {
-			shortestDist = localRay.dist;
-			bestNode = node;
-		}
-	}
-	for (auto& child : node->children) {
-		findBestNodeRecursive(child.get(), worldRay, shortestDist, bestNode);
-	}
-}
-
-void Scene::debugPrintSceneGraph(SceneNode* node, int depth) {
-	for (auto& child : node->children) {
-		debugPrintSceneGraph(child.get(), depth + 1);
-	}
-}
 
 
-/* ===== LIGHT FRUSTUM DRAWING ================================================================= */
-/*
-void Scene::initLightFrustumDebug() {
-	float frustumLines[] = {
-		// Near
-		-1,-1,-1,  1,-1,-1,
-			1,-1,-1,  1, 1,-1,
-			1, 1,-1, -1, 1,-1,
-		-1, 1,-1, -1,-1,-1,
-
-		// Far
-		-1,-1, 1,  1,-1, 1,
-			1,-1, 1,  1, 1, 1,
-			1, 1, 1, -1, 1, 1,
-		-1, 1, 1, -1,-1, 1,
-
-		// Sides
-		-1,-1,-1, -1,-1, 1,
-			1,-1,-1,  1,-1, 1,
-			1, 1,-1,  1, 1, 1,
-		-1, 1,-1, -1, 1, 1,
-	};
-
-
-	m_lightFrustumVAO.bind();
-	m_lightFrustumVBO = VBO(frustumLines, sizeof(frustumLines), GL_STATIC_DRAW);
-	m_lightFrustumVAO.linkAttrib(m_lightFrustumVBO, 0, 3, GL_FLOAT, 3 * sizeof(float), (void*)0);
-	m_lightFrustumVAO.unbind();
-
-	m_frustumShader = m_assetManager->loadShaderObject(
-		"lightFrustum.vert",
-		"lightFrustum.frag"
-	);
-}
-void Scene::drawDirectionalLightFrustums(const glm::mat4& projMat, const glm::mat4& viewMat, const glm::vec4& color, float lineWidth) const {
-	if (!drawLightFrustums || !m_frustumShader) return;
-
-	GLenum err;
-	while ((err = glGetError()) != GL_NO_ERROR) {
-		std::cerr << "[DRAW DIRLIGHT FRUST] OpenGL error: " << err << '\n';
-	}
-
-	glLineWidth(lineWidth);
-	m_frustumShader->use();
-	m_frustumShader->setMat4("projection", projMat);
-	m_frustumShader->setMat4("view", viewMat);
-	m_frustumShader->setVec4("color", color);
-
-	m_lightFrustumVAO.bind();
-
-	for (auto& dirLight : m_directionalLights) {
-		glm::mat4 lightVP = dirLight->shadowCasterComponent.getLightSpaceMatrix();
-		if (glm::any(glm::isnan(lightVP[0])) || glm::any(glm::isinf(lightVP[0]))) {
-			continue;
-		}
-
-		glm::mat4 invLightVP = glm::inverse(lightVP);
-		m_frustumShader->setMat4("model", invLightVP);
-		glDrawArrays(GL_LINES, 0, 24);
-	}
-	m_lightFrustumVAO.unbind();
-}
-//void drawPointLightFrustums();
-void Scene::drawSpotLightFrustums(const glm::mat4& projMat, const glm::mat4& viewMat, const glm::vec4& color, float lineWidth) const {
-	if (!drawLightFrustums || !m_frustumShader) return;
-
-	GLenum err;
-	while ((err = glGetError()) != GL_NO_ERROR) {
-		std::cerr << "[DRAW SPOTLIGHT FRUST] OpenGL error: " << err << '\n';
-	}
-
-	glLineWidth(lineWidth);
-	m_frustumShader->use();
-	m_frustumShader->setMat4("projection", projMat);
-	m_frustumShader->setMat4("view", viewMat);
-	m_frustumShader->setVec4("color", color);
-
-	m_lightFrustumVAO.bind();
-
-	for (auto& spotLight : m_spotLights) {
-		glm::mat4 lightVP = spotLight->shadowCasterComponent.getLightSpaceMatrix();
-		if (glm::any(glm::isnan(lightVP[0])) || glm::any(glm::isinf(lightVP[0]))) {
-			continue;
-		}
-
-		// Transform unit cube [-1,1] by inverse perspective matrix to get pyramid frustum corners
-		glm::mat4 invLightVP = glm::inverse(lightVP);
-		m_frustumShader->setMat4("model", invLightVP);
-		glDrawArrays(GL_LINES, 0, 24);
-	}
-	m_lightFrustumVAO.unbind();
-}
-*/
-
-
-void Scene::bindDepthMaps() const {
-	// --Directinoal lights
-	for (size_t i = 0; i < m_directionalLights.size() && i < MAX_LIGHTS; ++i) {
-		glActiveTexture(GL_TEXTURE0 + DIR_SHADOW_MAP_SLOT + i);
-		glBindTexture(GL_TEXTURE_2D, m_directionalLights[i]->shadowCasterComponent.getDepthMapTexID());
-	}
-	// --Point lights
-	for (size_t i = 0; i < m_pointLights.size() && i < MAX_LIGHTS; ++i) {
-		glActiveTexture(GL_TEXTURE0 + POINT_SHADOW_MAP_SLOT + i);
-		glBindTexture(GL_TEXTURE_CUBE_MAP, m_pointLights[i]->shadowCasterComponent.getDepthMapTexID());
-	}
-	// --Spot lights
-	for (size_t i = 0; i < m_spotLights.size() && i < MAX_LIGHTS; ++i) {
-		glActiveTexture(GL_TEXTURE0 + SPOT_SHADOW_MAP_SLOT + i);
-		glBindTexture(GL_TEXTURE_2D, m_spotLights[i]->shadowCasterComponent.getDepthMapTexID());
-	}
-
-	glActiveTexture(GL_TEXTURE0);
-}
-void Scene::bindIBLMaps() const {
-	if (m_skybox) {
-		
-		m_skybox->getIrradianceMap().bind(IRRADIANCE_MAP_SLOT);
-		m_skybox->getPrefilterMap().bind(PREFILTER_MAP_SLOT);
-		m_skybox->getBRDFLUT().bind(BRDF_LUT_SLOT);
-
-	}
-}
-
-/* ===== UPDATING UBOs ================================================================= */
-// CAMERA UBO
 void Scene::updateCameraUBO(const glm::mat4& projection, const glm::mat4& view, const glm::vec3& cameraPos) const {
 	CameraMatricesUBOData data = { projection, view, glm::vec4(cameraPos, 1.0f) };
 
-	glBindBuffer(GL_UNIFORM_BUFFER, cameraMatricesUBO);
+	glBindBuffer(GL_UNIFORM_BUFFER, m_cameraMatricesUBO);
 	glBufferData(GL_UNIFORM_BUFFER, sizeof(CameraMatricesUBOData), &data, GL_DYNAMIC_DRAW);
 	glBindBuffer(GL_UNIFORM_BUFFER, 0);
 }
-// LIGHTING UBO
+
 void Scene::updateLightingUBO() const {
 	LightingUBOData data = {};
 
-	data.numDirLights   = static_cast<int>(m_directionalLights.size());
+	data.numDirLights = static_cast<int>(m_directionalLights.size());
 	data.numPointLights = static_cast<int>(m_pointLights.size());
-	data.numSpotLights  = static_cast<int>(m_spotLights.size());
+	data.numSpotLights = static_cast<int>(m_spotLights.size());
 
-	// --Directional
 	for (size_t i = 0; i < m_directionalLights.size() && i < MAX_LIGHTS; ++i) {
 		auto& src = m_directionalLights[i];
 		auto& dst = data.directionalLight[i];
-		
-		dst.direction  = glm::vec4(src->direction, 0.0f);
-		dst.color      = glm::vec4(src->light.color, 1.0f);
-		dst.power      = src->light.power;
-		dst.range      = src->range;
+
+		dst.direction = glm::vec4(src->direction, 0.0f);
+		dst.color = glm::vec4(src->light.color, 1.0f);
+		dst.power = src->light.power;
+		dst.range = src->range;
 		dst.normalBias = src->light.normalBias;
-		dst.depthBias  = src->light.depthBias;
+		dst.depthBias = src->light.depthBias;
 	}
-	// --Point
+
 	for (size_t i = 0; i < m_pointLights.size() && i < MAX_LIGHTS; ++i) {
 		auto& src = m_pointLights[i];
 		auto& dst = data.pointLight[i];
-		
-		dst.position   = glm::vec4(src->position, 1.0f);
-		dst.color      = glm::vec4(src->light.color, 1.0f);
-		dst.power      = src->light.power;
-		dst.radius     = src->radius;
+
+		dst.position = glm::vec4(src->position, 1.0f);
+		dst.color = glm::vec4(src->light.color, 1.0f);
+		dst.power = src->light.power;
+		dst.radius = src->radius;
 		dst.normalBias = src->light.normalBias;
-		dst.depthBias  = src->light.depthBias;
+		dst.depthBias = src->light.depthBias;
 	}
-	// --Spot
+
 	for (size_t i = 0; i < m_spotLights.size() && i < MAX_LIGHTS; ++i) {
 		auto& src = m_spotLights[i];
 		auto& dst = data.spotLight[i];
-		
-		dst.position     = glm::vec4(src->position, 1.0f);
-		dst.direction    = glm::vec4(src->direction, 0.0f);
-		dst.color        = glm::vec4(src->light.color, 1.0f);
-		dst.power        = src->light.power;
-		dst.range        = src->range;
-		dst.inCosCutoff  = src->inCosCutoff;
+
+		dst.position = glm::vec4(src->position, 1.0f);
+		dst.direction = glm::vec4(src->direction, 0.0f);
+		dst.color = glm::vec4(src->light.color, 1.0f);
+		dst.power = src->light.power;
+		dst.range = src->range;
+		dst.inCosCutoff = src->inCosCutoff;
 		dst.outCosCutoff = src->outCosCutoff;
-		dst.normalBias   = src->light.normalBias;
-		dst.depthBias    = src->light.depthBias;
+		dst.normalBias = src->light.normalBias;
+		dst.depthBias = src->light.depthBias;
 	}
 
-	glBindBuffer(GL_UNIFORM_BUFFER, lightingUBO);
-	//glBufferData(GL_UNIFORM_BUFFER, sizeof(LightingUBOData), &data, GL_DYNAMIC_DRAW);
+	glBindBuffer(GL_UNIFORM_BUFFER, m_lightingUBO);
 	glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(LightingUBOData), &data);
 	glBindBuffer(GL_UNIFORM_BUFFER, 0);
 }
-// SHADOW UBO
+
+void Scene::updateRefProbeUBO() const {
+	ReflectionProbeUBOData data = {};
+
+	data.numRefProbes = numRefProbes;
+	for (size_t i = 0; i < m_refProbes.size() && i < MAX_LIGHTS; ++i) {
+		data.position[i]     = glm::vec4(m_refProbes[i]->transform.position, 1.0f);
+		data.worldMats[i]    = m_refProbes[i]->transform.getModelMatrix();
+		data.invWorldMats[i] = glm::inverse(m_refProbes[i]->transform.getModelMatrix());
+		data.proxyDims[i]	 = glm::vec4(m_refProbes[i]->proxyDims, 1.0f);
+	}
+
+	glBindBuffer(GL_UNIFORM_BUFFER, m_refProbeUBO);
+	glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(ReflectionProbeUBOData), &data);
+	glBindBuffer(GL_UNIFORM_BUFFER, 0);
+}
+
 void Scene::updateShadowUBO() const {
 	ShadowMatricesUBOData data = {};
 
-	// --Directional lights
 	for (size_t i = 0; i < m_directionalLights.size() && i < MAX_LIGHTS; ++i) {
 		data.directionalLightSpaceMatrices[i] = m_directionalLights[i]->shadowCasterComponent.getLightSpaceMatrix();
 	}
-	// --Spot lights
+
 	for (size_t i = 0; i < m_spotLights.size(); ++i) {
 		data.spotLightSpaceMatrices[i] = m_spotLights[i]->shadowCasterComponent.getLightSpaceMatrix();
 	}
 
-	glBindBuffer(GL_UNIFORM_BUFFER, shadowUBO);
-	//glBufferData(GL_UNIFORM_BUFFER, sizeof(ShadowMatricesUBOData), &data, GL_DYNAMIC_DRAW);
+	glBindBuffer(GL_UNIFORM_BUFFER, m_shadowUBO);
 	glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(ShadowMatricesUBOData), &data);
 	glBindBuffer(GL_UNIFORM_BUFFER, 0);
 }
 
-// LOAD EVERY SHADOW MAP TO OBJECT SHADERS
+
 void Scene::setNodeShadowMapUniforms() const {
+
 	m_modelShader->use();
 
 	for (size_t i = 0; i < MAX_LIGHTS; ++i) {
@@ -611,107 +418,148 @@ void Scene::setNodeShadowMapUniforms() const {
 }
 
 void Scene::setNodeIBLMapUniforms() const {
+	
 	m_modelShader->use();
+	
 	m_modelShader->setInt("irradianceMap", IRRADIANCE_MAP_SLOT);
 	m_modelShader->setInt("prefilterMap", PREFILTER_MAP_SLOT);
 	m_modelShader->setInt("brdfLUT", BRDF_LUT_SLOT);
 }
 
-/* ===== SELECTION DRAWING ================================================================= */
-/*
-void Scene::drawSelectionStencil() const {
-	if (m_selectedEntities.empty()) return;
+void Scene::setNodeRefMapUniforms() const {
 
-	// WRITE TO THE STENCIL BUFFER
-	glEnable(GL_STENCIL_TEST);
-	glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-	glStencilFunc(GL_ALWAYS, 1, 0xFF);
-	glStencilMask(0xFF);
+	m_modelShader->use();
 
-	glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
-	glDepthMask(GL_FALSE);
-
-	for (SceneNode* selectedNode : m_selectedEntities) {
-		if (!selectedNode->object) continue;
-		m_outlineShader->use();
-		m_outlineShader->setMat4("model", selectedNode->worldMatrix);
-		selectedNode->object->modelPtr->draw(*m_outlineShader);
+	for (size_t i = 0; i < MAX_LIGHTS; ++i) {
+		std::string uniformName = "refEnvMap[" + std::to_string(i) + "]";
+		m_modelShader->setInt(uniformName, REF_ENV_MAP_SLOT + i);
 	}
-
-	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-	glDepthMask(GL_TRUE);
-
-	// DRAWING THE OUTLINE
-	glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
-	glStencilMask(0x00);
-	glDisable(GL_DEPTH_TEST);
-
-	m_outlineShader->use();
-	m_outlineShader->setVec4("color", glm::vec4(0.8f, 0.4f, 1.0f, 0.2f));
-
-	for (SceneNode* selectedNode : m_selectedEntities) {
-		if (!selectedNode->object) continue;
-
-		glm::mat4 fatterModel = glm::scale(selectedNode->worldMatrix, glm::vec3(1.03f));
-		m_outlineShader->setMat4("model", fatterModel);
-		selectedNode->object->modelPtr->draw(*m_outlineShader);
-	}
-
-	// OPENGL STATE CLEANUP
-	glEnable(GL_DEPTH_TEST);
-	glDisable(GL_STENCIL_TEST);
-	glStencilMask(0xFF);
 }
-*/
 
-/* ===== AABB BOX DRAWING ================================================================= */
-/*
-void Scene::initDebugAABBDrawing() {
-	// For the box
-	float vertices[] = {
-		0,0,0, 1,0,0,  1,0,0, 1,1,0,  1,1,0, 0,1,0,  0,1,0, 0,0,0, // Back
-		0,0,1, 1,0,1,  1,0,1, 1,1,1,  1,1,1, 0,1,1,  0,1,1, 0,0,1, // Front
-		0,0,0, 0,0,1,  1,0,0, 1,0,1,  1,1,0, 1,1,1,  0,1,0, 0,1,1  // Connections
-	};
+void Scene::updateShadowMapLSMats() const {
 
-	m_debugVAO.bind();
-	m_debugVBO = VBO(vertices, sizeof(vertices), GL_STATIC_DRAW);
-	m_debugVAO.linkAttrib(m_debugVBO, 0, 3, GL_FLOAT, 3 * sizeof(float), (void*)0);
-	m_debugVAO.unbind();
-
-	m_debugShader = m_assetManager->loadShaderObject("debug.vert", "debug.frag");
-}
-void Scene::drawDebugAABBs(SceneNode* node) const {
-	if (!m_debugShader) return;
-
-	// Draw this node's AABB if it has an object
-	if (node->object && node->object->modelPtr) {
-		glm::vec3 size = node->object->modelPtr->aabb.max - node->object->modelPtr->aabb.min;
-		glm::vec3 offset = node->object->modelPtr->aabb.min;
-
-		glm::mat4 boxTransform = node->worldMatrix * glm::translate(glm::mat4(1.0f), offset) * glm::scale(glm::mat4(1.0f), size);
-
-
-		// Check if this node is selected
-		bool isSelected = false;
-		for (auto* sel : m_selectedEntities) {
-			if (sel == node) {
-				isSelected = true;
-				break;
-			}
+	for (auto& dirLight : m_directionalLights) {
+		if (glm::length(dirLight->direction) < 0.001f) {
+			std::cerr << "ERROR: Direction is zero or near-zero!" << '\n';
+		}
+		if (glm::any(glm::isnan(dirLight->direction))) {
+			std::cerr << "ERROR: Direction contains NaN!" << '\n';
 		}
 
-		m_debugShader->use();
-		m_debugShader->setMat4("model", boxTransform);
-		m_debugShader->setVec3("color", isSelected ? glm::vec3(0, 1, 0) : glm::vec3(1, 1, 1));
-		m_debugVAO.bind();
-		glDrawArrays(GL_LINES, 0, 24);
-		m_debugVAO.unbind();
+		dirLight->shadowCasterComponent.calcLightSpaceMat(dirLight->direction, glm::vec3(0.0f, 0.0f, 0.0f));
+
+		glm::mat4 test = dirLight->shadowCasterComponent.getLightSpaceMatrix();
+		if (glm::any(glm::isnan(test[0]))) {
+			std::cerr << "Matrix became NaN inside calcLightSpaceMat!" << '\n';
+		}
 	}
 
-	// Recurse to children
-	for (auto& child : node->children) {
-		drawDebugAABBs(child.get());
+	for (auto& pointLight : m_pointLights) {
+		pointLight->shadowCasterComponent.calcLightSpaceMats(pointLight->position);
+
+		std::array<glm::mat4, 6> test = pointLight->shadowCasterComponent.getLightSpaceMats();
+		if (glm::any(glm::isnan(test[0][0]))) {
+			std::cerr << "POINTLIGHT: Matrix became NaN inside calcLightSpaceMats!" << '\n';
+		}
+	}
+	
+	for (auto& spotLight : m_spotLights) {
+		if (glm::length(spotLight->direction) < 0.001f) {
+			std::cerr << "ERROR: Direction is zero or near-zero!" << '\n';
+		}
+		if (glm::any(glm::isnan(spotLight->direction))) {
+			std::cerr << "ERROR: Direction contains NaN!" << '\n';
+		}
+
+		spotLight->shadowCasterComponent.calcLightSpaceMat(spotLight->direction, spotLight->position);
+
+		glm::mat4 test = spotLight->shadowCasterComponent.getLightSpaceMatrix();
+		if (glm::any(glm::isnan(test[0]))) {
+			std::cerr << "SPOTLIGHT: Matrix became NaN inside calcLightSpaceMat!" << '\n';
+		}
 	}
 }
-*/
+
+void Scene::bindDepthMaps() const {
+
+	for (size_t i = 0; i < m_directionalLights.size() && i < MAX_LIGHTS; ++i) {
+		glActiveTexture(GL_TEXTURE0 + DIR_SHADOW_MAP_SLOT + i);
+		glBindTexture(GL_TEXTURE_2D, m_directionalLights[i]->shadowCasterComponent.getDepthMapTexID());
+	}
+
+	for (size_t i = 0; i < m_pointLights.size() && i < MAX_LIGHTS; ++i) {
+		glActiveTexture(GL_TEXTURE0 + POINT_SHADOW_MAP_SLOT + i);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, m_pointLights[i]->shadowCasterComponent.getDepthMapTexID());
+	}
+
+	for (size_t i = 0; i < m_spotLights.size() && i < MAX_LIGHTS; ++i) {
+		glActiveTexture(GL_TEXTURE0 + SPOT_SHADOW_MAP_SLOT + i);
+		glBindTexture(GL_TEXTURE_2D, m_spotLights[i]->shadowCasterComponent.getDepthMapTexID());
+	}
+
+	glActiveTexture(GL_TEXTURE0);
+}
+void Scene::bindIBLMaps() const {
+
+	if (m_skybox) {
+		m_skybox->getIrradianceMap().bind(IRRADIANCE_MAP_SLOT);
+		m_skybox->getPrefilterMap().bind(PREFILTER_MAP_SLOT);
+		m_brdfLUT.bind(BRDF_LUT_SLOT);
+	}
+}
+void Scene::bindRefProbeMaps() const {
+	for (size_t i = 0; i < m_refProbes.size() && i < MAX_LIGHTS; ++i) {
+		m_refProbes[i]->localEnvMap.getPrefilterMap().bind(REF_ENV_MAP_SLOT + i);
+	}
+}
+
+
+// NOTE: MOVE TO RENDERER CLASS
+/* ===== UTILITIES ============================================================ */
+void Scene::generateBRDFLUT() {
+	std::cout << "[SCENE] Generating BRDF LUT\n";
+
+	//--VAO & VBO
+	VAO quadVAO;
+	VBO quadVBO;
+	const std::array<float, 30> quadVertices = {
+		// positions            // texCoords
+		-1.0f,  1.0f, 0.0f,     0.0f, 1.0f,
+		-1.0f, -1.0f, 0.0f,     0.0f, 0.0f,
+		 1.0f, -1.0f, 0.0f,     1.0f, 0.0f,
+
+		-1.0f,  1.0f, 0.0f,     0.0f, 1.0f,
+		 1.0f, -1.0f, 0.0f,     1.0f, 0.0f,
+		 1.0f,  1.0f, 0.0f,     1.0f, 1.0f
+	};
+	quadVAO.bind();
+	quadVBO.setData(quadVertices.data(), quadVertices.size() * sizeof(float), GL_STATIC_DRAW);
+	quadVAO.linkAttrib(quadVBO, VertLayout::POS, 5 * sizeof(float), (void*)0);
+	quadVAO.linkAttrib(quadVBO, VertLayout::UV, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+	quadVAO.unbind();
+
+	//--FBO & RBO
+	GLuint fbo;
+	GLuint rbo;
+	glGenFramebuffers(1, &fbo);
+	glGenRenderbuffers(1, &rbo);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+	glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_brdfLUT.getID(), 0);
+
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+		std::cerr << "ERROR: Equirect cubemap framebuffer not complete!" << '\n';
+	}
+
+	//--Writing to the LUT
+	glViewport(0, 0, 512, 512);
+	m_brdfShader->use();
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	quadVAO.bind();
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+	quadVAO.unbind();
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}

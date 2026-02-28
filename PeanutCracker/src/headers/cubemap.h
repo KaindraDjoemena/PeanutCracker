@@ -15,8 +15,13 @@ public:
         const std::filesystem::path& i_hdrPath,
         const Shader& i_convolutionShader,
         const Shader& i_conversionShader,
-        const Shader& i_prefilterShader,
-        const Shader& i_brdfShader
+        const Shader& i_prefilterShader
+    );
+
+    Cubemap(
+        const Shader& i_convolutionShader,
+        const Shader& i_conversionShader,
+        const Shader& i_prefilterShader
     );
 
     ~Cubemap();
@@ -29,11 +34,10 @@ public:
     const Texture& getEnvironmentMap() const { return m_envCubemap; }
     const Texture& getIrradianceMap() const { return m_irradianceMap; }
     const Texture& getPrefilterMap() const { return m_prefilterMap; }
-    const Texture& getBRDFLUT() const { return m_brdfLUT; }
     
     void draw(const Shader& shader) const;
 
-
+    void generatePrefilterMap(const Shader& prefilterShader) const;
 
 private:
     Texture m_envCubemap;     // Environment cubemap
@@ -56,10 +60,6 @@ private:
     void convertEquirectToCubemap(GLuint hdrTexID, const Shader& conversionShader);
 
     void generateIrradianceMap(const Shader& convolutionShader);
-
-    void generatePrefilterMap(const Shader& prefilterShader);
-
-    void generateBRDFLUT(const Shader& brdfShader);
 
 
     void setupCubeMesh();

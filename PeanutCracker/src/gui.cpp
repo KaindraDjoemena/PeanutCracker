@@ -140,7 +140,7 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
                         if (ImGui::DragFloat3("##Scale", glm::value_ptr(tempScale), 0.05f)) {
                             node->setScale(tempScale, mUniformScale);
                         }
-                        });
+                    });
 
                     // --Rotation
                     glm::vec3 rot = node->getEulerRotation();
@@ -148,7 +148,7 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
                         if (ImGui::DragFloat3("##Rotation", glm::value_ptr(rot), 0.05f)) {
                             node->setEulerRotation(rot);
                         }
-                        });
+                    });
                 }
 
                 // --Textures Section
@@ -194,6 +194,7 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
             ImGui::EndTabItem();
         }
 
+        //--Lights
         if (ImGui::BeginTabItem("Lights")) {
             if (ImGui::BeginTabBar("LightingTabs")) {
 
@@ -232,6 +233,7 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
                     if (selectedDir >= 0 && selectedDir < (int)scene.getDirectionalLights().size()) {
                         auto& l = *scene.getDirectionalLights()[selectedDir];
 
+                        // Debug wireframe visibility
                         ImGui::Checkbox("Visible Area", &l.isVisible);
 
                         // Transform
@@ -293,6 +295,7 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
                     if (selectedPoint >= 0 && selectedPoint < (int)scene.getPointLights().size()) {
                         auto& l = *scene.getPointLights()[selectedPoint];
 
+                        // Debug wireframe visibility
                         ImGui::Checkbox("Visible Area", &l.isVisible);
 
                         // Transform
@@ -366,6 +369,7 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
                     if (selectedSpot >= 0 && selectedSpot < (int)scene.getSpotLights().size()) {
                         auto& l = *scene.getSpotLights()[selectedSpot];
 
+                        // Debug wireframe visibility
                         ImGui::Checkbox("Visible Area", &l.isVisible);
 
                         // Transform
@@ -417,8 +421,73 @@ ImVec2 GUI::update(float deltaTime, GLFWwindow* window, Camera& camera, Scene& s
             ImGui::EndTabItem();
         }
 
-        ImGui::EndTabBar();
+        //--Probes
+        if (ImGui::BeginTabItem("Probes")) {
+            static int selectedProbe = 0;
+
+            ImGui::BeginGroup();
+            ImGui::BeginChild("ProbeList", ImVec2(130, -70), true);
+            for (int i = 0; i < (int)scene.getRefProbes().size(); i++) {
+                char label[32]; sprintf(label, "Probe %d", i);
+                if (ImGui::Selectable(label, selectedProbe == i)) selectedProbe = i;
+            }
+            ImGui::EndChild();
+
+            bool isMax = (scene.getRefProbes().size() >= MAX_LIGHTS);
+            bool isEmpty = (scene.getRefProbes().empty());
+
+            if (isMax) { ImGui::BeginDisabled(); }
+            if (ImGui::Button("(+)", ImVec2(130, 0))) {
+                scene.createAndAddReflectionProbe(std::make_unique<RefProbe>(scene.getConvolutionShader(), scene.getConversionShader(), scene.getPrefilterShader()));
+                selectedProbe = (int)scene.getRefProbes().size() - 1;
+            }
+            if (isMax) { ImGui::EndDisabled(); }
+
+            if (isEmpty) { ImGui::BeginDisabled(); }
+            //if (ImGui::Button("(-)", ImVec2(130, 0))) {
+            //    if (selectedProbe >= 0 && selectedProbe < (int)scene.getRefProbes().size()) {
+            //        scene.deleteRefProbe(selectedProbe);
+            //        selectedProbe--;
+            //    }
+            //}
+            if (isEmpty) { ImGui::EndDisabled(); }
+            ImGui::EndGroup();
+
+            ImGui::SameLine();
+
+            ImGui::BeginChild("ProbeDetails", ImVec2(0, 0), false);
+            if (selectedProbe >= 0 && selectedProbe < (int)scene.getRefProbes().size()) {
+                auto& p = *scene.getRefProbes()[selectedProbe];
+
+                // Debug wireframe visibility
+                ImGui::Checkbox("Visible Proxy Volume", &p.isVisible);
+
+                // Transform
+                ImGui::SeparatorText("Transform");
+                DrawProperty("Pos", [&]() { ImGui::DragFloat3("##pp", glm::value_ptr(p.transform.position), 0.05f); });
+                DrawProperty("Rot", [&]() {
+                    glm::vec3 rot = glm::degrees(glm::eulerAngles(p.transform.quatRotation));
+                        if (ImGui::DragFloat3("##pr", glm::value_ptr(rot), 0.05f)) {
+                            p.transform.setRotDeg(rot);
+                        }
+                });
+
+                // Proxy object dimensions
+                ImGui::SeparatorText("Proxy Volume");
+                DrawProperty("Size", [&]() { ImGui::DragFloat3("##ps", glm::value_ptr(p.proxyDims), 0.1f, 0.1f, 1000.0f); });
+                DrawProperty("Far", [&]() { ImGui::DragFloat("##pf", &p.farPlane, 1.0f, 0.1f, 10000.0f); });
+
+                ImGui::SeparatorText("Baking");
+                if (ImGui::Button("Bake", ImVec2(-FLT_MIN, 0))) {
+                    p.toBeBaked = true;
+                }
+            }
+            ImGui::EndChild();
+
+            ImGui::EndTabItem();
+        }
     }
+    ImGui::EndTabBar();
     ImGui::End();
 
 

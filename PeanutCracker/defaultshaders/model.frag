@@ -3,7 +3,8 @@ out vec4 FragColor;
 
 #define MAX_LIGHTS 8
 
-const float PI = 3.14159f;
+const float PI 				   = 3.14159f;
+const float MAX_REFLECTION_LOD = 4.0f;
 
 in VS_OUT {
     vec3 FragPos;
@@ -57,7 +58,7 @@ struct SpotLightStruct {
 
 uniform Material material;
 
-// SHADOWS
+// Shadows
 uniform sampler2DShadow DirectionalShadowMap[MAX_LIGHTS];
 uniform samplerCube     PointShadowMap[MAX_LIGHTS];
 uniform sampler2DShadow SpotShadowMap[MAX_LIGHTS];
@@ -66,6 +67,9 @@ uniform sampler2DShadow SpotShadowMap[MAX_LIGHTS];
 uniform samplerCube irradianceMap;
 uniform samplerCube prefilterMap;
 uniform sampler2D   brdfLUT;
+
+// Reflection Probes
+uniform samplerCube refEnvMap[MAX_LIGHTS];
 
 layout (std140) uniform CameraMatricesUBOData {
     mat4 projection;
@@ -83,14 +87,26 @@ layout (std140) uniform LightingUBOData {
     int padding;
 } lightingBlock;
 
+layout (std140) uniform ReflectionProbeUBOData {
+    vec4 position[MAX_LIGHTS];
+    mat4 worldMats[MAX_LIGHTS];
+    mat4 invWorldMats[MAX_LIGHTS];
+    vec4 proxyDims[MAX_LIGHTS];
+    int  numRefProbes;
+    int  padding0;
+    int  padding1;
+    int  padding2;
+} refProbeBlock;
 
-// FUNCTION PROTOTYPES (Standardized to use 'light' as parameter name)
+
 vec3  getNormal();
 float distributionGGX(vec3 normal, vec3 halfVec, float roughness);
 float geometryShlickGGX(float nDotv, float roughness);
 float geometrySmithGGX(vec3 normal, vec3 viewDir, vec3 lightDir, float roughness);
 vec3  fresnelSchlick(float hDotV, vec3 F0);
 vec3  fresnelSchlickRoughness(float hDotV, vec3 F0, float roughness);
+vec3  parallaxCorrect(vec3 R, float roughness);
+bool  isInAABB(vec3 pos, vec3 dimensions);
 
 float calcDirShadow(bool isLocalLight, vec4 fragPosLightSpace, sampler2DShadow shadowMap, vec3 normal, vec3 lightDir, float depthBias);
 float calcOmniShadow(vec3 lightPos, samplerCube shadowMap, float farPlane, vec3 normal, float depthBias);
@@ -138,8 +154,8 @@ void main() {
 	vec3 diffuseIBL = irradiance * albedo;
 
 	//--Specular IBL
-	const float MAX_REFLECTION_LOD = 4.0f;
-	vec3 prefilteredCol = textureLod(prefilterMap, R, roughness * MAX_REFLECTION_LOD).rgb;
+	//vec3 prefilteredCol = textureLod(prefilterMap, R, roughness * MAX_REFLECTION_LOD).rgb;
+	vec3 prefilteredCol = parallaxCorrect(R, roughness);
 	vec2 brdf           = texture(brdfLUT, vec2(max(dot(norm, viewDir), 0.0f), roughness)).rg;
 	vec3 specularIBL    = prefilteredCol * (F * brdf.x + brdf.y);
 	
@@ -258,7 +274,6 @@ vec3 calcPBRSpot(SpotLightStruct light, vec3 normal, vec3 viewDir, vec3 F0, vec3
 
 
 /* ======================================= HELPER FUNCTIONS === */
-
 vec3 getNormal() {
     vec3 tangentNormal = texture(material.normalMap, fs_in.TexCoord).rgb;
     tangentNormal = tangentNormal * 2.0f - 1.0f;
@@ -298,6 +313,45 @@ vec3  fresnelSchlick(float hDotV, vec3 F0) {
 }
 vec3  fresnelSchlickRoughness(float hDotV, vec3 F0, float roughness) {
 	return F0 + (max(vec3(1.0f - roughness), F0) - F0) * pow(clamp(1.0f - hDotV, 0.0f, 1.0f), 5.0f);
+}
+
+vec3 parallaxCorrect(vec3 R, float roughness) {
+	for (int i = 0; i < refProbeBlock.numRefProbes; ++i) {
+		vec3 localPos = vec3(refProbeBlock.invWorldMats[i] * vec4(fs_in.FragPos, 1.0f));
+		
+		if (isInAABB(localPos, refProbeBlock.proxyDims[i].xyz)) {
+			// Slab intersection check from inside the AABB
+			vec3 localR = vec3(refProbeBlock.invWorldMats[i] * vec4(R, 0.0f));
+			
+			vec3 t1 = (-refProbeBlock.proxyDims[i].xyz / 2 - localPos) / localR;
+			vec3 t2 = ( refProbeBlock.proxyDims[i].xyz / 2 - localPos) / localR;
+			
+			vec3 tMin = min(t1, t2);
+			vec3 tMax = max(t1, t2);
+			float t = min(min(tMax.x, tMax.y), tMax.z);
+		
+			vec3 localHit = localPos + t * localR;
+			vec3 worldHit = vec3(refProbeBlock.worldMats[i] * vec4(localHit, 1.0f));
+		
+			vec3 rPrime = worldHit - refProbeBlock.position[i].xyz;
+		
+			switch(i) {
+			case 0: return textureLod(refEnvMap[0], rPrime, roughness * MAX_REFLECTION_LOD).rgb; break;
+			case 1: return textureLod(refEnvMap[1], rPrime, roughness * MAX_REFLECTION_LOD).rgb; break;
+			case 2: return textureLod(refEnvMap[2], rPrime, roughness * MAX_REFLECTION_LOD).rgb; break;
+			case 3: return textureLod(refEnvMap[3], rPrime, roughness * MAX_REFLECTION_LOD).rgb; break;
+			case 4: return textureLod(refEnvMap[4], rPrime, roughness * MAX_REFLECTION_LOD).rgb; break;
+			case 5: return textureLod(refEnvMap[5], rPrime, roughness * MAX_REFLECTION_LOD).rgb; break;
+			case 6: return textureLod(refEnvMap[6], rPrime, roughness * MAX_REFLECTION_LOD).rgb; break;
+			case 7: return textureLod(refEnvMap[7], rPrime, roughness * MAX_REFLECTION_LOD).rgb; break;
+			}
+		}
+	}
+	return textureLod(prefilterMap, R, roughness * MAX_REFLECTION_LOD).rgb;
+}
+
+bool isInAABB(vec3 pos, vec3 dimensions) {
+    return all(greaterThanEqual(pos, -dimensions / 2)) && all(lessThanEqual(pos, dimensions / 2));
 }
 
 float calcDirShadow(bool isLocalLight, vec4 fragPosLightSpace, sampler2DShadow shadowMap, vec3 normal, vec3 lightDir, float depthBias) {

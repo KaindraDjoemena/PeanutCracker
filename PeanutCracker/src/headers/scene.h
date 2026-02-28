@@ -8,6 +8,7 @@
 #include "sceneNode.h"
 #include "cubemap.h"
 #include "camera.h"
+#include "refPRobe.h"
 
 //#include <glad/glad.h>
 #include <glm/glm.hpp>
@@ -34,6 +35,9 @@ public:
     SceneNode* getWorldNode() { return m_worldNode.get(); }
     const Cubemap* getSkybox() const { return m_skybox.get(); }
     const Shader& getSkyboxShader() const { return *m_skyboxShader; }
+    const Shader& getConvolutionShader() const { return *m_convolutionShader; }
+    const Shader& getConversionShader() const { return *m_conversionShader; }
+    const Shader& getPrefilterShader() const { return *m_prefilterShader; }
     const Shader& getModelShader() const { return *m_modelShader; }
     const Shader& getDirDepthShader() const { return *m_dirDepthShader; }
     const Shader& getOmniDepthShader() const { return *m_omniDepthShader; }
@@ -45,21 +49,18 @@ public:
     const std::vector<std::unique_ptr<DirectionalLight>>& getDirectionalLights() const { return m_directionalLights; }
     const std::vector<std::unique_ptr<PointLight>>& getPointLights() const { return m_pointLights; }
     const std::vector<std::unique_ptr<SpotLight>>& getSpotLights() const { return m_spotLights; }
+    
+    const std::vector<std::unique_ptr<RefProbe>>& getRefProbes() const { return m_refProbes; }
+
     const std::vector<SceneNode*>& getSelectedEnts() const { return m_selectedEntities; }
 
 
     /* ===== OBJECT PICKING & OPERATIONS ================================================================= */
-
-    //--PICKING
     SceneNode* Scene::getNodeByPickingID(uint32_t pickingID) const;
     void handleSelectionLogic(SceneNode* node, bool isHoldingShift);
-    void clearSelection();
-
-    //--DELETION
     void deleteSelectedEntities();
-    
-    //--DUPLICATION
     void duplicateSelectedEntities();
+    void clearSelection();
 
 
     /* ===== OBJECT LOADING QUEUE ================================================================= */
@@ -72,6 +73,7 @@ public:
     void createAndAddDirectionalLight(std::unique_ptr<DirectionalLight> light);
     void createAndAddPointLight(std::unique_ptr<PointLight> light);
     void createAndAddSpotLight(std::unique_ptr<SpotLight> light);
+    void createAndAddReflectionProbe(std::unique_ptr<RefProbe> probe);
     void createAndAddSkyboxHDR(const std::filesystem::path& path);
 
 
@@ -79,56 +81,50 @@ public:
     void deleteDirLight(int index);
     void deletePointLight(int index);
     void deleteSpotLight(int index);
+    void deleteRefProbe(int index);
     void deleteSkybox();
-
-    void bindDepthMaps() const;
-    void bindIBLMaps() const;
 
 
     /* ===== UBOs ============================================================================*/
-    // --ALLOCATION
-    void setupUBOBindings();
-    // --SHADER BINDING
-    void bindToUBOs(const Shader& shader) const;
-    void setupSkyboxShaderUBOs(const Shader& shader) const;
-
-    /* ===== UPDATING UBOs ================================================================= */
-    // CAMERA UBO
+    void setupUBOBindings();                        // Binding point allocation
+    void bindToUBOs(const Shader& shader) const;    // Binding shaders to binding points
+    
     void updateCameraUBO(const glm::mat4& projection, const glm::mat4& view, const glm::vec3& cameraPos) const;
-    // LIGHTING UBO
     void updateLightingUBO() const;
-    // SHADOW UBO
+    void updateRefProbeUBO() const;
     void updateShadowUBO() const;
-
-    // LOAD EVERY SHADOW MAP TO OBJECT SHADERS
-    void setNodeShadowMapUniforms() const;
-    void setNodeIBLMapUniforms() const;
     void updateShadowMapLSMats() const;
 
-    void init();
+    // Bind texture
+    void bindDepthMaps() const;
+    void bindIBLMaps() const;
+    void bindRefProbeMaps() const;
+
+    // Bind texture to shader
+    void setNodeShadowMapUniforms() const;
+    void setNodeIBLMapUniforms() const;
+    void setNodeRefMapUniforms() const;
 
 private:
-    AssetManager* m_assetManager;
-
     // TODO: move inside texture.h
     enum Texture_Slot {
         MAT_TEX_SLOT		  = 10,
         DIR_SHADOW_MAP_SLOT   = 20,
         POINT_SHADOW_MAP_SLOT = 30,
         SPOT_SHADOW_MAP_SLOT  = 40,
-        IRRADIANCE_MAP_SLOT   = 50,
-        PREFILTER_MAP_SLOT    = 51,
-        BRDF_LUT_SLOT         = 52
+        REF_ENV_MAP_SLOT      = 50,
+        IRRADIANCE_MAP_SLOT   = 60,
+        PREFILTER_MAP_SLOT    = 61,
+        BRDF_LUT_SLOT         = 62
     };
 
-    // UBO BINDING POINT ENUM
     enum Binding_Point {
-        CAMERA_BINDING_POINT = 0,	// 0
-        LIGHTS_BINDING_POINT = 1,	// 1
-        SHADOW_BINDING_POINT = 2	// 2
+        CAMERA_BINDING_POINT    = 0,
+        LIGHTS_BINDING_POINT    = 1,
+        REF_PROBE_BINDING_POINT = 2,
+        SHADOW_BINDING_POINT    = 3
     };
 
-    // UBO DATA
     struct alignas(16) DirectionalLightStruct {
         glm::vec4 direction;	// 16
         glm::vec4 color;        // 16
@@ -172,6 +168,17 @@ private:
         int padding;											// 4
     };
 
+    struct alignas(16) ReflectionProbeUBOData {     // 1296 Bytes
+        glm::vec4 position[MAX_LIGHTS];             // 16 * 8 = 128
+        glm::mat4 worldMats[MAX_LIGHTS];            // 64 * 8 = 512
+        glm::mat4 invWorldMats[MAX_LIGHTS];         // 64 * 8 = 512
+        glm::vec4 proxyDims[MAX_LIGHTS];            // 16 * 8 = 128
+        int numRefProbes;                           // 4
+        int padding0;
+        int padding1;
+        int padding2;
+    };
+
     struct alignas(16) ShadowMatricesUBOData {					// 1024 Bytes
         glm::mat4 directionalLightSpaceMatrices[MAX_LIGHTS];	// 64 * 8  = 512
         glm::mat4 spotLightSpaceMatrices[MAX_LIGHTS];			// 64 * 8  = 512
@@ -184,23 +191,28 @@ private:
     };
 
 
+    AssetManager* m_assetManager;
+
     std::unique_ptr<SceneNode> m_worldNode;	// Scene graph parent
     std::unique_ptr<Cubemap>    m_skybox;
 
     std::vector<std::unique_ptr<DirectionalLight>> m_directionalLights;
     std::vector<std::unique_ptr<PointLight>>	   m_pointLights;
     std::vector<std::unique_ptr<SpotLight>>		   m_spotLights;
-    std::vector<SceneNode*>						   m_selectedEntities;
-
-    std::vector<std::filesystem::path> loadQueue;
-
+    std::vector<std::unique_ptr<RefProbe>>         m_refProbes;
     unsigned int numDirectionalLights = 0;
     unsigned int numPointLights       = 0;
     unsigned int numSpotLights        = 0;
+    unsigned int numRefProbes         = 0;
 
-    unsigned int cameraMatricesUBO = 0;
-    unsigned int lightingUBO       = 0;
-    unsigned int shadowUBO         = 0;
+    std::vector<SceneNode*> m_selectedEntities;
+
+    std::vector<std::filesystem::path> loadQueue;
+
+    GLuint m_cameraMatricesUBO = 0;
+    GLuint m_lightingUBO       = 0;
+    GLuint m_refProbeUBO       = 0;
+    GLuint m_shadowUBO         = 0;
 
     std::shared_ptr<Shader> m_modelShader;
     std::shared_ptr<Shader> m_dirDepthShader;
@@ -217,37 +229,8 @@ private:
     std::shared_ptr<Shader> m_prefilterShader;
     std::shared_ptr<Shader> m_brdfShader;
 
-    /*
-    VAO m_debugVAO;
-    VBO m_debugVBO;
-    std::shared_ptr<Shader> m_debugShader;
+    Texture m_brdfLUT = Texture(512, 512, GL_RG16F);
 
-    VAO m_lightFrustumVAO;
-    VBO m_lightFrustumVBO;
-    bool drawLightFrustums = true;
-    std::shared_ptr<Shader> m_frustumShader;
-    */
-
-    /* ===== PICKING OPERATIONS ================================================================= */
-    void findBestNodeRecursive(SceneNode* node, MouseRay& worldRay, float& shortestDist, SceneNode*& bestNode);
-    void debugPrintSceneGraph(SceneNode* node, int depth = 0);
-
-
-    /* ===== LIGHT FRUSTUM DRAWING ================================================================= */
-    /*
-    void initLightFrustumDebug();
-    void drawDirectionalLightFrustums(const glm::mat4& projMat, const glm::mat4& viewMat, const glm::vec4& color = glm::vec4(1.0f, 0.0f, 1.0f, 1.0f), float lineWidth = 2.0f) const;
-    void drawPointLightFrustums();
-    void drawSpotLightFrustums(const glm::mat4& projMat, const glm::mat4& viewMat, const glm::vec4& color = glm::vec4(0.0f, 1.0f, 1.0f, 1.0f), float lineWidth = 2.0f) const;
-    */
-    /* ===== SELECTION DRAWING ================================================================= */
-    /*
-    void drawSelectionStencil() const;
-    */
-
-    /* ===== AABB BOX DRAWING ================================================================= */
-    /*
-    void initDebugAABBDrawing();
-    void drawDebugAABBs(SceneNode* node) const;
-    */
+    /* ===== UTILITIIES ================================================================= */
+    void generateBRDFLUT();
 };

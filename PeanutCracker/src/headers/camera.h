@@ -1,6 +1,8 @@
 #pragma once
 
-#include "ray.h"
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
 #include "frustum.h"
 
 const float c_fov = 60.0f;

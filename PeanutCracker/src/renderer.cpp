@@ -7,6 +7,7 @@ void Renderer::initScene(Scene& scene) {
     setupUnitLine();
     setupUnitQuad();
     setupUnitCone();
+    setupUnitCube();
 }
 
 
@@ -26,23 +27,37 @@ void Renderer::update(Scene& scene, Camera& cam, int vWidth, int vHeight) {
     scene.getWorldNode()->update(glm::mat4(1.0f), true);
     scene.updateCameraUBO(cam.getProjMat((float)vWidth / (float)vHeight), cam.getViewMat(), cam.getPos());
     scene.updateLightingUBO();
+    scene.updateRefProbeUBO();
     scene.updateShadowUBO();
 }
 
 void Renderer::renderScene(const Scene& scene, const Camera& cam, int vWidth, int vHeight) const {
     // --Shadow map
     if (_usingShadowMap) {
+        scene.bindDepthMaps();
+        scene.setNodeShadowMapUniforms();
         renderShadowPass(scene, cam);
     }
+
+    scene.bindIBLMaps();
+    scene.bindRefProbeMaps();
+
+    scene.setNodeIBLMapUniforms();
+    scene.setNodeRefMapUniforms();
 
     // --Objects & skybox
     m_viewportFBO.bind(vWidth, vHeight);
     renderLightPass(scene, cam, vWidth, vHeight);
 
-    // --Debug
-    renderSelectionHightlight(scene);
-    renderLightAreas(scene, cam, vWidth, vHeight);
+    bakeRefProbePass(scene);
 
+    scene.updateCameraUBO(cam.getProjMat((float)vWidth / (float)vHeight), cam.getViewMat(), cam.getPos());
+
+    renderSelectionHightlight(scene);
+    
+    // --Debug
+    renderLightAreas(scene, cam, vWidth, vHeight);
+    renderRefProbeProxy(scene, cam, vWidth, vHeight);
 
     m_viewportFBO.resolve();
 
@@ -52,17 +67,16 @@ void Renderer::renderScene(const Scene& scene, const Camera& cam, int vWidth, in
 }
 
 void Renderer::renderShadowPass(const Scene& scene, const Camera& cam) const {
+    
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
 
     glEnable(GL_POLYGON_OFFSET_FILL);
-
     glPolygonOffset(1.0f, 1.0f);
 
-    // --Rendering each object for each light from the lights pov,
-    // and storing the depth value to an FBO
-    // -- Directional lights
+
+    //--Directional lights
     scene.getDirDepthShader().use();
     for (auto& dirLight : scene.getDirectionalLights()) {
         const glm::vec2 res = dirLight->shadowCasterComponent.getShadowMapRes();
@@ -74,7 +88,8 @@ void Renderer::renderShadowPass(const Scene& scene, const Camera& cam) const {
         scene.getDirDepthShader().setMat4("lightSpaceMatrix", dirLight->shadowCasterComponent.getLightSpaceMatrix());
         renderShadowMap(scene.getWorldNode(), scene.getDirDepthShader());
     }
-    // -- Point lights
+
+    //--Point lights
     scene.getOmniDepthShader().use();
     for (auto& pointLight : scene.getPointLights()) {
         const glm::vec2 res = pointLight->shadowCasterComponent.getShadowMapRes();
@@ -93,7 +108,8 @@ void Renderer::renderShadowPass(const Scene& scene, const Camera& cam) const {
         scene.getOmniDepthShader().setFloat("farPlane", pointLight->shadowCasterComponent.getFarPlane());
         renderShadowMap(scene.getWorldNode(), scene.getOmniDepthShader());
     }
-    // -- Spot lights
+
+    //--Spot lights
     scene.getDirDepthShader().use();
     for (auto& spotLight : scene.getSpotLights()) {
         const glm::vec2 res = spotLight->shadowCasterComponent.getShadowMapRes();
@@ -105,30 +121,24 @@ void Renderer::renderShadowPass(const Scene& scene, const Camera& cam) const {
         renderShadowMap(scene.getWorldNode(), scene.getDirDepthShader());
     }
 
-    // --Reset opengl stuff
+
     glDisable(GL_POLYGON_OFFSET_FILL);
 }
 
 void Renderer::renderLightPass(const Scene& scene, const Camera& cam, int vWidth, int vHeight) const {
-    scene.bindDepthMaps();
-    scene.bindIBLMaps();
 
     if (scene.getSkybox()) {
         renderSkybox(scene);
     }
 
-    scene.setNodeShadowMapUniforms(); // Set fragment shader shadow map uniformms
-    scene.setNodeIBLMapUniforms();
-
     if (_renderMode == Render_Mode::WIREFRAME) { glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); }
-    renderObjects(scene, scene.getWorldNode(), cam);
+    renderObjectsFC(scene, scene.getWorldNode(), cam);
     if (_renderMode == Render_Mode::WIREFRAME) { glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); }
-
 }
 
-// Renders objects to the scene
-void Renderer::renderObjects(const Scene& scene, const SceneNode* node, const Camera& cam) const {
-    // Camera Frustum Culling
+// Render objects with frustum culling
+void Renderer::renderObjectsFC(const Scene& scene, const SceneNode* node, const Camera& cam) const {
+
     bool isVisible = true;
     if (node->sphereColliderComponent && node != scene.getWorldNode()) {
         BoundingSphere boundingSphere = { node->sphereColliderComponent->worldCenter, node->sphereColliderComponent->worldRadius };
@@ -143,8 +153,19 @@ void Renderer::renderObjects(const Scene& scene, const SceneNode* node, const Ca
         }
 
         for (auto& child : node->children) {
-            renderObjects(scene, child.get(), cam);
+            renderObjectsFC(scene, child.get(), cam);
         }
+    }
+}
+
+// Render objects without frustum culling
+void Renderer::renderObjects(const Scene& scene, const SceneNode* node) const {
+    if (node != scene.getWorldNode() && node->object) {
+        node->object->draw(scene.getModelShader(), node->worldMatrix);
+    }
+
+    for (auto& child : node->children) {
+        renderObjects(scene, child.get());
     }
 }
 
@@ -215,6 +236,68 @@ void Renderer::renderSelectionHightlight(const Scene& scene) const {
     glDisable(GL_STENCIL_TEST);
     glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
+}
+
+void Renderer::bakeRefProbePass(const Scene& scene) const {
+
+    for (auto& probe : scene.getRefProbes()) {
+        if (!probe->toBeBaked) continue;
+
+        std::cout << "baking probe" << std::endl;
+        std::cout << "setting view mats" << std::endl;
+        // Setup view mats
+        std::array<glm::mat4, 6> viewMats = {
+            glm::lookAt(probe->transform.position, probe->transform.position + glm::vec3(1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+            glm::lookAt(probe->transform.position, probe->transform.position + glm::vec3(-1.0f, 0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+            glm::lookAt(probe->transform.position, probe->transform.position + glm::vec3(0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)),
+            glm::lookAt(probe->transform.position, probe->transform.position + glm::vec3(0.0f, -1.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f)),
+            glm::lookAt(probe->transform.position, probe->transform.position + glm::vec3(0.0f,  0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+            glm::lookAt(probe->transform.position, probe->transform.position + glm::vec3(0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
+        };
+        std::cout << "initialized viewMats" << std::endl;
+
+        // Render scene to cubemap
+        GLuint fbo, rbo;
+        glGenFramebuffers(1, &fbo);
+        glGenRenderbuffers(1, &rbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+        glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo);
+        glViewport(0, 0, 512, 512);
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+            std::cerr << "ERROR: [RENDERER] probe baking error!" << '\n';
+        }
+        std::cout << "fbo and rbo ready" << std::endl;
+
+        for (unsigned int i = 0; i < 6; ++i) {
+            scene.updateCameraUBO(glm::perspective(glm::radians(90.0f), 1.0f, 0.01f, probe->farPlane), viewMats[i], probe->transform.position);
+            std::cout << "Rendering face " << i << " with " << scene.getWorldNode()->children.size() << " root children" << std::endl;
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, probe->localEnvMap.getEnvironmentMap().getID(), 0);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            // Write to cubemap texture
+            if (scene.getSkybox()) {
+                renderSkybox(scene);
+            }
+
+            renderObjects(scene, scene.getWorldNode());
+        }
+        std::cout << "writing to faces done" << std::endl;
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glDeleteFramebuffers(1, &fbo);
+        glDeleteRenderbuffers(1, &rbo);
+
+        // Generate prefilter map
+        probe->localEnvMap.getEnvironmentMap().generateMipmaps();
+        probe->localEnvMap.getPrefilterMap().generateMipmaps();
+        probe->localEnvMap.generatePrefilterMap(scene.getPrefilterShader());
+        std::cout << "generating prefilterMap done" << std::endl;
+
+        probe->toBeBaked = false;
+
+    }
 }
 
 // Returns picking ID
@@ -395,6 +478,37 @@ void Renderer::renderLightAreas(const Scene& scene, const Camera& cam, int vWidt
     glDepthMask(GL_TRUE);
 }
 
+void Renderer::renderRefProbeProxy(const Scene& scene, const Camera& cam, int vWidth, int vHeight) const {
+    const Shader& primitiveShader = scene.getPrimitiveShader();
+    static const glm::vec3 greenCol = glm::vec3(0.0f, 1.0f, 0.0f);
+
+    primitiveShader.use();
+    primitiveShader.setVec3("color", greenCol);
+    primitiveShader.setMat4("view", cam.getViewMat());
+    primitiveShader.setMat4("projection", cam.getProjMat((float)vWidth / (float)vHeight));
+
+    for (auto& probe : scene.getRefProbes()) {
+        if (!probe->isVisible) continue;
+
+        // Proxy box wireframe
+        m_cubeVAO.bind();
+        primitiveShader.setInt("mode", static_cast<int>(Primitive_Mode::LINE));
+        glm::mat4 probeMat = probe->transform.getModelMatrix();
+        probeMat = glm::scale(probeMat, probe->proxyDims);
+        primitiveShader.setMat4("model", probeMat);
+        glDrawArrays(GL_LINES, 0, 24);
+        m_cubeVAO.unbind();
+    
+        // Reflection location
+        m_quadVAO.bind();
+        primitiveShader.setInt("mode", static_cast<int>(Primitive_Mode::SDF));
+        glm::mat4 locMat = glm::scale(calcBillboardMat(probe->transform.position, cam.getViewMat()), glm::vec3(0.1f));
+        primitiveShader.setMat4("model", locMat);
+        primitiveShader.setFloat("thickness", 0.5f);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        m_quadVAO.unbind();
+    }
+}
 
 void Renderer::setupUnitCone() {
     // TODO: USE ARRAYS?
@@ -457,6 +571,31 @@ void Renderer::setupUnitLine() {
     m_lineVBO.setData(lineVertices, sizeof(lineVertices), GL_STATIC_DRAW);
     m_lineVAO.linkAttrib(m_lineVBO, VertLayout::POS, 3 * sizeof(float), (void*)0);
     m_lineVAO.unbind();
+}
+void Renderer::setupUnitCube() {
+    float v = 0.5f;
+    float cubeVertices[] = {
+        // Bottom
+        -v,-v,-v,  v,-v,-v,
+        v,-v,-v,  v,-v, v,
+        v,-v, v, -v,-v, v,
+        -v,-v, v, -v,-v,-v,
+        // Top
+        -v, v,-v,  v, v,-v,
+        v, v,-v,  v, v, v,
+        v, v, v, -v, v, v,
+        -v, v, v, -v, v,-v,
+        // Vertical
+        -v,-v,-v, -v, v,-v,
+        v,-v,-v,  v, v,-v,
+        v,-v, v,  v, v, v,
+        -v,-v, v, -v, v, v,
+    };
+
+    m_cubeVAO.bind();
+    m_cubeVBO.setData(cubeVertices, sizeof(cubeVertices), GL_STATIC_DRAW);
+    m_cubeVAO.linkAttrib(m_cubeVBO, VertLayout::POS, 3 * sizeof(float), (void*)0);
+    m_cubeVAO.unbind();
 }
 
 void Renderer::renderPostProcess(const Scene& scene, int vWidth, int vHeight) const {

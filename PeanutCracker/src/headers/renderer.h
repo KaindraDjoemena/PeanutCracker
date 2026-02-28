@@ -6,6 +6,7 @@
 #include "camera.h"
 #include "sceneNode.h"
 #include "cubemap.h"
+#include "refProbe.h"
 
 enum class Render_Mode {
     PBR,
@@ -193,25 +194,35 @@ private:
     VBO m_coneVBO;
     int m_coneVertexCount = 0;
 
+    VAO m_cubeVAO;
+    VBO m_cubeVBO;
+
     float m_EV100 = 0.0f;
     
     void renderPostProcess(const Scene& scene, int vWidth, int vHeight) const;
 
     void renderShadowPass(const Scene& scene, const Camera& cam) const;
     void renderLightPass(const Scene& scene, const Camera& cam, int vWidth, int vHeight) const;
-    void renderObjects(const Scene& scene, const SceneNode* node, const Camera& cam) const;
+    void bakeRefProbePass(const Scene& scene) const;
+    
+    void renderObjectsFC(const Scene& scene, const SceneNode* node, const Camera& cam) const;
+    void renderObjects(const Scene& scene, const SceneNode* node) const;
     void renderShadowMap(const SceneNode* node, const Shader& depthShader) const;
     void renderSkybox(const Scene& scena) const;
 
     void renderPickingNode(const Scene& scene, const SceneNode* node, uint32_t& id);
 
     void renderSelectionHightlight(const Scene& scene) const;
+
+    // DEBUG
     void renderLightAreas(const Scene& scene, const Camera& cam, int vWidth, int vHeight) const;
+    void renderRefProbeProxy(const Scene& scene, const Camera& cam, int vWidth, int vHeight) const;
 
     // TODO: inside a rendering utils class? (the renderer class just keeps track of the vao)
     void setupUnitLine();
     void setupUnitQuad();
     void setupUnitCone();
+    void setupUnitCube();
 
     // TODO: put inside a utils file for these operations (e.g. extracting 3x3 from 4x4 mat)
     inline glm::mat4 calcBillboardMat(const glm::vec3& position, const glm::mat4& viewMat) const {

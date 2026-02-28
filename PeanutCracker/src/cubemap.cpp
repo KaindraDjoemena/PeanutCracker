@@ -23,15 +23,12 @@ Cubemap::Cubemap(
     const std::filesystem::path& i_hdrPath,
     const Shader& i_convolutionShader,
     const Shader& i_conversionShader,
-    const Shader& i_prefilterShader,
-    const Shader& i_brdfShader)
+    const Shader& i_prefilterShader)
     : m_envCubemap(512, TexType::TEX_CUBE, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR)
     , m_irradianceMap(32, TexType::TEX_CUBE, GL_LINEAR, GL_LINEAR)
     , m_prefilterMap(128, TexType::TEX_CUBE, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR)
-    , m_brdfLUT(512, 512, GL_RG16F)
 {
     setupCubeMesh();
-    setupQuadMesh();
 
     glGenFramebuffers(1, &m_captureFBO);
     glGenRenderbuffers(1, &m_captureRBO);
@@ -57,7 +54,32 @@ Cubemap::Cubemap(
 
     m_prefilterMap.generateMipmaps();
     generatePrefilterMap(i_prefilterShader);
-    generateBRDFLUT(i_brdfShader);
+}
+
+Cubemap::Cubemap(
+    const Shader& i_convolutionShader,
+    const Shader& i_conversionShader,
+    const Shader& i_prefilterShader)
+    : m_envCubemap(512, TexType::TEX_CUBE, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR)
+    , m_irradianceMap(32, TexType::TEX_CUBE, GL_LINEAR, GL_LINEAR)
+    , m_prefilterMap(128, TexType::TEX_CUBE, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR)
+{
+    setupCubeMesh();
+
+    glGenFramebuffers(1, &m_captureFBO);
+    glGenRenderbuffers(1, &m_captureRBO);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, m_captureFBO);
+    glBindRenderbuffer(GL_RENDERBUFFER, m_captureRBO);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, m_captureRBO);
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        std::cerr << "ERROR: Equirect cubemap framebuffer not complete!" << '\n';
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 }
 
 Cubemap::~Cubemap() {
@@ -138,7 +160,7 @@ void Cubemap::generateIrradianceMap(const Shader& convolutionShader) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-void Cubemap::generatePrefilterMap(const Shader& prefilterShader) {
+void Cubemap::generatePrefilterMap(const Shader& prefilterShader) const {
     std::cout << "[SKYBOX] Generating prefilter map\n";
 
     prefilterShader.use();
@@ -171,24 +193,6 @@ void Cubemap::generatePrefilterMap(const Shader& prefilterShader) {
             m_cubeVAO.unbind();
         }
     }
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-}
-
-void Cubemap::generateBRDFLUT(const Shader& brdfShader) {
-    std::cout << "[SKYBOX] Generating BRDF LUT\n";
-
-    glBindFramebuffer(GL_FRAMEBUFFER, m_captureFBO);
-    glBindRenderbuffer(GL_RENDERBUFFER, m_captureRBO);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_brdfLUT.getID(), 0);
-
-    glViewport(0, 0, 512, 512);
-    brdfShader.use();
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    m_quadVAO.bind();
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-    m_quadVAO.unbind();
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
@@ -243,23 +247,4 @@ void Cubemap::setupCubeMesh() {
     m_cubeVBO.setData(vertices.data(), vertices.size() * sizeof(float), GL_STATIC_DRAW);
     m_cubeVAO.linkAttrib(m_cubeVBO, VertLayout::POS, 3 * sizeof(float), (void*)0);
     m_cubeVAO.unbind();
-}
-
-void Cubemap::setupQuadMesh() {
-    static const std::array<float, 30> quadVertices = {
-        // positions            // texCoords
-        -1.0f,  1.0f, 0.0f,     0.0f, 1.0f,
-        -1.0f, -1.0f, 0.0f,     0.0f, 0.0f,
-         1.0f, -1.0f, 0.0f,     1.0f, 0.0f,
-
-        -1.0f,  1.0f, 0.0f,     0.0f, 1.0f,
-         1.0f, -1.0f, 0.0f,     1.0f, 0.0f,
-         1.0f,  1.0f, 0.0f,     1.0f, 1.0f
-    };
-
-    m_quadVAO.bind();
-    m_quadVBO.setData(quadVertices.data(), quadVertices.size() * sizeof(float), GL_STATIC_DRAW);
-    m_quadVAO.linkAttrib(m_quadVBO, VertLayout::POS, 5 * sizeof(float), (void*)0);
-    m_quadVAO.linkAttrib(m_quadVBO, VertLayout::UV,  5 * sizeof(float), (void*)(3 * sizeof(float)));
-    m_quadVAO.unbind();
 }

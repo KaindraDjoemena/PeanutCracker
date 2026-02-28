@@ -48,7 +48,7 @@ add_executable(PeanutCracker
     "PeanutCracker/src/sphereColliderComponent.cpp"
     "PeanutCracker/src/texture.cpp"
     "PeanutCracker/src/cubemap.cpp"
-)
+ "PeanutCracker/src/refProbe.cpp")
 
 target_link_libraries(PeanutCracker PRIVATE 
     glfw
