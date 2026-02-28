@@ -3,8 +3,26 @@
 
 **A low-level 3D renderer built from scratch using C++17 and OpenGL 3.3 (Core Profile)**
 
+<div align="center">
+    <video src="https://github.com/user-attachments/assets/ccd98807-ff88-4965-b1c2-49e327e0389c"
+        autoplay
+        loop
+        muted
+        playsinline
+        style="max-width: 100%; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+    </video>
+    <p><i>Real-time PBR Pipeline, Shadow Mapping, and Static Reflection Probes.</i></p>
+</div>
+
 This project was built to understand the low level graphics pipeline by designing and implementing
 the elements of a real-time 3D rendering engine. Prioritizing code structure and performance, while generating quality images
+
+## Graphics Pipeline
+- PBR
+- Dynamic Lighting
+- Shadow Mapping
+- Localized Environment Maps
+- HDR & Tonemapping
 
 ## Installation
 #### Prerequisites
